@@ -126,9 +126,12 @@ export function TripList({ store, saveFailed, onOpen, onCreate, onReplaceAll }: 
               onFocus={(e) => e.currentTarget.select()}
             />
             <div className="row actions">
-              <button className="ghost" onClick={saveExportFile}>
-                파일로 저장
-              </button>
+              {/* 임베디드 뷰어(단일 파일 빌드)는 다운로드를 막아서 눌러도 아무 일도 없다. 그쪽에서는 복사만 보여준다. */}
+              {!import.meta.env.VITE_EMBEDDED && (
+                <button className="ghost" onClick={saveExportFile}>
+                  파일로 저장
+                </button>
+              )}
               <button className="primary" onClick={copyExport}>
                 복사
               </button>

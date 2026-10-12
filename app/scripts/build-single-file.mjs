@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url'
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const src = join(root, 'dist-single-src')
 const out = join(root, 'dist-single')
-const run = (args) => execFileSync('npx', args, { cwd: root, stdio: 'inherit', env: { ...process.env, NO_PWA: '1', BASE_PATH: './' } })
+const run = (args) => execFileSync('npx', args, { cwd: root, stdio: 'inherit', env: { ...process.env, NO_PWA: '1', BASE_PATH: './', VITE_EMBEDDED: '1' } })
 
 run(['tsc', '-b'])
 run(['vite', 'build', '--outDir', 'dist-single-src', '--emptyOutDir'])
