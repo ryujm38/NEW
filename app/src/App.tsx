@@ -4,10 +4,10 @@ import { useStore, useTripRoute } from './store'
 
 export default function App() {
   const { store, saveFailed, replaceAll, addTrip, updateTrip, deleteTrip } = useStore()
-  const [tripId, go] = useTripRoute()
-  const trip = tripId ? store.trips.find((t) => t.id === tripId) : undefined
+  const [route, go] = useTripRoute()
+  const trip = route ? store.trips.find((t) => t.id === route.id) : undefined
 
-  if (tripId && !trip) {
+  if (route && !trip) {
     return (
       <main className="page">
         <h1>여행을 찾을 수 없어요</h1>
@@ -19,10 +19,12 @@ export default function App() {
     )
   }
 
-  if (trip) {
+  if (route && trip) {
     return (
       <TripView
         trip={trip}
+        step={route.step}
+        onStep={(step) => go(trip.id, step)}
         onChange={(fn) => updateTrip(trip.id, fn)}
         onBack={() => go(null)}
         onDelete={() => {

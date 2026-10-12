@@ -1,4 +1,4 @@
-import type { Category, Item, Store, Trip } from '../types'
+import type { Category, Flight, Item, ShoppingItem, Stay, Store, Trip } from '../types'
 import { CATEGORIES } from '../types'
 
 const KEY = 'travel-planner:v1'
@@ -6,6 +6,10 @@ const EMPTY: Store = { version: 1, trips: [] }
 
 const str = (v: unknown, fallback = ''): string => (typeof v === 'string' ? v : fallback)
 const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : 0)
+const bool = (v: unknown): boolean => v === true
+const rec = (raw: unknown): Record<string, unknown> | null => (raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : null)
+const list = <T>(raw: unknown, convert: (x: unknown) => T | null): T[] =>
+  Array.isArray(raw) ? raw.map(convert).filter((x): x is T => x !== null) : []
 
 function toItem(raw: unknown): Item | null {
   if (!raw || typeof raw !== 'object') return null
@@ -21,14 +25,51 @@ function toItem(raw: unknown): Item | null {
     note: str(r.note),
     cost: num(r.cost),
     category,
+    done: bool(r.done),
   }
+}
+
+function toFlight(raw: unknown): Flight | null {
+  const r = rec(raw)
+  if (!r || typeof r.id !== 'string' || typeof r.departDate !== 'string') return null
+  return {
+    id: r.id,
+    flightNo: str(r.flightNo),
+    from: str(r.from),
+    to: str(r.to),
+    departDate: r.departDate,
+    departTime: str(r.departTime),
+    arriveDate: str(r.arriveDate, r.departDate),
+    arriveTime: str(r.arriveTime),
+    cost: num(r.cost),
+    note: str(r.note),
+  }
+}
+
+function toStay(raw: unknown): Stay | null {
+  const r = rec(raw)
+  if (!r || typeof r.id !== 'string' || typeof r.checkIn !== 'string' || typeof r.checkOut !== 'string') return null
+  return {
+    id: r.id,
+    name: str(r.name, '이름 없는 숙소'),
+    address: str(r.address),
+    checkIn: r.checkIn,
+    checkOut: r.checkOut,
+    cost: num(r.cost),
+    note: str(r.note),
+  }
+}
+
+function toShopping(raw: unknown): ShoppingItem | null {
+  const r = rec(raw)
+  if (!r || typeof r.id !== 'string' || typeof r.name !== 'string') return null
+  return { id: r.id, name: r.name, where: str(r.where), price: num(r.price), bought: bool(r.bought) }
 }
 
 function toTrip(raw: unknown): Trip | null {
   if (!raw || typeof raw !== 'object') return null
   const r = raw as Record<string, unknown>
   if (typeof r.id !== 'string' || typeof r.startDate !== 'string' || typeof r.endDate !== 'string') return null
-  const items = Array.isArray(r.items) ? r.items.map(toItem).filter((i): i is Item => i !== null) : []
   return {
     id: r.id,
     name: str(r.name, '이름 없는 여행'),
@@ -36,7 +77,10 @@ function toTrip(raw: unknown): Trip | null {
     startDate: r.startDate,
     endDate: r.endDate,
     budget: num(r.budget),
-    items,
+    items: list(r.items, toItem),
+    flights: list(r.flights, toFlight),
+    stays: list(r.stays, toStay),
+    shopping: list(r.shopping, toShopping),
     createdAt: str(r.createdAt, new Date(0).toISOString()),
   }
 }

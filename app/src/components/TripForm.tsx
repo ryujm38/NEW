@@ -13,7 +13,7 @@ interface Props {
   initial?: TripFormValues
   submitLabel: string
   onSubmit: (values: TripFormValues) => void
-  onCancel: () => void
+  onCancel?: () => void
 }
 
 export function TripForm({ initial, submitLabel, onSubmit, onCancel }: Props) {
@@ -44,7 +44,7 @@ export function TripForm({ initial, submitLabel, onSubmit, onCancel }: Props) {
     <form className="card form" onSubmit={submit}>
       <label>
         여행지
-        <input value={destination} onChange={(e) => setDestination(e.target.value)} placeholder="예: 제주, 도쿄" autoFocus />
+        <input value={destination} onChange={(e) => setDestination(e.target.value)} placeholder="예: 제주, 도쿄" autoFocus={!initial} />
       </label>
       <label>
         여행 이름 (선택)
@@ -77,9 +77,11 @@ export function TripForm({ initial, submitLabel, onSubmit, onCancel }: Props) {
         </p>
       )}
       <div className="row actions">
-        <button type="button" className="ghost" onClick={onCancel}>
-          취소
-        </button>
+        {onCancel && (
+          <button type="button" className="ghost" onClick={onCancel}>
+            취소
+          </button>
+        )}
         <button type="submit" className="primary">
           {submitLabel}
         </button>

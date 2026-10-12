@@ -1,13 +1,13 @@
 import { useRef, useState } from 'react'
 import { parseStore } from '../lib/storage'
-import { eachDate, formatWon, newId, totalCost } from '../lib/trip'
-import type { Store, Trip } from '../types'
+import { budgetBreakdown, eachDate, formatWon, newId } from '../lib/trip'
+import type { StepKey, Store, Trip } from '../types'
 import { TripForm, type TripFormValues } from './TripForm'
 
 interface Props {
   store: Store
   saveFailed: boolean
-  onOpen: (id: string) => void
+  onOpen: (id: string, step?: StepKey) => void
   onCreate: (trip: Trip) => void
   onReplaceAll: (store: Store) => void
 }
@@ -22,10 +22,11 @@ export function TripList({ store, saveFailed, onOpen, onCreate, onReplaceAll }: 
   const exportRef = useRef<HTMLTextAreaElement>(null)
 
   const create = (v: TripFormValues) => {
-    const trip: Trip = { id: newId(), ...v, items: [], createdAt: new Date().toISOString() }
+    const trip: Trip = { id: newId(), ...v, items: [], flights: [], stays: [], shopping: [], createdAt: new Date().toISOString() }
     onCreate(trip)
     setCreating(false)
-    onOpen(trip.id)
+    // 기본 정보를 입력했으니 다음 단계(항공권)부터 이어서 안내한다.
+    onOpen(trip.id, 'flights')
   }
 
   const toggleExport = () => setExportText((cur) => (cur === null ? JSON.stringify(store, null, 2) : null))
@@ -88,7 +89,7 @@ export function TripList({ store, saveFailed, onOpen, onCreate, onReplaceAll }: 
                 {t.destination} · {t.startDate} ~ {t.endDate} ({eachDate(t.startDate, t.endDate).length}일)
               </span>
               <span className="muted">
-                일정 {t.items.length}개 · {formatWon(totalCost(t.items))}
+                일정 {t.items.length}개 · {formatWon(budgetBreakdown(t).total)}
               </span>
             </button>
           </li>

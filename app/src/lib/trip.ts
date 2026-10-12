@@ -1,4 +1,4 @@
-import type { Item, Trip } from '../types'
+import type { Flight, Item, Trip } from '../types'
 import { CATEGORIES } from '../types'
 
 const DAY_MS = 86_400_000
@@ -109,21 +109,160 @@ export function mapLinks(item: Pick<Item, 'place' | 'title'>, destination: strin
   }
 }
 
+export function nights(checkIn: string, checkOut: string): number {
+  return Math.round((parse(checkOut) - parse(checkIn)) / DAY_MS)
+}
+
+export function sumBy<T>(list: T[], pick: (t: T) => number): number {
+  return list.reduce((sum, t) => {
+    const v = pick(t)
+    return sum + (Number.isFinite(v) ? v : 0)
+  }, 0)
+}
+
+export interface Breakdown {
+  flights: number
+  stays: number
+  activities: number
+  shopping: number
+  total: number
+}
+
+/** 항공·숙소·일정·쇼핑 비용과 합계. 쇼핑은 예상 가격 기준이다. */
+export function budgetBreakdown(trip: Pick<Trip, 'flights' | 'stays' | 'items' | 'shopping'>): Breakdown {
+  const flights = sumBy(trip.flights, (f) => f.cost)
+  const stays = sumBy(trip.stays, (s) => s.cost)
+  const activities = sumBy(trip.items, (i) => i.cost)
+  const shopping = sumBy(trip.shopping, (s) => s.price)
+  return { flights, stays, activities, shopping, total: flights + stays + activities + shopping }
+}
+
+export function completion(items: Item[]): { done: number; total: number } {
+  return { done: items.filter((i) => i.done).length, total: items.length }
+}
+
+export interface DayEvent {
+  kind: 'flight' | 'stay'
+  label: string
+  time: string
+  sort: string
+}
+
+/** 항공·숙소 정보에서 자동으로 만든, 그 날짜의 고정 일정(출발, 도착, 체크인, 체크아웃). */
+export function dayEvents(trip: Pick<Trip, 'flights' | 'stays'>, date: string): DayEvent[] {
+  const out: DayEvent[] = []
+  for (const f of trip.flights) {
+    const route = `${f.from || '?'} → ${f.to || '?'}${f.flightNo ? ` (${f.flightNo})` : ''}`
+    if (f.departDate === date) {
+      const sameDayArrival = f.arriveDate === f.departDate && f.arriveTime
+      out.push({
+        kind: 'flight',
+        label: `항공 ${route}${sameDayArrival ? ` · ${f.arriveTime} 도착` : ''}`,
+        time: f.departTime,
+        sort: f.departTime || '12:00',
+      })
+    }
+    if (f.arriveDate && f.arriveDate !== f.departDate && f.arriveDate === date) {
+      out.push({ kind: 'flight', label: `항공 도착 ${f.to || '?'}`, time: f.arriveTime, sort: f.arriveTime || '12:00' })
+    }
+  }
+  for (const s of trip.stays) {
+    if (s.checkOut === date) out.push({ kind: 'stay', label: `숙소 체크아웃 · ${s.name}`, time: '', sort: '10:00' })
+    if (s.checkIn === date) out.push({ kind: 'stay', label: `숙소 체크인 · ${s.name}`, time: '', sort: '15:00' })
+  }
+  return out.sort((a, b) => (a.sort < b.sort ? -1 : a.sort > b.sort ? 1 : 0))
+}
+
+/** 여행 기간 중 어떤 숙소로도 덮이지 않는 밤(체크인 날짜 이상, 체크아웃 날짜 미만). */
+export function uncoveredNights(trip: Pick<Trip, 'startDate' | 'endDate' | 'stays'>): string[] {
+  const days = eachDate(trip.startDate, trip.endDate)
+  return days.slice(0, -1).filter((d) => !trip.stays.some((s) => s.checkIn <= d && d < s.checkOut))
+}
+
+/** 연속된 날짜를 [시작, 끝] 구간으로 묶는다. 입력은 오름차순이어야 한다. */
+export function groupRanges(dates: string[]): [string, string][] {
+  const out: [string, string][] = []
+  for (const d of dates) {
+    const last = out[out.length - 1]
+    if (last && parse(d) - parse(last[1]) === DAY_MS) last[1] = d
+    else out.push([d, d])
+  }
+  return out
+}
+
+export function sortFlights(flights: Flight[]): Flight[] {
+  const key = (f: Flight) => `${f.departDate} ${f.departTime || '99:99'}`
+  return flights.slice().sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0))
+}
+
+export interface RoundTripInput {
+  from: string
+  to: string
+  outFlightNo: string
+  retFlightNo: string
+  outTime: string
+  retTime: string
+  /** 왕복 총액. 가는 편과 오는 편에 반씩 나눠 기록한다. */
+  total: number
+}
+
+/** 왕복 항공권 한 번에 입력: 가는 편은 출발일, 오는 편은 도착일에 날짜를 맞춘다. */
+export function makeRoundTrip(inp: RoundTripInput, startDate: string, endDate: string): Flight[] {
+  const outCost = Math.floor(inp.total / 2)
+  const base = { arriveTime: '', note: '' }
+  return [
+    { id: newId(), flightNo: inp.outFlightNo, from: inp.from, to: inp.to, departDate: startDate, departTime: inp.outTime, arriveDate: startDate, cost: outCost, ...base },
+    { id: newId(), flightNo: inp.retFlightNo, from: inp.to, to: inp.from, departDate: endDate, departTime: inp.retTime, arriveDate: endDate, cost: inp.total - outCost, ...base },
+  ]
+}
+
 /** 메신저로 공유하기 좋은 일정 텍스트 */
 export function formatItinerary(trip: Trip): string {
   const lines: string[] = [`✈️ ${trip.name} (${trip.destination})`, `${trip.startDate} ~ ${trip.endDate}`]
+
+  if (trip.flights.length > 0) {
+    lines.push('', '[항공]')
+    for (const f of sortFlights(trip.flights)) {
+      const parts = [`${f.departDate} ${f.departTime || '--:--'}`, `${f.from || '?'} → ${f.to || '?'}`]
+      if (f.flightNo) parts.push(`(${f.flightNo})`)
+      if (f.cost) parts.push(formatWon(f.cost))
+      lines.push(`  ${parts.join(' ')}`)
+    }
+  }
+  if (trip.stays.length > 0) {
+    lines.push('', '[숙소]')
+    for (const s of trip.stays) {
+      const parts = [s.name, `${s.checkIn} ~ ${s.checkOut} (${nights(s.checkIn, s.checkOut)}박)`]
+      if (s.address) parts.push(`@ ${s.address}`)
+      if (s.cost) parts.push(formatWon(s.cost))
+      lines.push(`  ${parts.join(' ')}`)
+    }
+  }
+
   eachDate(trip.startDate, trip.endDate).forEach((date, idx) => {
     lines.push('', `Day ${idx + 1} · ${dateLabel(date)}`)
+    for (const e of dayEvents(trip, date)) lines.push(`  ${e.time ? `${e.time} ` : ''}${e.label}`)
     const day = itemsForDate(trip.items, date)
-    if (day.length === 0) lines.push('  (일정 없음)')
+    if (day.length === 0 && dayEvents(trip, date).length === 0) lines.push('  (일정 없음)')
     for (const it of day) {
-      const parts = [it.time || '--:--', it.title]
+      const parts = [it.done ? '✔' : '', it.time || '--:--', it.title].filter(Boolean)
       if (it.place) parts.push(`@ ${it.place}`)
       if (it.cost) parts.push(`(${formatWon(it.cost)})`)
       lines.push(`  ${parts.join(' ')} [${CATEGORIES[it.category]}]`)
     }
   })
-  const total = totalCost(trip.items)
+
+  if (trip.shopping.length > 0) {
+    lines.push('', '[쇼핑]')
+    for (const s of trip.shopping) {
+      const parts = [s.bought ? '✔' : '-', s.name]
+      if (s.where) parts.push(`@ ${s.where}`)
+      if (s.price) parts.push(`(${formatWon(s.price)})`)
+      lines.push(`  ${parts.join(' ')}`)
+    }
+  }
+
+  const { total } = budgetBreakdown(trip)
   if (total > 0) lines.push('', `총 예상 비용: ${formatWon(total)}`)
   return lines.join('\n')
 }

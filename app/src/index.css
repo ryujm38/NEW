@@ -7,6 +7,7 @@
   --primary: #0f766e;
   --primary-text: #ffffff;
   --danger: #b42318;
+  --warn: #b54708;
   --radius: 12px;
   color-scheme: light;
 }
@@ -21,6 +22,7 @@
     --primary: #2dd4bf;
     --primary-text: #062a26;
     --danger: #ff8a80;
+    --warn: #fdb022;
     color-scheme: dark;
   }
 }
@@ -34,6 +36,7 @@
   --primary: #2dd4bf;
   --primary-text: #062a26;
   --danger: #ff8a80;
+  --warn: #fdb022;
   color-scheme: dark;
 }
 
@@ -424,4 +427,198 @@ button.danger-solid {
   border-radius: 10px;
   padding: 8px 10px;
   margin: 8px 0;
+}
+
+/* 단계 탭 */
+.stepper {
+  list-style: none;
+  display: flex;
+  gap: 6px;
+  padding: 0 0 4px;
+  margin: 12px 0;
+  overflow-x: auto;
+}
+
+.stepper li {
+  flex: 1 0 auto;
+}
+
+.step {
+  width: 100%;
+  gap: 6px;
+  padding: 0 12px;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.step-no {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  font-size: 0.75rem;
+}
+
+.step.filled .step-no {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.step.active {
+  border-color: var(--primary);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.step.active .step-no {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-text);
+}
+
+.step-count {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.step-nav {
+  margin-top: 24px;
+}
+
+.row.between {
+  justify-content: space-between;
+}
+
+/* 빠른 추가 */
+.quick-add {
+  flex-direction: row;
+  align-items: stretch;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.quick-add input {
+  flex: 1;
+  min-width: 0;
+}
+
+.quick-add input.price {
+  flex: 0 0 7rem;
+}
+
+/* 항공·숙소가 만든 자동 일정 */
+.events {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0;
+  display: grid;
+  gap: 4px;
+}
+
+.event {
+  display: flex;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.event .time {
+  min-width: 3.2rem;
+  padding-top: 0;
+}
+
+.warn {
+  color: var(--warn);
+  font-size: 0.9rem;
+  margin: 6px 0;
+}
+
+/* 완료 체크 */
+.check {
+  width: 24px;
+  height: 24px;
+  margin: 2px 0 0;
+  flex: none;
+  accent-color: var(--primary);
+}
+
+.item.done .item-body strong,
+.item.done .time {
+  text-decoration: line-through;
+}
+
+.item.done {
+  opacity: 0.6;
+}
+
+.plan-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.switch input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--primary);
+}
+
+h3 {
+  font-size: 1.05rem;
+  margin: 0;
+}
+
+/* 예산 내역 */
+.breakdown {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 16px;
+  margin: 12px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.breakdown div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.breakdown dt {
+  color: var(--muted);
+}
+
+.breakdown dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 480px) {
+  .stepper {
+    gap: 4px;
+  }
+  .step {
+    padding: 0 10px;
+    gap: 4px;
+  }
+  .step-no {
+    display: none;
+  }
 }
