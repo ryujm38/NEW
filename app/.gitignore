@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# 단일 파일 빌드 결과
+dist-single
+dist-single-src

@@ -15,7 +15,11 @@ interface Props {
 export function TripList({ store, saveFailed, onOpen, onCreate, onReplaceAll }: Props) {
   const [creating, setCreating] = useState(false)
   const [message, setMessage] = useState('')
+  // 불러올 백업을 파싱한 뒤, 현재 데이터를 덮어써도 되는지 사용자가 확인할 때까지 들고 있는다.
+  const [pendingImport, setPendingImport] = useState<Store | null>(null)
+  const [exportText, setExportText] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const exportRef = useRef<HTMLTextAreaElement>(null)
 
   const create = (v: TripFormValues) => {
     const trip: Trip = { id: newId(), ...v, items: [], createdAt: new Date().toISOString() }
@@ -24,8 +28,21 @@ export function TripList({ store, saveFailed, onOpen, onCreate, onReplaceAll }: 
     onOpen(trip.id)
   }
 
-  const exportJson = () => {
-    const blob = new Blob([JSON.stringify(store, null, 2)], { type: 'application/json' })
+  const toggleExport = () => setExportText((cur) => (cur === null ? JSON.stringify(store, null, 2) : null))
+
+  // 임베디드 뷰어에서는 다운로드가 막혀 있어서, 복사와 파일 저장을 둘 다 제공한다.
+  const copyExport = async () => {
+    try {
+      await navigator.clipboard.writeText(exportText ?? '')
+      setMessage('백업 내용을 복사했어요.')
+    } catch {
+      exportRef.current?.select()
+      setMessage('자동 복사가 막혀 있어요. 선택된 내용을 직접 복사해 주세요.')
+    }
+  }
+
+  const saveExportFile = () => {
+    const blob = new Blob([exportText ?? ''], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -37,9 +54,8 @@ export function TripList({ store, saveFailed, onOpen, onCreate, onReplaceAll }: 
   const importJson = async (file: File) => {
     const parsed = parseStore(await file.text())
     if (!parsed) return setMessage('백업 파일 형식이 올바르지 않아요.')
-    if (!window.confirm(`현재 여행 ${store.trips.length}개를 지우고 백업의 여행 ${parsed.trips.length}개로 바꿀까요?`)) return
-    onReplaceAll(parsed)
-    setMessage(`여행 ${parsed.trips.length}개를 불러왔어요.`)
+    setMessage('')
+    setPendingImport(parsed)
   }
 
   return (
@@ -80,8 +96,8 @@ export function TripList({ store, saveFailed, onOpen, onCreate, onReplaceAll }: 
       </ul>
 
       <footer className="backup">
-        <button className="ghost" onClick={exportJson} disabled={store.trips.length === 0}>
-          백업 내보내기
+        <button className="ghost" onClick={toggleExport} disabled={store.trips.length === 0 && exportText === null}>
+          {exportText === null ? '백업 내보내기' : '백업 닫기'}
         </button>
         <button className="ghost" onClick={() => fileRef.current?.click()}>
           백업 불러오기
@@ -97,6 +113,52 @@ export function TripList({ store, saveFailed, onOpen, onCreate, onReplaceAll }: 
             e.target.value = ''
           }}
         />
+
+        {exportText !== null && (
+          <div className="export-panel">
+            <textarea
+              ref={exportRef}
+              className="export-box"
+              readOnly
+              rows={8}
+              value={exportText}
+              aria-label="백업 데이터"
+              onFocus={(e) => e.currentTarget.select()}
+            />
+            <div className="row actions">
+              <button className="ghost" onClick={saveExportFile}>
+                파일로 저장
+              </button>
+              <button className="primary" onClick={copyExport}>
+                복사
+              </button>
+            </div>
+          </div>
+        )}
+
+        {pendingImport && (
+          <div className="card export-panel" role="alertdialog" aria-label="백업 불러오기 확인">
+            <p>
+              현재 여행 {store.trips.length}개를 지우고 백업의 여행 {pendingImport.trips.length}개로 바꿀까요?
+            </p>
+            <div className="row actions">
+              <button className="ghost" onClick={() => setPendingImport(null)} autoFocus>
+                취소
+              </button>
+              <button
+                className="danger-solid"
+                onClick={() => {
+                  onReplaceAll(pendingImport)
+                  setMessage(`여행 ${pendingImport.trips.length}개를 불러왔어요.`)
+                  setPendingImport(null)
+                }}
+              >
+                바꾸기
+              </button>
+            </div>
+          </div>
+        )}
+
         {message && (
           <p className="muted" role="status">
             {message}

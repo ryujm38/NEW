@@ -25,9 +25,9 @@ npm run preview  # 빌드 결과 미리보기
 
 ## 배포 (GitHub Pages)
 
-`.github/workflows/deploy.yml`이 기본 브랜치에 푸시될 때마다 lint → 테스트 → 빌드 → 배포를 자동으로 실행해요. 주소는 `https://<사용자>.github.io/NEW/`예요.
+**지금은 공개 배포를 하지 않아요.** `.github/workflows/deploy.yml`은 자동 실행을 꺼 두었고, 공개할 때만 Actions 탭에서 수동으로 실행하면 lint → 테스트 → 빌드 → 배포가 돌아요. 주소는 `https://<사용자>.github.io/NEW/`예요. 이 저장소가 공개 저장소라서 Pages를 켜면 누구나 접속할 수 있어요.
 
-**처음 한 번만:** 저장소 Settings → Pages → Build and deployment → Source를 **GitHub Actions**로 바꿔 주세요. 이걸 켜기 전에는 배포 단계가 실패해요.
+**공개할 때 처음 한 번만:** 저장소 Settings → Pages → Build and deployment → Source를 **GitHub Actions**로 바꿔 주세요. 이걸 켜기 전에는 배포 단계가 실패해요.
 
 로컬에서 배포와 같은 조건으로 확인하려면 빌드와 미리보기 **둘 다**에 같은 경로를 지정해야 해요.
 
@@ -35,6 +35,16 @@ npm run preview  # 빌드 결과 미리보기
 BASE_PATH=/NEW/ npm run build
 BASE_PATH=/NEW/ npm run preview   # http://localhost:4173/NEW/
 ```
+
+## 비공개 미리보기 (단일 파일)
+
+파일 하나만 열 수 있는 곳(사이드 패널, Claude Artifact)용으로 앱을 HTML 한 파일에 합쳐요.
+
+```bash
+npm run build:single   # dist-single/index.html(전체 문서), dist-single/fragment.html(Artifact용)
+```
+
+이 버전은 서비스 워커를 쓰지 않아서 오프라인 설치(PWA)는 안 돼요. 또 이런 뷰어에서는 `confirm()`, 공유 시트, 파일 다운로드가 막혀 있어서, 삭제 확인은 앱 안의 버튼으로, 공유와 백업은 복사할 수 있는 텍스트로 대신 제공해요.
 
 ## 구조
 

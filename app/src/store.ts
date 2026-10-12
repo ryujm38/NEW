@@ -44,7 +44,12 @@ export function useTripRoute(): [string | null, (id: string | null) => void] {
   }, [])
 
   const go = useCallback((next: string | null) => {
-    window.location.hash = next ? `/trip/${encodeURIComponent(next)}` : '/'
+    setId(next)
+    try {
+      window.location.hash = next ? `/trip/${encodeURIComponent(next)}` : '/'
+    } catch {
+      // 주소 해시를 바꿀 수 없는 환경(임베디드 뷰어)에서도 화면 전환은 동작해야 한다.
+    }
   }, [])
 
   return [id, go]

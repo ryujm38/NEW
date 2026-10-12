@@ -12,8 +12,9 @@ import {
   sortDayByTime,
   totalCost,
 } from '../lib/trip'
-import type { Item, Trip } from '../types'
+import type { Trip } from '../types'
 import { CATEGORIES } from '../types'
+import { ConfirmButton } from './ConfirmButton'
 import { ItemForm, type ItemValues } from './ItemForm'
 import { TripForm } from './TripForm'
 
@@ -29,6 +30,8 @@ export function TripView({ trip, onChange, onBack, onDelete }: Props) {
   // 'new:<date>' 이면 해당 날짜에 추가 중, 그 외에는 수정 중인 item id
   const [editing, setEditing] = useState<string | null>(null)
   const [notice, setNotice] = useState('')
+  // 공유 시트와 클립보드가 모두 막혔을 때 직접 복사할 수 있게 보여주는 텍스트
+  const [shareText, setShareText] = useState<string | null>(null)
 
   const dates = eachDate(trip.startDate, trip.endDate)
   const total = totalCost(trip.items)
@@ -43,22 +46,28 @@ export function TripView({ trip, onChange, onBack, onDelete }: Props) {
     onChange((t) => ({ ...t, items: t.items.map((i) => (i.id === id ? { ...i, ...v } : i)) }))
     setEditing(null)
   }
-  const removeItem = (item: Item) => {
-    if (!window.confirm(`'${item.title}' 일정을 삭제할까요?`)) return
-    onChange((t) => ({ ...t, items: t.items.filter((i) => i.id !== item.id) }))
+  const removeItem = (id: string) => {
+    onChange((t) => ({ ...t, items: t.items.filter((i) => i.id !== id) }))
   }
 
   const share = async () => {
     const text = formatItinerary(trip)
     try {
-      if (navigator.share) await navigator.share({ title: trip.name, text })
-      else {
-        await navigator.clipboard.writeText(text)
-        setNotice('일정을 클립보드에 복사했어요.')
+      if (navigator.share) {
+        await navigator.share({ title: trip.name, text })
+        return
       }
     } catch (e) {
-      // 사용자가 공유 창을 닫은 경우는 오류로 보지 않는다.
-      if (!(e instanceof DOMException && e.name === 'AbortError')) setNotice('공유하지 못했어요. 다시 시도해 주세요.')
+      // 사용자가 공유 창을 닫은 경우는 오류로 보지 않는다. 그 외(권한 거부 등)는 복사로 넘어간다.
+      if (e instanceof DOMException && e.name === 'AbortError') return
+    }
+    try {
+      await navigator.clipboard.writeText(text)
+      setShareText(null)
+      setNotice('일정을 클립보드에 복사했어요.')
+    } catch {
+      setShareText(text)
+      setNotice('자동 복사가 막혀 있어요. 아래 내용을 직접 복사해 주세요.')
     }
   }
 
@@ -75,12 +84,7 @@ export function TripView({ trip, onChange, onBack, onDelete }: Props) {
           <button className="ghost" onClick={() => setEditingTrip((v) => !v)}>
             수정
           </button>
-          <button
-            className="ghost danger"
-            onClick={() => window.confirm(`'${trip.name}' 여행을 삭제할까요? 되돌릴 수 없어요.`) && onDelete()}
-          >
-            삭제
-          </button>
+          <ConfirmButton label="삭제" prompt="이 여행을 삭제할까요? 되돌릴 수 없어요." onConfirm={onDelete} />
         </div>
       </header>
 
@@ -92,6 +96,9 @@ export function TripView({ trip, onChange, onBack, onDelete }: Props) {
         {notice}
       </p>
       {notice && <p className="notice">{notice}</p>}
+      {shareText && (
+        <textarea className="export-box" readOnly rows={8} value={shareText} aria-label="공유할 일정 텍스트" onFocus={(e) => e.currentTarget.select()} />
+      )}
 
       {editingTrip && (
         <TripForm
@@ -177,9 +184,7 @@ export function TripView({ trip, onChange, onBack, onDelete }: Props) {
                           <button className="ghost" onClick={() => setEditing(item.id)}>
                             수정
                           </button>
-                          <button className="ghost danger" onClick={() => removeItem(item)}>
-                            삭제
-                          </button>
+                          <ConfirmButton label="삭제" prompt={`'${item.title}' 삭제?`} onConfirm={() => removeItem(item.id)} />
                         </div>
                       </>
                     )}

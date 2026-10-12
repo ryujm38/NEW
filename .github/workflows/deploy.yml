@@ -1,9 +1,10 @@
 name: Deploy to GitHub Pages
 
 on:
-  push:
-    # Pages 환경은 기본 브랜치에서만 배포를 허용한다. 기본 브랜치를 바꾸면 여기도 맞춰 주세요.
-    branches: [main, ccr-66528cad-yn1j9s]
+  # 공개 배포 전까지는 자동 실행하지 않는다. 배포할 때 Actions 탭에서 수동으로 실행하거나,
+  # 아래 push 트리거의 주석을 풀면 된다. (Pages 환경은 기본 브랜치에서만 배포를 허용한다.)
+  # push:
+  #   branches: [ccr-66528cad-yn1j9s]
   workflow_dispatch:
 
 permissions:
