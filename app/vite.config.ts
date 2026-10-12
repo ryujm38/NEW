@@ -4,6 +4,8 @@ import { defineConfig } from 'vitest/config'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // GitHub Pages 같은 하위 경로(/NEW/)에 배포할 때만 BASE_PATH로 지정한다. 로컬 개발은 '/'.
+  base: process.env.BASE_PATH || '/',
   plugins: [
     react(),
     VitePWA({

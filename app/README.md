@@ -23,6 +23,19 @@ npm run build    # dist/ 생성 (PWA 포함)
 npm run preview  # 빌드 결과 미리보기
 ```
 
+## 배포 (GitHub Pages)
+
+`.github/workflows/deploy.yml`이 기본 브랜치에 푸시될 때마다 lint → 테스트 → 빌드 → 배포를 자동으로 실행해요. 주소는 `https://<사용자>.github.io/NEW/`예요.
+
+**처음 한 번만:** 저장소 Settings → Pages → Build and deployment → Source를 **GitHub Actions**로 바꿔 주세요. 이걸 켜기 전에는 배포 단계가 실패해요.
+
+로컬에서 배포와 같은 조건으로 확인하려면 빌드와 미리보기 **둘 다**에 같은 경로를 지정해야 해요.
+
+```bash
+BASE_PATH=/NEW/ npm run build
+BASE_PATH=/NEW/ npm run preview   # http://localhost:4173/NEW/
+```
+
 ## 구조
 
 - `src/lib/trip.ts` 날짜·예산·정렬 등 순수 로직 (테스트 대상)
