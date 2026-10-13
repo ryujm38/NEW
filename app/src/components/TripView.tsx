@@ -6,7 +6,7 @@ import { ConfirmButton } from './ConfirmButton'
 import { BasicStep } from './steps/BasicStep'
 import { FlightsStep } from './steps/FlightsStep'
 import { PlanStep } from './steps/PlanStep'
-import { ShoppingStep } from './steps/ShoppingStep'
+import { PrepStep } from './steps/PrepStep'
 import { StaysStep } from './steps/StaysStep'
 import { StepNav } from './StepNav'
 import { Stepper } from './Stepper'
@@ -57,7 +57,7 @@ export function TripView({ trip, step, onStep, onChange, onBack, onDelete }: Pro
     flights: trip.flights.length === 0,
     stays: trip.stays.length === 0,
     plan: trip.items.length === 0,
-    shopping: trip.shopping.length === 0,
+    prep: trip.shopping.length === 0 && trip.packing.length === 0,
   }
 
   return (
@@ -93,7 +93,7 @@ export function TripView({ trip, step, onStep, onChange, onBack, onDelete }: Pro
       {step === 'flights' && <FlightsStep trip={trip} onChange={onChange} />}
       {step === 'stays' && <StaysStep trip={trip} onChange={onChange} />}
       {step === 'plan' && <PlanStep trip={trip} onChange={onChange} />}
-      {step === 'shopping' && <ShoppingStep trip={trip} onChange={onChange} />}
+      {step === 'prep' && <PrepStep trip={trip} onChange={onChange} />}
 
       {step !== 'basic' && <StepNav step={step} onStep={onStep} empty={emptyStep[step]} />}
     </main>

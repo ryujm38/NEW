@@ -9,8 +9,8 @@ function count(trip: Trip, key: StepKey): number {
       return trip.stays.length
     case 'plan':
       return trip.items.length
-    case 'shopping':
-      return trip.shopping.length
+    case 'prep':
+      return trip.shopping.length + trip.packing.length
     default:
       return 0
   }

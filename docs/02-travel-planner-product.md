@@ -43,7 +43,7 @@
 `app/` 폴더. 실행 방법과 기능 목록은 `app/README.md` 참고.
 
 **검증한 것**
-- 단위 테스트 43개 통과 (날짜 계산, 윤일·월 경계, 순서 변경, 시간순 정렬, 예산 내역, 항공·숙소 자동 일정, 숙소 빈 밤, 왕복 생성, 이전 저장 데이터 호환, 공유 텍스트)
+- 단위 테스트 70개 통과 (날짜 계산, 윤일·월 경계, 순서 변경, 시간순 정렬, 예산 내역, 항공·숙소 자동 일정, 숙소 빈 밤, 왕복 생성, 경로 링크, 일정 가능 시간대와 경고, 이전 저장 데이터 호환, 공유 텍스트)
 - 린트, 타입 검사, 프로덕션 빌드 통과
 - 실제 브라우저(390px 폰, 1280px PC)에서 새 여행 → 항공(왕복) → 숙소(빈 밤 경고) → 일정(자동 표시, 빠른 추가, 완료 체크) → 쇼핑 → 예산 합계 → 새로고침 후 같은 단계 유지, 가로 스크롤 없음, 콘솔 에러 없음
 - 네트워크를 끈 상태에서 새로고침해도 앱이 열림
@@ -71,6 +71,26 @@
 - 경쟁사가 연 $24~49이고 "월 결제가 없다"는 불만이 있으니 **월 결제 옵션**을 차별점으로 삼는 것도 검증해 볼 만합니다.
 - 숫자는 아직 없습니다. 1단계에서 사용자 반응을 본 뒤 정합니다.
 
+## 7. 다른 앱 기능 조사와 반영 현황
+
+등록한 항공·숙소를 일정 짤 때 꺼내 쓰는 장치와, 다른 앱에 있는 기능을 조사했습니다. 근거는 앱 소개 글과 스토어 설명 위주라서 **기능의 실제 깊이는 확인하지 못했습니다.**
+
+| 조사에서 확인된 기능 | 어느 앱 | 이 앱의 반영 |
+|---|---|---|
+| 장소를 먼저 모아 두었다가 날짜로 옮겨 일정 만들기 | Wanderlog, 트리플(갈 곳만 고르면 동선까지) | **반영**: 후보지 보관함 → 날짜 선택 → 일정에 넣기 |
+| 지도 기반 경로, 동선 | Wanderlog(경로 최적화는 유료), 트리플 | **일부 반영**: 숙소 기점 구글지도 경로 링크. 순서 최적화와 이동 시간 계산은 하지 않음 |
+| 예약 확인 메일로 일정 자동 생성 | TripIt, Wanderlog | 보류: 메일 연동이나 AI 추출이 필요해서 서버가 있어야 함 |
+| 준비물 리스트 | 여러 앱(Wanderlog은 범용형이라는 평이 있으나 확인 못 함) | **반영**: 자주 챙기는 것 칩 + 직접 입력 |
+| 가계부·경비 정산 | 트리플, Wanderlog(출처마다 말이 엇갈림) | 보류: 실제 지출 기록, 환율, 동행자 정산 |
+| 캘린더 연동 | TripIt | 보류: .ics 내보내기는 가능하나 일부 뷰어에서는 다운로드가 막힘 |
+| AI 일정 생성 | 트리플 | 보류: 비용 구조를 먼저 계산해야 함 |
+| 일정 이미지 저장, 동행자 초대 | 트리플 | 보류: 동행자 초대는 서버·계정 필요 |
+
+**조사에서 나온 것이 아니라 우리가 만든 것** (경쟁 앱에 있는지 확인하지 못했습니다)
+- 항공 도착·출발 시간으로 계산한 **일정 가능 시간대**와 경고. 여유 시간(도착 후 1시간, 출발 전 2시간)은 임의의 기본값입니다.
+- 일정 추가 폼의 **불러오기 칩**(그날의 숙소·공항을 장소로 채우기)
+- 숙소가 비는 **밤 알림**
+
 ## 출처 (2차 자료, 경쟁 앱 블로그 포함)
 
 - [Stippl vs Wanderlog (2026)](https://docs.stippl.io/blog/stippl-vs-wanderlog) — 경쟁 앱 Stippl이 쓴 글이라 편향 가능
@@ -78,3 +98,8 @@
 - [Wanderlog 앱 피드백 보고서 — Kimola](https://kimola.com/reports/wanderlog-app-feedback-report-in-depth-user-insights-app-store-gb-156376) — 유료 보고서 요약
 - [Tripomatic Trip Planner & Maps — AppsHunter](https://appshunter.io/ios/app/519058033) — 앱 목록 페이지
 - [Group Road Trip Planner — RIT 학생 프로젝트](https://zz2998.cad.rit.edu/wordpress/?p=644)
+- [Wanderlog Your Way — BYU Stowaway Magazine](https://stowawaymag.byu.edu/wanderlog-your-way) — 장소를 일정으로 옮기는 방식
+- [TripIt: Everything You Need to Know — 10xTravel](https://10xtravel.com/tripit-everything-you-need-to-know/) — 예약 메일 기반 일정
+- [TripIt Adds Calendar Sync — TechCrunch (2007)](https://techcrunch.com/2007/12/06/11834) — 캘린더 연동은 오래된 기사라 현재 기능과 다를 수 있음
+- [트리플 — App Store](https://apps.apple.com/kr/app/트리플-최저가-예약부터-여행계획까지/id1225499481) — 스토어 설명 기준
+- [Best Trip Planning Apps 2026 — TripProf](https://tripprof.com/en/blog/best-trip-planning-apps-2026/) — 자사 앱을 홍보하는 글

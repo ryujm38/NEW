@@ -76,7 +76,7 @@ export function ShoppingStep({ trip, onChange }: Props) {
 
   return (
     <section aria-label="쇼핑 목록">
-      <h2>쇼핑 목록</h2>
+      <h3>쇼핑 목록</h3>
       <p className="muted">살 물건을 적어 두고, 샀으면 체크하세요. 예상 가격은 예산에 합산돼요.</p>
 
       <QuickAdd

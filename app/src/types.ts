@@ -63,6 +63,22 @@ export interface ShoppingItem {
   bought: boolean
 }
 
+/** 아직 날짜를 정하지 않은 후보지. 일정에 넣으면 Item이 된다. */
+export interface Idea {
+  id: string
+  title: string
+  place: string
+  category: Category
+  note: string
+  cost: number
+}
+
+export interface PackingItem {
+  id: string
+  name: string
+  packed: boolean
+}
+
 export interface Trip {
   id: string
   name: string
@@ -78,6 +94,8 @@ export interface Trip {
   flights: Flight[]
   stays: Stay[]
   shopping: ShoppingItem[]
+  ideas: Idea[]
+  packing: PackingItem[]
   createdAt: string
 }
 
@@ -92,7 +110,7 @@ export const STEPS = [
   { key: 'flights', label: '항공' },
   { key: 'stays', label: '숙소' },
   { key: 'plan', label: '일정' },
-  { key: 'shopping', label: '쇼핑' },
+  { key: 'prep', label: '준비' },
 ] as const
 
 export type StepKey = (typeof STEPS)[number]['key']

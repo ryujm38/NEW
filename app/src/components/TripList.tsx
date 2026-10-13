@@ -22,7 +22,7 @@ export function TripList({ store, saveFailed, onOpen, onCreate, onReplaceAll }: 
   const exportRef = useRef<HTMLTextAreaElement>(null)
 
   const create = (v: TripFormValues) => {
-    const trip: Trip = { id: newId(), ...v, items: [], flights: [], stays: [], shopping: [], createdAt: new Date().toISOString() }
+    const trip: Trip = { id: newId(), ...v, items: [], flights: [], stays: [], shopping: [], ideas: [], packing: [], createdAt: new Date().toISOString() }
     onCreate(trip)
     setCreating(false)
     // 기본 정보를 입력했으니 다음 단계(항공권)부터 이어서 안내한다.

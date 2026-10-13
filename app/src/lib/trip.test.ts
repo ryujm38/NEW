@@ -1,21 +1,30 @@
 import { describe, expect, it } from 'vitest'
-import type { Flight, Item, Stay, Trip } from '../types'
+import type { Flight, Idea, Item, Stay, Trip } from '../types'
 import { parseStore } from './storage'
 import {
   MAX_TRIP_DAYS,
+  MAX_WAYPOINTS,
+  addMinutes,
   budgetBreakdown,
   clampItems,
   completion,
   dateLabel,
+  dayAnchors,
   dayEvents,
+  dayWarnings,
+  dayWindow,
+  duplicateTimes,
   eachDate,
   formatItinerary,
   formatWon,
   groupRanges,
+  ideaToItem,
   makeRoundTrip,
   mapLinks,
   moveItem,
   nights,
+  placeSuggestions,
+  routeUrl,
   sortDayByTime,
   sortFlights,
   totalCost,
@@ -71,6 +80,8 @@ const trip = (over: Partial<Trip> = {}): Trip => ({
   flights: [],
   stays: [],
   shopping: [],
+  ideas: [],
+  packing: [],
   createdAt: '',
   ...over,
 })
@@ -384,5 +395,224 @@ describe('parseStore: 이전 버전 데이터 호환', () => {
     expect(t?.flights[0].arriveDate).toBe('2026-10-12')
     expect(t?.stays).toHaveLength(1)
     expect(t?.shopping).toEqual([{ id: 'p', name: '라면', where: '', price: 0, bought: true }])
+  })
+})
+
+describe('addMinutes', () => {
+  it('시간을 더하고 빼며 하루 안으로 자른다', () => {
+    expect(addMinutes('11:40', 60)).toBe('12:40')
+    expect(addMinutes('19:00', -120)).toBe('17:00')
+    expect(addMinutes('23:30', 90)).toBe('23:59')
+    expect(addMinutes('01:00', -120)).toBe('00:00')
+  })
+})
+
+describe('dayAnchors', () => {
+  const t = trip({
+    stays: [
+      stay({ id: 'a', name: 'A호텔', checkIn: '2026-11-05', checkOut: '2026-11-07' }),
+      stay({ id: 'b', name: 'B게하', checkIn: '2026-11-07', checkOut: '2026-11-08' }),
+    ],
+  })
+  it('도착일은 아침 숙소가 없고 밤 숙소만 있다', () => {
+    const a = dayAnchors(t, '2026-11-05')
+    expect(a.start).toBeUndefined()
+    expect(a.end?.name).toBe('A호텔')
+  })
+  it('중간 날은 전날 밤 숙소에서 시작해 같은 숙소로 끝난다', () => {
+    const a = dayAnchors(t, '2026-11-06')
+    expect([a.start?.name, a.end?.name]).toEqual(['A호텔', 'A호텔'])
+  })
+  it('숙소를 옮기는 날은 이전 숙소에서 시작해 새 숙소에서 끝난다', () => {
+    const a = dayAnchors(t, '2026-11-07')
+    expect([a.start?.name, a.end?.name]).toEqual(['A호텔', 'B게하'])
+  })
+  it('마지막 날은 밤 숙소가 없다', () => {
+    const a = dayAnchors(t, '2026-11-08')
+    expect([a.start?.name, a.end]).toEqual(['B게하', undefined])
+  })
+})
+
+describe('routeUrl', () => {
+  const place = (id: string, date: string, p: string, over: Partial<Item> = {}): Item => ({ ...item(id, date), place: p, ...over })
+  const t = trip({
+    destination: '제주',
+    stays: [stay({ name: '제주호텔', checkIn: '2026-11-05', checkOut: '2026-11-07' })],
+    items: [place('a', '2026-11-06', '성산일출봉'), place('b', '2026-11-06', '우도'), place('c', '2026-11-06', '')],
+  })
+  const parse = (url: string) => new URL(url).searchParams
+
+  it('숙소에서 출발해 장소들을 지나 숙소로 돌아오는 경로', () => {
+    const r = routeUrl(t, '2026-11-06', { returnToStay: true })
+    const q = parse(r!.url)
+    expect(q.get('origin')).toBe('제주호텔 제주')
+    expect(q.get('waypoints')).toBe('성산일출봉 제주|우도 제주')
+    expect(q.get('destination')).toBe('제주호텔 제주')
+    expect(r!.stops).toBe(4)
+    expect(r!.truncated).toBe(false)
+  })
+  it('복귀를 끄면 마지막 장소가 도착지', () => {
+    const q = parse(routeUrl(t, '2026-11-06')!.url)
+    expect(q.get('destination')).toBe('우도 제주')
+    expect(q.get('waypoints')).toBe('성산일출봉 제주')
+  })
+  it('장소가 없는 일정은 경로에서 빠지고, 장소가 하나도 없으면 null', () => {
+    expect(routeUrl(t, '2026-11-05')).toBeNull()
+    const none = trip({ items: [place('x', '2026-11-06', '')] })
+    expect(routeUrl(none, '2026-11-06')).toBeNull()
+  })
+  it('완료한 일정은 남은 경로에서 제외', () => {
+    const done = trip({ ...t, items: [place('a', '2026-11-06', '성산일출봉', { done: true }), place('b', '2026-11-06', '우도')] })
+    const q = parse(routeUrl(done, '2026-11-06')!.url)
+    expect(q.get('origin')).toBe('제주호텔 제주')
+    expect(q.get('destination')).toBe('우도 제주')
+    expect(q.get('waypoints')).toBeNull()
+  })
+  it('숙소가 없고 장소가 하나뿐이면 경로를 만들 수 없다', () => {
+    expect(routeUrl(trip({ items: [place('a', '2026-11-06', '우도')] }), '2026-11-06')).toBeNull()
+  })
+  it('도착일은 첫 장소에서 시작해 밤 숙소에서 끝난다', () => {
+    const arrive = trip({ ...t, items: [place('a', '2026-11-05', '용두암')] })
+    const q = parse(routeUrl(arrive, '2026-11-05', { returnToStay: true })!.url)
+    expect(q.get('origin')).toBe('용두암 제주')
+    expect(q.get('destination')).toBe('제주호텔 제주')
+  })
+  it('이동이 없는 경로(숙소 → 같은 숙소)는 만들지 않는다', () => {
+    const atHotel = trip({ ...t, items: [place('a', '2026-11-05', '제주호텔')] })
+    expect(routeUrl(atHotel, '2026-11-05', { returnToStay: true })).toBeNull()
+    // 숙소에서 출발해 같은 곳을 두 번 적어도 연속 중복은 합쳐진다
+    const dup = trip({ ...t, items: [place('a', '2026-11-06', '우도'), place('b', '2026-11-06', '우도')] })
+    expect(parse(routeUrl(dup, '2026-11-06')!.url).get('waypoints')).toBeNull()
+    expect(routeUrl(dup, '2026-11-06')!.stops).toBe(2)
+  })
+  it('경유지가 너무 많으면 최대 개수까지만 넣고 알린다', () => {
+    const many = trip({ destination: '제주', items: Array.from({ length: 14 }, (_, i) => place(`p${i}`, '2026-11-06', `장소${i}`)) })
+    const r = routeUrl(many, '2026-11-06')!
+    expect(parse(r.url).get('waypoints')!.split('|')).toHaveLength(MAX_WAYPOINTS)
+    expect(r.truncated).toBe(true)
+  })
+  it('한글과 공백, 특수문자가 안전하게 인코딩된다', () => {
+    const t2 = trip({ destination: '제주', items: [place('a', '2026-11-06', 'A&B 카페'), place('b', '2026-11-06', '카페 #2')] })
+    const q = parse(routeUrl(t2, '2026-11-06')!.url)
+    expect(q.get('origin')).toBe('A&B 카페 제주')
+    expect(q.get('destination')).toBe('카페 #2 제주')
+  })
+})
+
+describe('dayWindow', () => {
+  const base = { startDate: '2026-11-05', endDate: '2026-11-08' }
+  it('첫날 같은 날 도착: 도착 1시간 뒤부터', () => {
+    const w = dayWindow({ ...base, flights: [flight({ departTime: '10:30', arriveTime: '11:40' })] }, '2026-11-05')
+    expect(w).toMatchObject({ from: '12:40', to: '' })
+    expect(w?.fromNote).toBe('도착 11:40 + 1시간')
+  })
+  it('마지막 날 같은 날 출발: 출발 2시간 전까지', () => {
+    const ret = flight({ from: 'CJU', to: 'ICN', departDate: '2026-11-08', arriveDate: '2026-11-08', departTime: '19:00', arriveTime: '20:10' })
+    const w = dayWindow({ ...base, flights: [ret] }, '2026-11-08')
+    expect(w).toMatchObject({ from: '', to: '17:00' })
+  })
+  it('같은 날 출발·도착이라도 첫날의 출발, 마지막 날의 도착은 무시한다', () => {
+    const out = flight({ departTime: '10:30', arriveTime: '11:40' })
+    expect(dayWindow({ ...base, flights: [out] }, '2026-11-05')?.to).toBe('')
+    const ret = flight({ departDate: '2026-11-08', arriveDate: '2026-11-08', departTime: '19:00', arriveTime: '20:10' })
+    expect(dayWindow({ ...base, flights: [ret] }, '2026-11-08')?.from).toBe('')
+  })
+  it('다른 날 도착하는 항공은 도착일에, 출발은 출발일에 적용', () => {
+    const red = flight({ departDate: '2026-11-05', departTime: '23:50', arriveDate: '2026-11-06', arriveTime: '06:10' })
+    const f = { ...base, flights: [red] }
+    expect(dayWindow(f, '2026-11-06')).toMatchObject({ from: '07:10', to: '' })
+    expect(dayWindow(f, '2026-11-05')).toMatchObject({ from: '', to: '21:50' })
+  })
+  it('시간이 적힌 항공이 없거나 관련 없는 날은 null', () => {
+    expect(dayWindow({ ...base, flights: [flight()] }, '2026-11-05')).toBeNull()
+    expect(dayWindow({ ...base, flights: [flight({ departTime: '10:30', arriveTime: '11:40' })] }, '2026-11-06')).toBeNull()
+    expect(dayWindow({ ...base, flights: [] }, '2026-11-05')).toBeNull()
+  })
+})
+
+describe('duplicateTimes / dayWarnings', () => {
+  it('같은 시간 일정을 묶는다 (시간 없는 건 제외)', () => {
+    const items = [item('a', 'd', '10:00'), item('b', 'd', '10:00'), item('c', 'd', '11:00'), item('d', 'd'), item('e', 'd')]
+    expect(duplicateTimes(items)).toEqual([{ time: '10:00', titles: ['a', 'b'] }])
+  })
+  it('도착 시간보다 이른 일정과 같은 시간 일정에 경고', () => {
+    const t = trip({
+      flights: [flight({ departTime: '10:30', arriveTime: '11:40' })],
+      items: [item('성산', '2026-11-05', '11:00'), item('점심', '2026-11-05', '13:00'), item('카페', '2026-11-05', '13:00')],
+    })
+    const w = dayWarnings(t, '2026-11-05')
+    expect(w).toHaveLength(2)
+    expect(w[0]).toContain("'성산' 11:00")
+    expect(w[0]).toContain('12:40 이후')
+    expect(w[1]).toContain('13:00에 일정 2개가 겹쳐요')
+  })
+  it('출발 2시간 전 이후 일정에 경고하고, 완료한 일정은 무시한다', () => {
+    const ret = flight({ departDate: '2026-11-08', arriveDate: '2026-11-08', departTime: '19:00', arriveTime: '20:10' })
+    const t = trip({
+      flights: [ret],
+      items: [item('쇼핑', '2026-11-08', '18:00'), { ...item('식사', '2026-11-08', '18:30'), done: true }],
+    })
+    const w = dayWarnings(t, '2026-11-08')
+    expect(w).toHaveLength(1)
+    expect(w[0]).toContain('17:00 전에 끝내는 게 좋아요')
+  })
+  it('문제가 없으면 빈 배열', () => {
+    expect(dayWarnings(trip({ items: [item('a', '2026-11-06', '10:00')] }), '2026-11-06')).toEqual([])
+  })
+})
+
+describe('placeSuggestions / ideaToItem', () => {
+  it('그날의 숙소와 공항을 장소 후보로 만든다 (중복 제거)', () => {
+    const t = trip({
+      stays: [stay({ name: '제주호텔', checkIn: '2026-11-05', checkOut: '2026-11-07' })],
+      flights: [flight({ from: '인천(ICN)', to: '제주(CJU)' })],
+    })
+    expect(placeSuggestions(t, '2026-11-05').map((x) => x.label)).toEqual(['숙소 · 제주호텔', '출발 · 인천(ICN)', '도착 · 제주(CJU)'])
+    expect(placeSuggestions(t, '2026-11-06').map((x) => x.label)).toEqual(['숙소 · 제주호텔'])
+    expect(placeSuggestions(trip(), '2026-11-06')).toEqual([])
+  })
+  it('후보지를 일정으로 옮기면 내용이 이어지고 새 id를 받는다', () => {
+    const idea: Idea = { id: 'idea1', title: '우도', place: '우도 선착장', category: 'sight', note: '배 시간 확인', cost: 5000 }
+    const it = ideaToItem(idea, '2026-11-06')
+    expect(it).toMatchObject({ date: '2026-11-06', time: '', title: '우도', place: '우도 선착장', note: '배 시간 확인', cost: 5000, category: 'sight', done: false })
+    expect(it.id).not.toBe('idea1')
+  })
+})
+
+describe('formatItinerary (후보지·준비물)', () => {
+  it('후보지와 준비물을 포함한다', () => {
+    const t = trip({
+      ideas: [{ id: 'i', title: '우도', place: '우도 선착장', category: 'sight', note: '', cost: 0 }],
+      packing: [{ id: 'p', name: '여권', packed: true }, { id: 'q', name: '충전기', packed: false }],
+    })
+    const text = formatItinerary(t)
+    expect(text).toContain('[후보지]')
+    expect(text).toContain('- 우도 @ 우도 선착장')
+    expect(text).toContain('✔ 여권')
+    expect(text).toContain('- 충전기')
+  })
+})
+
+describe('parseStore: 후보지·준비물', () => {
+  it('없으면 빈 배열, 있으면 검증해서 읽는다', () => {
+    const old = parseStore(JSON.stringify({ version: 1, trips: [{ id: 't', startDate: '2026-10-12', endDate: '2026-10-13' }] }))
+    expect(old?.trips[0].ideas).toEqual([])
+    expect(old?.trips[0].packing).toEqual([])
+    const s = parseStore(
+      JSON.stringify({
+        version: 1,
+        trips: [
+          {
+            id: 't',
+            startDate: '2026-10-12',
+            endDate: '2026-10-13',
+            ideas: [{ id: 'i', title: '우도', category: 'weird', cost: -1 }, { id: 'bad' }],
+            packing: [{ id: 'p', name: '여권', packed: true }, { name: 'no id' }],
+          },
+        ],
+      }),
+    )
+    expect(s?.trips[0].ideas).toEqual([{ id: 'i', title: '우도', place: '', category: 'sight', note: '', cost: 0 }])
+    expect(s?.trips[0].packing).toEqual([{ id: 'p', name: '여권', packed: true }])
   })
 })

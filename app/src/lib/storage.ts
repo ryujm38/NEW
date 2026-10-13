@@ -1,4 +1,4 @@
-import type { Category, Flight, Item, ShoppingItem, Stay, Store, Trip } from '../types'
+import type { Category, Flight, Idea, Item, PackingItem, ShoppingItem, Stay, Store, Trip } from '../types'
 import { CATEGORIES } from '../types'
 
 const KEY = 'travel-planner:v1'
@@ -66,6 +66,19 @@ function toShopping(raw: unknown): ShoppingItem | null {
   return { id: r.id, name: r.name, where: str(r.where), price: num(r.price), bought: bool(r.bought) }
 }
 
+function toIdea(raw: unknown): Idea | null {
+  const r = rec(raw)
+  if (!r || typeof r.id !== 'string' || typeof r.title !== 'string') return null
+  const category = (typeof r.category === 'string' && r.category in CATEGORIES ? r.category : 'sight') as Category
+  return { id: r.id, title: r.title, place: str(r.place), category, note: str(r.note), cost: num(r.cost) }
+}
+
+function toPacking(raw: unknown): PackingItem | null {
+  const r = rec(raw)
+  if (!r || typeof r.id !== 'string' || typeof r.name !== 'string') return null
+  return { id: r.id, name: r.name, packed: bool(r.packed) }
+}
+
 function toTrip(raw: unknown): Trip | null {
   if (!raw || typeof raw !== 'object') return null
   const r = raw as Record<string, unknown>
@@ -81,6 +94,8 @@ function toTrip(raw: unknown): Trip | null {
     flights: list(r.flights, toFlight),
     stays: list(r.stays, toStay),
     shopping: list(r.shopping, toShopping),
+    ideas: list(r.ideas, toIdea),
+    packing: list(r.packing, toPacking),
     createdAt: str(r.createdAt, new Date(0).toISOString()),
   }
 }

@@ -105,7 +105,8 @@ h2 {
 
 /* 버튼: 터치 영역 44px 이상 */
 button,
-.item-actions a {
+.item-actions a,
+.linkbtn {
   font: inherit;
   min-height: 44px;
   padding: 0 14px;
@@ -328,7 +329,8 @@ button.icon {
   margin-top: 8px;
 }
 
-.item-actions a {
+.item-actions a,
+.linkbtn {
   border-color: transparent;
   color: var(--primary);
   text-decoration: none;
@@ -621,4 +623,75 @@ h3 {
   .step-no {
     display: none;
   }
+}
+
+/* 불러오기·자주 챙기는 것 칩 */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 8px;
+}
+
+.chip {
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 99px;
+  font-size: 0.9rem;
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.presets summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* 후보지 보관함 */
+.ideas {
+  margin-top: 16px;
+}
+
+.day-select {
+  font: inherit;
+  font-size: 16px;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  max-width: 100%;
+}
+
+/* 일정 가능 시간대·경고 */
+.window {
+  margin: 4px 0;
+}
+
+.warns {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0 8px;
+  display: grid;
+  gap: 2px;
+}
+
+.plan-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+
+.prep h3 {
+  margin: 24px 0 4px;
+}
+
+.prep h2 + section h3 {
+  margin-top: 8px;
 }

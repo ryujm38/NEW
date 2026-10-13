@@ -3,18 +3,23 @@ import {
   completion,
   dateLabel,
   dayEvents,
+  dayWarnings,
+  dayWindow,
   eachDate,
   formatWon,
   itemsForDate,
   mapLinks,
   moveItem,
   newId,
+  placeSuggestions,
+  routeUrl,
   sortDayByTime,
   totalCost,
 } from '../../lib/trip'
 import type { Trip } from '../../types'
 import { CATEGORIES } from '../../types'
 import { ConfirmButton } from '../ConfirmButton'
+import { IdeasPanel } from '../IdeasPanel'
 import { ItemForm, type ItemValues } from '../ItemForm'
 import { QuickAdd } from '../QuickAdd'
 
@@ -27,6 +32,7 @@ export function PlanStep({ trip, onChange }: Props) {
   // 'new:<date>' 이면 해당 날짜에 자세히 추가 중, 그 외에는 수정 중인 item id
   const [editing, setEditing] = useState<string | null>(null)
   const [hideDone, setHideDone] = useState(false)
+  const [returnToStay, setReturnToStay] = useState(true)
 
   const dates = eachDate(trip.startDate, trip.endDate)
   const all = completion(trip.items)
@@ -52,13 +58,23 @@ export function PlanStep({ trip, onChange }: Props) {
         <p className="muted">
           {all.total > 0 ? `전체 ${all.total}개 중 ${all.done}개 완료` : '이름만 적고 Enter를 누르면 바로 추가돼요. 시간·장소·비용은 나중에 채워도 돼요.'}
         </p>
-        {all.done > 0 && (
-          <label className="switch">
-            <input type="checkbox" checked={hideDone} onChange={(e) => setHideDone(e.target.checked)} />
-            완료한 일정 숨기기
-          </label>
-        )}
+        <div className="plan-toggles">
+          {all.done > 0 && (
+            <label className="switch">
+              <input type="checkbox" checked={hideDone} onChange={(e) => setHideDone(e.target.checked)} />
+              완료한 일정 숨기기
+            </label>
+          )}
+          {trip.stays.length > 0 && (
+            <label className="switch">
+              <input type="checkbox" checked={returnToStay} onChange={(e) => setReturnToStay(e.target.checked)} />
+              경로에 숙소 복귀 포함
+            </label>
+          )}
+        </div>
       </div>
+
+      <IdeasPanel trip={trip} dates={dates} onChange={onChange} />
 
       <div className="days">
         {dates.map((date, idx) => {
@@ -67,6 +83,9 @@ export function PlanStep({ trip, onChange }: Props) {
           const visible = hideDone ? day.filter((i) => !i.done) : day
           const progress = completion(day)
           const adding = editing === `new:${date}`
+          const win = dayWindow(trip, date)
+          const warnings = dayWarnings(trip, date)
+          const route = routeUrl(trip, date, { returnToStay })
           return (
             <section className="day" key={date} aria-label={`${idx + 1}일차`}>
               <div className="day-head">
@@ -90,6 +109,21 @@ export function PlanStep({ trip, onChange }: Props) {
                 </ul>
               )}
 
+              {win && (
+                <p className="muted window">
+                  일정 가능 시간 {win.from || '처음'} ~ {win.to || '밤'} ({[win.fromNote, win.toNote].filter(Boolean).join(', ')})
+                </p>
+              )}
+              {warnings.length > 0 && (
+                <ul className="warns" aria-label="확인이 필요한 일정">
+                  {warnings.map((w) => (
+                    <li key={w} className="warn">
+                      {w}
+                    </li>
+                  ))}
+                </ul>
+              )}
+
               {day.length === 0 && events.length === 0 && !adding && <p className="muted empty">아직 일정이 없어요.</p>}
               {day.length > 0 && visible.length === 0 && <p className="muted empty">이 날 일정을 모두 마쳤어요.</p>}
 
@@ -99,7 +133,13 @@ export function PlanStep({ trip, onChange }: Props) {
                   return (
                     <li key={item.id} className={`card item${item.done ? ' done' : ''}`}>
                       {editing === item.id ? (
-                        <ItemForm initial={item} submitLabel="저장" onCancel={() => setEditing(null)} onSubmit={(v) => saveItem(item.id, v)} />
+                        <ItemForm
+                          initial={item}
+                          suggestions={placeSuggestions(trip, item.date)}
+                          submitLabel="저장"
+                          onCancel={() => setEditing(null)}
+                          onSubmit={(v) => saveItem(item.id, v)}
+                        />
                       ) : (
                         <>
                           <div className="item-main">
@@ -161,7 +201,12 @@ export function PlanStep({ trip, onChange }: Props) {
 
               {adding ? (
                 <div className="card">
-                  <ItemForm submitLabel="추가" onCancel={() => setEditing(null)} onSubmit={(v) => addItem(date, v)} />
+                  <ItemForm
+                    submitLabel="추가"
+                    suggestions={placeSuggestions(trip, date)}
+                    onCancel={() => setEditing(null)}
+                    onSubmit={(v) => addItem(date, v)}
+                  />
                 </div>
               ) : (
                 <>
@@ -175,6 +220,11 @@ export function PlanStep({ trip, onChange }: Props) {
                         시간순 정렬
                       </button>
                     )}
+                    {route && (
+                      <a className="linkbtn" href={route.url} target="_blank" rel="noreferrer noopener">
+                        경로 보기 ({route.stops}곳)
+                      </a>
+                    )}
                     {progress.done > 0 && (
                       <ConfirmButton
                         label={`완료 ${progress.done}개 삭제`}
@@ -183,6 +233,7 @@ export function PlanStep({ trip, onChange }: Props) {
                       />
                     )}
                   </div>
+                  {route?.truncated && <p className="muted">경유지는 9곳까지만 경로에 반영돼요.</p>}
                 </>
               )}
             </section>

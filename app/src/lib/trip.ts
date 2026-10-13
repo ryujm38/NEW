@@ -1,4 +1,4 @@
-import type { Flight, Item, Trip } from '../types'
+import type { Flight, Idea, Item, Stay, Trip } from '../types'
 import { CATEGORIES } from '../types'
 
 const DAY_MS = 86_400_000
@@ -216,6 +216,181 @@ export function makeRoundTrip(inp: RoundTripInput, startDate: string, endDate: s
   ]
 }
 
+// ---------------------------------------------------------------------------
+// 등록한 항공·숙소를 일정 짤 때 꺼내 쓰는 장치들
+// ---------------------------------------------------------------------------
+
+/** 도착 후 입국·수하물·이동에 쓰는 시간(분). 이 시간이 지난 뒤부터 일정을 잡는 것을 권장한다. */
+export const ARRIVE_BUFFER_MIN = 60
+/** 출발 전에 공항에 도착해야 하는 시간(분). */
+export const DEPART_BUFFER_MIN = 120
+/** 구글지도 경로 링크가 받을 수 있는 경유지 수 */
+export const MAX_WAYPOINTS = 9
+
+/** 'HH:MM'에 분을 더한다. 하루(00:00~23:59) 안으로 자른다. */
+export function addMinutes(time: string, minutes: number): string {
+  const [h, m] = time.split(':').map(Number)
+  const total = Math.min(23 * 60 + 59, Math.max(0, h * 60 + m + minutes))
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+}
+
+export interface DayAnchors {
+  /** 그날 아침에 머문 숙소(전날 밤 숙소). 도착일이면 없다. */
+  start?: Stay
+  /** 그날 밤에 묵을 숙소. 마지막 날이면 없다. */
+  end?: Stay
+}
+
+export function dayAnchors(trip: Pick<Trip, 'stays'>, date: string): DayAnchors {
+  const byCheckIn = trip.stays.slice().sort((a, b) => (a.checkIn < b.checkIn ? -1 : a.checkIn > b.checkIn ? 1 : 0))
+  return {
+    start: byCheckIn.find((s) => s.checkIn < date && date <= s.checkOut),
+    end: byCheckIn.find((s) => s.checkIn <= date && date < s.checkOut),
+  }
+}
+
+const stayQuery = (s: Stay, destination: string) => [s.name, s.address || destination].filter(Boolean).join(' ')
+
+export interface DayRoute {
+  url: string
+  /** 경로에 들어간 지점 수(출발·경유·도착 포함) */
+  stops: number
+  /** 경유지가 너무 많아 일부를 뺐으면 true */
+  truncated: boolean
+}
+
+/**
+ * 그날 아직 하지 않은 일정의 장소들을 숙소 기점으로 이은 구글지도 경로 링크.
+ * 장소가 적힌 일정이 하나도 없으면 null.
+ */
+export function routeUrl(
+  trip: Pick<Trip, 'items' | 'stays' | 'destination'>,
+  date: string,
+  options: { returnToStay?: boolean } = {},
+): DayRoute | null {
+  const stops = trip.items
+    .filter((i) => i.date === date && !i.done && i.place.trim())
+    .map((i) => [i.place.trim(), trip.destination].filter(Boolean).join(' '))
+  if (stops.length === 0) return null
+
+  const { start, end } = dayAnchors(trip, date)
+  const raw = [
+    ...(start ? [stayQuery(start, trip.destination)] : []),
+    ...stops,
+    ...(options.returnToStay && end ? [stayQuery(end, trip.destination)] : []),
+  ]
+  // 같은 지점이 연달아 나오면(예: 숙소에서 출발해 숙소가 목적지인 일정) 이동이 아니므로 합친다.
+  const points = raw.filter((p, i) => p !== raw[i - 1])
+  if (points.length < 2) return null
+
+  const origin = points[0]
+  const destination = points[points.length - 1]
+  const middle = points.slice(1, -1)
+  const waypoints = middle.slice(0, MAX_WAYPOINTS)
+  const params = new URLSearchParams({ api: '1', origin, destination })
+  if (waypoints.length > 0) params.set('waypoints', waypoints.join('|'))
+  return {
+    url: `https://www.google.com/maps/dir/?${params.toString()}`,
+    stops: 2 + waypoints.length,
+    truncated: middle.length > MAX_WAYPOINTS,
+  }
+}
+
+export interface DayWindow {
+  /** 이 시각 이후에 일정을 잡는 것을 권장. 비어 있으면 제한 없음 */
+  from: string
+  /** 이 시각 전에 일정을 끝내는 것을 권장. 비어 있으면 제한 없음 */
+  to: string
+  fromNote: string
+  toNote: string
+}
+
+/**
+ * 항공 시간으로 계산한 그날의 일정 가능 시간대.
+ * - 다른 날 도착하는 항공은 도착일에, 출발은 출발일에 적용한다.
+ * - 같은 날 출발·도착하는 항공은 첫날이면 도착만, 마지막 날이면 출발만 적용한다(첫날 출발지·마지막 날 도착지는 일정과 무관).
+ * 시간이 적힌 항공이 없으면 null.
+ */
+export function dayWindow(trip: Pick<Trip, 'flights' | 'startDate' | 'endDate'>, date: string): DayWindow | null {
+  let arrival = ''
+  let departure = ''
+  for (const f of trip.flights) {
+    const sameDay = f.departDate === f.arriveDate
+    if (f.arriveDate === date && f.arriveTime && (!sameDay || date === trip.startDate)) {
+      if (f.arriveTime > arrival) arrival = f.arriveTime
+    }
+    if (f.departDate === date && f.departTime && (!sameDay || date === trip.endDate)) {
+      if (!departure || f.departTime < departure) departure = f.departTime
+    }
+  }
+  if (!arrival && !departure) return null
+  return {
+    from: arrival ? addMinutes(arrival, ARRIVE_BUFFER_MIN) : '',
+    to: departure ? addMinutes(departure, -DEPART_BUFFER_MIN) : '',
+    fromNote: arrival ? `도착 ${arrival} + ${ARRIVE_BUFFER_MIN / 60}시간` : '',
+    toNote: departure ? `출발 ${departure} − ${DEPART_BUFFER_MIN / 60}시간` : '',
+  }
+}
+
+/** 같은 시간(비어 있지 않은)에 잡힌 일정들을 시간별로 묶어 돌려준다. 2개 이상인 것만. */
+export function duplicateTimes(items: Item[]): { time: string; titles: string[] }[] {
+  const byTime = new Map<string, string[]>()
+  for (const i of items) {
+    if (!i.time) continue
+    byTime.set(i.time, [...(byTime.get(i.time) ?? []), i.title])
+  }
+  return [...byTime.entries()].filter(([, titles]) => titles.length > 1).map(([time, titles]) => ({ time, titles }))
+}
+
+/** 그날 일정에서 확인이 필요한 점들(항공 시간과 어긋남, 같은 시간에 겹침). */
+export function dayWarnings(trip: Pick<Trip, 'items' | 'flights' | 'startDate' | 'endDate'>, date: string): string[] {
+  const day = itemsForDate(trip.items, date)
+  const out: string[] = []
+  const win = dayWindow(trip, date)
+  if (win) {
+    for (const i of day) {
+      if (!i.time || i.done) continue
+      if (win.from && i.time < win.from) out.push(`'${i.title}' ${i.time}: ${win.from} 이후가 좋아요 (${win.fromNote})`)
+      else if (win.to && i.time > win.to) out.push(`'${i.title}' ${i.time}: ${win.to} 전에 끝내는 게 좋아요 (${win.toNote})`)
+    }
+  }
+  for (const d of duplicateTimes(day)) out.push(`${d.time}에 일정 ${d.titles.length}개가 겹쳐요: ${d.titles.join(', ')}`)
+  return out
+}
+
+export interface PlaceSuggestion {
+  label: string
+  place: string
+}
+
+/** 일정 추가 폼에서 눌러서 채울 수 있게, 그날 등록된 숙소와 공항을 장소 후보로 만든다. */
+export function placeSuggestions(trip: Pick<Trip, 'stays' | 'flights'>, date: string): PlaceSuggestion[] {
+  const out: PlaceSuggestion[] = []
+  const { start, end } = dayAnchors(trip, date)
+  for (const s of [start, end]) if (s) out.push({ label: `숙소 · ${s.name}`, place: s.name })
+  for (const f of trip.flights) {
+    if (f.departDate === date && f.from) out.push({ label: `출발 · ${f.from}`, place: f.from })
+    if (f.arriveDate === date && f.to) out.push({ label: `도착 · ${f.to}`, place: f.to })
+  }
+  const seen = new Set<string>()
+  return out.filter((x) => !seen.has(x.place) && seen.add(x.place))
+}
+
+/** 후보지를 해당 날짜의 일정으로 옮긴다. 시간은 비워 둔다. */
+export function ideaToItem(idea: Idea, date: string): Item {
+  return {
+    id: newId(),
+    date,
+    time: '',
+    title: idea.title,
+    place: idea.place,
+    note: idea.note,
+    cost: idea.cost,
+    category: idea.category,
+    done: false,
+  }
+}
+
 /** 메신저로 공유하기 좋은 일정 텍스트 */
 export function formatItinerary(trip: Trip): string {
   const lines: string[] = [`✈️ ${trip.name} (${trip.destination})`, `${trip.startDate} ~ ${trip.endDate}`]
@@ -252,6 +427,14 @@ export function formatItinerary(trip: Trip): string {
     }
   })
 
+  if (trip.ideas.length > 0) {
+    lines.push('', '[후보지]')
+    for (const i of trip.ideas) lines.push(`  - ${i.title}${i.place ? ` @ ${i.place}` : ''}`)
+  }
+  if (trip.packing.length > 0) {
+    lines.push('', '[준비물]')
+    for (const p of trip.packing) lines.push(`  ${p.packed ? '✔' : '-'} ${p.name}`)
+  }
   if (trip.shopping.length > 0) {
     lines.push('', '[쇼핑]')
     for (const s of trip.shopping) {
