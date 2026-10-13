@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { dateLabel, formatWon, groupRanges, newId, nights, uncoveredNights } from '../../lib/trip'
+import { isDomestic } from '../../lib/countries'
+import { dateLabel, formatWon, groupRanges, newId, nights, placeContext, uncoveredNights } from '../../lib/trip'
 import type { Stay, Trip } from '../../types'
 import { ConfirmButton } from '../ConfirmButton'
 
@@ -97,6 +98,8 @@ export function StaysStep({ trip, onChange }: Props) {
   // 'new' | 수정 중인 숙소 id | null
   const [mode, setMode] = useState<string | null>(trip.stays.length === 0 ? 'new' : null)
 
+  const context = placeContext(trip)
+  const domestic = isDomestic(trip.country)
   const gaps = trip.stays.length > 0 ? groupRanges(uncoveredNights(trip)) : []
   const sorted = trip.stays.slice().sort((a, b) => (a.checkIn < b.checkIn ? -1 : a.checkIn > b.checkIn ? 1 : 0))
 
@@ -143,15 +146,17 @@ export function StaysStep({ trip, onChange }: Props) {
                   {s.cost > 0 && <div className="cost">{formatWon(s.cost)}</div>}
                 </div>
                 <div className="item-actions">
+                  {domestic && (
+                    <a
+                      href={`https://map.naver.com/p/search/${encodeURIComponent([s.name, s.address || context].filter(Boolean).join(' '))}`}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                    >
+                      네이버지도
+                    </a>
+                  )}
                   <a
-                    href={`https://map.naver.com/p/search/${encodeURIComponent([s.name, s.address].filter(Boolean).join(' '))}`}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                  >
-                    네이버지도
-                  </a>
-                  <a
-                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([s.name, s.address].filter(Boolean).join(' '))}`}
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([s.name, s.address || context].filter(Boolean).join(' '))}`}
                     target="_blank"
                     rel="noreferrer noopener"
                   >

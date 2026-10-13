@@ -1,4 +1,4 @@
-import { clampItems } from '../../lib/trip'
+import { applyBasicValues } from '../../lib/trip'
 import type { Trip } from '../../types'
 import { BudgetSummary } from '../BudgetSummary'
 import { TripForm } from '../TripForm'
@@ -18,8 +18,8 @@ export function BasicStep({ trip, onChange, onNext }: Props) {
         initial={trip}
         submitLabel="저장하고 다음 →"
         onSubmit={(v) => {
-          // 기간을 줄이면 범위 밖이 된 일정을 가장 가까운 날짜로 옮긴다.
-          onChange((t) => ({ ...t, ...v, items: clampItems(t.items, v.startDate, v.endDate) }))
+          // 기간을 줄이면 범위 밖 일정을 옮기고, 현지 통화가 바뀌면 이전 환율을 버린다.
+          onChange((t) => applyBasicValues(t, v))
           onNext()
         }}
       />

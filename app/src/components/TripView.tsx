@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { eachDate, formatItinerary } from '../lib/trip'
+import { eachDate, formatForAssistant, formatItinerary } from '../lib/trip'
 import type { StepKey, Trip, ViewKey } from '../types'
 import { BudgetSummary } from './BudgetSummary'
 import { ConfirmButton } from './ConfirmButton'
 import { BasicStep } from './steps/BasicStep'
 import { FlightsStep } from './steps/FlightsStep'
+import { LedgerStep } from './steps/LedgerStep'
 import { PlanStep } from './steps/PlanStep'
 import { PrepStep } from './steps/PrepStep'
 import { StaysStep } from './steps/StaysStep'
@@ -34,10 +35,10 @@ export function TripView({ trip, view, day, onView, onChange, onBack, onDelete }
     if (!day) window.scrollTo({ top: 0 })
   }, [view, day])
 
-  const share = async () => {
-    const text = formatItinerary(trip)
+  // 공유 시트(지원하면) → 클립보드 → 직접 복사할 수 있는 글상자 순서로 시도한다.
+  const deliver = async (text: string, copiedMessage: string, useShareSheet: boolean) => {
     try {
-      if (navigator.share) {
+      if (useShareSheet && navigator.share) {
         await navigator.share({ title: trip.name, text })
         return
       }
@@ -48,12 +49,14 @@ export function TripView({ trip, view, day, onView, onChange, onBack, onDelete }
     try {
       await navigator.clipboard.writeText(text)
       setShareText(null)
-      setNotice('일정을 클립보드에 복사했어요.')
+      setNotice(copiedMessage)
     } catch {
       setShareText(text)
       setNotice('자동 복사가 막혀 있어요. 아래 내용을 직접 복사해 주세요.')
     }
   }
+  const share = () => deliver(formatItinerary(trip), '일정을 클립보드에 복사했어요.', true)
+  const copyForAssistant = () => deliver(formatForAssistant(trip), '물어보기용 요약을 복사했어요. 대화창에 붙여 넣고 궁금한 걸 이어서 물어보세요.', false)
 
   const days = eachDate(trip.startDate, trip.endDate).length
   const emptyStep: Record<StepKey, boolean> = {
@@ -62,6 +65,7 @@ export function TripView({ trip, view, day, onView, onChange, onBack, onDelete }
     stays: trip.stays.length === 0,
     plan: trip.items.length === 0,
     prep: trip.shopping.length === 0 && trip.packing.length === 0,
+    ledger: trip.expenses.length === 0,
   }
   const step = view === 'overview' ? null : view
 
@@ -97,18 +101,19 @@ export function TripView({ trip, view, day, onView, onChange, onBack, onDelete }
         <textarea className="export-box" readOnly rows={8} value={shareText} aria-label="공유할 일정 텍스트" onFocus={(e) => e.currentTarget.select()} />
       )}
 
-      {!step && <TripOverview trip={trip} onOpen={(s, d) => onView(s, d)} />}
+      {!step && <TripOverview trip={trip} onOpen={(s, d) => onView(s, d)} onCopyForAssistant={copyForAssistant} />}
 
       {step && (
         <>
           <Stepper trip={trip} step={step} onStep={(s) => onView(s)} />
-          {step !== 'basic' && step !== 'plan' && <BudgetSummary trip={trip} />}
+          {step !== 'basic' && step !== 'plan' && step !== 'ledger' && <BudgetSummary trip={trip} />}
 
           {step === 'basic' && <BasicStep trip={trip} onChange={onChange} onNext={() => onView('flights')} />}
           {step === 'flights' && <FlightsStep trip={trip} onChange={onChange} />}
           {step === 'stays' && <StaysStep trip={trip} onChange={onChange} />}
           {step === 'plan' && <PlanStep trip={trip} onChange={onChange} focusDay={day} />}
           {step === 'prep' && <PrepStep trip={trip} onChange={onChange} />}
+          {step === 'ledger' && <LedgerStep trip={trip} onChange={onChange} />}
 
           {step !== 'basic' && <StepNav step={step} onStep={(s) => onView(s)} empty={emptyStep[step]} />}
         </>

@@ -11,11 +11,13 @@ import {
   mapLinks,
   moveItem,
   newId,
+  placeContext,
   placeSuggestions,
   routeUrl,
   sortDayByTime,
   totalCost,
 } from '../../lib/trip'
+import { isDomestic } from '../../lib/countries'
 import type { Trip } from '../../types'
 import { CATEGORIES } from '../../types'
 import { ConfirmButton } from '../ConfirmButton'
@@ -43,6 +45,9 @@ export function PlanStep({ trip, onChange, focusDay }: Props) {
 
   const dates = eachDate(trip.startDate, trip.endDate)
   const all = completion(trip.items)
+  const context = placeContext(trip)
+  // 네이버지도는 해외 장소에는 약해서 국내 여행에서만 보여준다.
+  const domestic = isDomestic(trip.country)
 
   // 캘린더에서 날짜를 눌러 들어오면 그 날짜가 맨 위에 오도록 스크롤한다.
   useEffect(() => {
@@ -159,7 +164,7 @@ export function PlanStep({ trip, onChange, focusDay }: Props) {
 
               <ul className="items">
                 {visible.map((item, i) => {
-                  const links = mapLinks(item, trip.destination)
+                  const links = mapLinks(item, context)
                   const open = openId === item.id
                   return (
                     <li key={item.id} className={`card item compact${item.done ? ' done' : ''}`}>
@@ -204,9 +209,11 @@ export function PlanStep({ trip, onChange, focusDay }: Props) {
                           </div>
                           {open && (
                             <div className="item-actions">
-                              <a href={links.naver} target="_blank" rel="noreferrer noopener">
-                                네이버지도
-                              </a>
+                              {domestic && (
+                                <a href={links.naver} target="_blank" rel="noreferrer noopener">
+                                  네이버지도
+                                </a>
+                              )}
                               <a href={links.google} target="_blank" rel="noreferrer noopener">
                                 구글지도
                               </a>

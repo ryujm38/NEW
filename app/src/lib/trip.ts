@@ -1,5 +1,7 @@
 import type { Flight, Idea, Item, Stay, Trip } from '../types'
 import { CATEGORIES } from '../types'
+import { findCountry, isDomestic } from './countries'
+import { rateLabel } from './fx'
 
 const DAY_MS = 86_400_000
 export const MAX_TRIP_DAYS = 60
@@ -13,6 +15,57 @@ function parse(date: string): number {
 
 function format(ms: number): string {
   return new Date(ms).toISOString().slice(0, 10)
+}
+
+/** 여행 기본 정보(만들기·수정 폼의 값) */
+export interface BasicValues {
+  name: string
+  destination: string
+  country: string
+  currency: string
+  startDate: string
+  endDate: string
+  budget: number
+  travelers: number
+}
+
+export function createTrip(v: BasicValues): Trip {
+  return {
+    id: newId(),
+    ...v,
+    rate: v.currency === 'KRW' ? 1 : 0,
+    rateUpdatedAt: '',
+    rateSource: '',
+    items: [],
+    flights: [],
+    stays: [],
+    shopping: [],
+    ideas: [],
+    packing: [],
+    expenses: [],
+    createdAt: new Date().toISOString(),
+  }
+}
+
+/**
+ * 기본 정보 수정을 반영한다. 기간을 줄이면 범위 밖이 된 일정을 가장 가까운 날짜로 옮기고,
+ * 현지 통화가 바뀌면 이전 통화의 환율은 버린다(이미 기록한 지출은 자기 환율을 갖고 있어서 그대로다).
+ */
+export function applyBasicValues(t: Trip, v: BasicValues): Trip {
+  const next = { ...t, ...v, items: clampItems(t.items, v.startDate, v.endDate) }
+  if (v.currency === t.currency) return next
+  return { ...next, rate: v.currency === 'KRW' ? 1 : 0, rateUpdatedAt: '', rateSource: '' }
+}
+
+/**
+ * 장소 이름 뒤에 붙여 지도 검색에 쓰는 지역 맥락. 해외면 나라 이름까지 붙여서
+ * 같은 이름의 장소(일본·미국의 유니버설 스튜디오)를 구분한다. 국내는 도시·지역만.
+ */
+export function placeContext(trip: Pick<Trip, 'destination' | 'country'>): string {
+  const c = findCountry(trip.country)
+  const dest = trip.destination.trim()
+  const addCountry = c && !isDomestic(c.code) && c.code !== 'ZZ' && !dest.includes(c.name)
+  return [dest, addCountry ? c.name : ''].filter(Boolean).join(' ')
 }
 
 export function eachDate(start: string, end: string): string[] {
@@ -321,20 +374,21 @@ export interface DayRoute {
  * 장소가 적힌 일정이 하나도 없으면 null.
  */
 export function routeUrl(
-  trip: Pick<Trip, 'items' | 'stays' | 'destination'>,
+  trip: Pick<Trip, 'items' | 'stays' | 'destination' | 'country'>,
   date: string,
   options: { returnToStay?: boolean } = {},
 ): DayRoute | null {
+  const context = placeContext(trip)
   const stops = trip.items
     .filter((i) => i.date === date && !i.done && i.place.trim())
-    .map((i) => [i.place.trim(), trip.destination].filter(Boolean).join(' '))
+    .map((i) => [i.place.trim(), context].filter(Boolean).join(' '))
   if (stops.length === 0) return null
 
   const { start, end } = dayAnchors(trip, date)
   const raw = [
-    ...(start ? [stayQuery(start, trip.destination)] : []),
+    ...(start ? [stayQuery(start, context)] : []),
     ...stops,
-    ...(options.returnToStay && end ? [stayQuery(end, trip.destination)] : []),
+    ...(options.returnToStay && end ? [stayQuery(end, context)] : []),
   ]
   // 같은 지점이 연달아 나오면(예: 숙소에서 출발해 숙소가 목적지인 일정) 이동이 아니므로 합친다.
   const points = raw.filter((p, i) => p !== raw[i - 1])
@@ -451,6 +505,11 @@ export function ideaToItem(idea: Idea, date: string): Item {
 /** 메신저로 공유하기 좋은 일정 텍스트 */
 export function formatItinerary(trip: Trip): string {
   const lines: string[] = [`✈️ ${trip.name} (${trip.destination})`, `${trip.startDate} ~ ${trip.endDate}`]
+  const country = findCountry(trip.country)
+  const overseas = country && !isDomestic(country.code)
+  if (overseas) lines.push(`나라: ${country.name}`)
+  if (trip.travelers > 1) lines.push(`인원: ${trip.travelers}명`)
+  if (overseas && trip.currency !== 'KRW') lines.push(`통화: ${trip.currency}${trip.rate > 0 ? ` (${rateLabel(trip.currency, trip.rate)})` : ''}`)
 
   if (trip.flights.length > 0) {
     lines.push('', '[항공]')
@@ -505,4 +564,23 @@ export function formatItinerary(trip: Trip): string {
   const { total } = budgetBreakdown(trip)
   if (total > 0) lines.push('', `총 예상 비용: ${formatWon(total)}`)
   return lines.join('\n')
+}
+
+/**
+ * Claude 같은 도우미에게 물어볼 때 붙여 넣는 글. 나라와 지역을 분명히 알려서
+ * 같은 이름의 장소(예: 일본·미국의 유니버설 스튜디오)가 섞이지 않게 한다.
+ */
+export function formatForAssistant(trip: Trip): string {
+  const country = findCountry(trip.country)
+  const where = country && !isDomestic(country.code) && country.code !== 'ZZ' ? `${country.name} ${trip.destination}` : trip.destination
+  return [
+    '아래는 제가 여행 플래너 앱으로 짜고 있는 여행 계획이에요.',
+    `여행지: ${where}`,
+    '같은 이름의 장소가 여러 나라에 있으면 위 여행지 기준으로 찾아 주세요. 주소를 알려 줄 때는 현지 표기와 한글 표기를 함께 알려 주세요.',
+    '',
+    formatItinerary(trip),
+    '',
+    '도움이 필요한 것:',
+    '',
+  ].join('\n')
 }

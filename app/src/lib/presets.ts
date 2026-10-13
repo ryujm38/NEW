@@ -5,3 +5,15 @@ export const PACKING_PRESETS: { group: string; items: string[] }[] = [
   { group: '생활', items: ['상비약', '세면도구', '선크림', '우산'] },
   { group: '옷', items: ['속옷·양말', '편한 신발', '겉옷'] },
 ]
+
+/** 국내 여행에서는 해외에서만 필요한 것(여권, 변환 어댑터, 여행자보험 등)을 뺀다. */
+const OVERSEAS_ONLY = new Set(['여권', '항공권·예약 확인서', '여행자보험', '멀티 어댑터'])
+
+export function packingPresetsFor(domestic: boolean): { group: string; items: string[] }[] {
+  const groups = PACKING_PRESETS.map((g) => ({
+    group: g.group,
+    items: domestic ? g.items.filter((n) => !OVERSEAS_ONLY.has(n)) : [...g.items],
+  }))
+  if (domestic) groups.find((g) => g.group === '서류·결제')?.items.unshift('신분증')
+  return groups.filter((g) => g.items.length > 0)
+}

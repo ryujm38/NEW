@@ -1,5 +1,6 @@
-import type { Category, Flight, Idea, Item, PackingItem, ShoppingItem, Stay, Store, Trip } from '../types'
-import { CATEGORIES } from '../types'
+import type { Category, Expense, Flight, Idea, Item, LedgerCategory, PackingItem, ShoppingItem, Stay, Store, Trip } from '../types'
+import { CATEGORIES, LEDGER_CATEGORIES } from '../types'
+import { findCountry, inferCountry } from './countries'
 
 const KEY = 'travel-planner:v1'
 const EMPTY: Store = { version: 1, trips: [] }
@@ -79,23 +80,53 @@ function toPacking(raw: unknown): PackingItem | null {
   return { id: r.id, name: r.name, packed: bool(r.packed) }
 }
 
+const positive = (v: unknown, fallback: number): number => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : fallback)
+const currencyCode = (v: unknown): string | null => (typeof v === 'string' && /^[A-Z]{3}$/.test(v) ? v : null)
+
+function toExpense(raw: unknown): Expense | null {
+  const r = rec(raw)
+  if (!r || typeof r.id !== 'string' || typeof r.date !== 'string' || typeof r.title !== 'string') return null
+  const category = (typeof r.category === 'string' && r.category in LEDGER_CATEGORIES ? r.category : 'etc') as LedgerCategory
+  return {
+    id: r.id,
+    date: r.date,
+    title: r.title,
+    category,
+    amount: num(r.amount),
+    currency: currencyCode(r.currency) ?? 'KRW',
+    rate: positive(r.rate, 1),
+    sourceId: str(r.sourceId),
+  }
+}
+
 function toTrip(raw: unknown): Trip | null {
   if (!raw || typeof raw !== 'object') return null
   const r = raw as Record<string, unknown>
   if (typeof r.id !== 'string' || typeof r.startDate !== 'string' || typeof r.endDate !== 'string') return null
+  const destination = str(r.destination)
+  // 나라가 없는 예전 데이터는 여행지에 나라 이름이 들어 있으면(예: '대만') 그 나라로, 아니면 국내로 본다.
+  const country = (typeof r.country === 'string' && findCountry(r.country) ? findCountry(r.country) : inferCountry(destination)) ?? findCountry('KR')!
+  const currency = currencyCode(r.currency) ?? country.currency
   return {
     id: r.id,
     name: str(r.name, '이름 없는 여행'),
-    destination: str(r.destination),
+    destination,
+    country: country.code,
     startDate: r.startDate,
     endDate: r.endDate,
     budget: num(r.budget),
+    travelers: Math.min(99, Math.max(1, Math.round(positive(r.travelers, 1)))),
+    currency,
+    rate: currency === 'KRW' ? 1 : num(r.rate),
+    rateUpdatedAt: str(r.rateUpdatedAt),
+    rateSource: str(r.rateSource),
     items: list(r.items, toItem),
     flights: list(r.flights, toFlight),
     stays: list(r.stays, toStay),
     shopping: list(r.shopping, toShopping),
     ideas: list(r.ideas, toIdea),
     packing: list(r.packing, toPacking),
+    expenses: list(r.expenses, toExpense),
     createdAt: str(r.createdAt, new Date(0).toISOString()),
   }
 }

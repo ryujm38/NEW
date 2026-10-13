@@ -1,14 +1,42 @@
 import { describe, expect, it } from 'vitest'
 import type { Flight, Idea, Item, Stay, Trip } from '../types'
+import { COUNTRIES, findCountry, inferCountry } from './countries'
+import { CURRENCIES } from './currencies'
+import {
+  fetchRate,
+  defaultUnit,
+  isStale,
+  parseErApi,
+  parseFrankfurter,
+  rateLabel,
+  rateUnit,
+  toKrw,
+  unitFor,
+  type Fetcher,
+} from './fx'
+import {
+  actualByCategory,
+  actualTotal,
+  defaultExpenseDate,
+  expenseFromPlanned,
+  krwOf,
+  perPerson,
+  plannedByCategory,
+  rateForExpense,
+  unrecordedPlanned,
+} from './ledger'
+import { packingPresetsFor, PACKING_PRESETS } from './presets'
 import { parseStore } from './storage'
 import {
   MAX_TRIP_DAYS,
   MAX_WAYPOINTS,
   addMinutes,
+  applyBasicValues,
   budgetBreakdown,
   calendarWeeks,
   clampItems,
   completion,
+  createTrip,
   dateLabel,
   dayAnchors,
   dayEvents,
@@ -17,6 +45,7 @@ import {
   daySummary,
   duplicateTimes,
   eachDate,
+  formatForAssistant,
   formatItinerary,
   formatWon,
   groupRanges,
@@ -26,6 +55,7 @@ import {
   monthLabel,
   moveItem,
   nights,
+  placeContext,
   placeSuggestions,
   routeUrl,
   sortDayByTime,
@@ -78,15 +108,22 @@ const trip = (over: Partial<Trip> = {}): Trip => ({
   id: 't',
   name: '제주 여행',
   destination: '제주',
+  country: 'KR',
   startDate: '2026-11-05',
   endDate: '2026-11-08',
   budget: 0,
+  travelers: 1,
+  currency: 'KRW',
+  rate: 1,
+  rateUpdatedAt: '',
+  rateSource: '',
   items: [],
   flights: [],
   stays: [],
   shopping: [],
   ideas: [],
   packing: [],
+  expenses: [],
   createdAt: '',
   ...over,
 })
@@ -687,5 +724,301 @@ describe('daySummary / todayString', () => {
   it('오늘 날짜를 현지 기준으로 만든다', () => {
     expect(todayString(new Date(2026, 0, 5, 23, 59))).toBe('2026-01-05')
     expect(todayString(new Date(2026, 11, 31, 0, 0))).toBe('2026-12-31')
+  })
+})
+
+describe('countries / currencies', () => {
+  it('국가 코드는 중복이 없고, 모든 기본 통화가 통화 목록에 있다', () => {
+    const codes = COUNTRIES.map((c) => c.code)
+    expect(new Set(codes).size).toBe(codes.length)
+    for (const c of COUNTRIES) expect(Object.keys(CURRENCIES), `${c.name}의 통화 ${c.currency}`).toContain(c.currency)
+  })
+  it('나라를 코드로 찾는다', () => {
+    expect(findCountry('JP')).toMatchObject({ name: '일본', currency: 'JPY' })
+    expect(findCountry('TW')?.currency).toBe('TWD')
+    expect(findCountry('XX')).toBeUndefined()
+  })
+  it('여행지 글에 나라 이름이 있으면 그 나라로 추측한다 (국내·기타·도시 이름만 있으면 추측하지 않음)', () => {
+    expect(inferCountry('대만')?.code).toBe('TW')
+    expect(inferCountry('일본 오사카')?.code).toBe('JP')
+    expect(inferCountry('사이판')?.code).toBe('MP')
+    expect(inferCountry('인도네시아 발리')?.code).toBe('ID')
+    expect(inferCountry('인도 뭄바이')?.code).toBe('IN')
+    expect(inferCountry('인도네시아와 인도')?.code).toBe('ID')
+    expect(inferCountry('제주')).toBeUndefined()
+    expect(inferCountry('도쿄')).toBeUndefined()
+    expect(inferCountry('')).toBeUndefined()
+  })
+})
+
+describe('placeContext (같은 이름의 장소 구분)', () => {
+  it('해외는 나라 이름까지 붙인다', () => {
+    expect(placeContext({ destination: '오사카', country: 'JP' })).toBe('오사카 일본')
+    expect(placeContext({ destination: '올랜도', country: 'US' })).toBe('올랜도 미국')
+  })
+  it('국내는 도시·지역만, 이미 나라 이름이 있으면 중복하지 않는다', () => {
+    expect(placeContext({ destination: '제주', country: 'KR' })).toBe('제주')
+    expect(placeContext({ destination: '일본 오사카', country: 'JP' })).toBe('일본 오사카')
+    expect(placeContext({ destination: '어딘가', country: 'ZZ' })).toBe('어딘가')
+  })
+  it('경로 링크에도 나라가 들어간다', () => {
+    const t = trip({
+      destination: '오사카',
+      country: 'JP',
+      items: [{ ...item('a', '2026-11-06'), place: '유니버설 스튜디오' }, { ...item('b', '2026-11-06'), place: '도톤보리' }],
+    })
+    const q = new URL(routeUrl(t, '2026-11-06')!.url).searchParams
+    expect(q.get('origin')).toBe('유니버설 스튜디오 오사카 일본')
+    expect(q.get('destination')).toBe('도톤보리 오사카 일본')
+  })
+})
+
+describe('createTrip / applyBasicValues', () => {
+  const v = { name: '오사카 여행', destination: '오사카', country: 'JP', currency: 'JPY', startDate: '2026-11-05', endDate: '2026-11-08', budget: 1000000, travelers: 2 }
+  it('새 여행은 비어 있고 외화면 환율은 아직 모른다', () => {
+    const t = createTrip(v)
+    expect(t).toMatchObject({ country: 'JP', currency: 'JPY', rate: 0, travelers: 2, items: [], expenses: [] })
+    expect(createTrip({ ...v, country: 'KR', currency: 'KRW' }).rate).toBe(1)
+  })
+  it('기간을 줄이면 범위 밖 일정을 옮기고, 통화가 같으면 환율을 유지한다', () => {
+    const t = { ...createTrip(v), rate: 9.2, rateUpdatedAt: 'x', rateSource: 'manual', items: [item('a', '2026-11-08')] }
+    const next = applyBasicValues(t, { ...v, endDate: '2026-11-06' })
+    expect(next.items[0].date).toBe('2026-11-06')
+    expect(next.rate).toBe(9.2)
+  })
+  it('통화를 바꾸면 이전 환율은 버리지만 기록한 지출은 그대로 둔다', () => {
+    const exp = { id: 'e', date: '2026-11-05', title: '라멘', category: 'food' as const, amount: 1000, currency: 'JPY', rate: 9.2, sourceId: '' }
+    const t = { ...createTrip(v), rate: 9.2, rateUpdatedAt: 'x', rateSource: 'manual', expenses: [exp] }
+    const next = applyBasicValues(t, { ...v, currency: 'USD' })
+    expect(next).toMatchObject({ rate: 0, rateUpdatedAt: '', rateSource: '' })
+    expect(next.expenses).toEqual([exp])
+    expect(applyBasicValues(t, { ...v, country: 'KR', currency: 'KRW' }).rate).toBe(1)
+  })
+})
+
+describe('fx: 환율 해석 (응답 형식은 문서 기준의 예시이며 실제 호출로 확인하지 못함)', () => {
+  const er = { result: 'success', time_last_update_unix: 1760230000, rates: { KRW: 1, JPY: 0.108, TWD: 0.0225, VND: 18.2 } }
+  it('open.er-api.com 형식: 원 1당 외화를 1외화당 원으로 뒤집는다', () => {
+    const q = parseErApi(er, 'JPY')!
+    expect(q.rate).toBeCloseTo(9.2593, 3)
+    expect(q.source).toBe('open.er-api.com')
+    expect(q.updatedAt).toBe(new Date(1760230000 * 1000).toISOString())
+    expect(parseErApi(er, 'TWD')!.rate).toBeCloseTo(44.444, 2)
+  })
+  it('frankfurter 형식', () => {
+    const q = parseFrankfurter({ amount: 1, base: 'KRW', date: '2026-10-12', rates: { JPY: 0.108 } }, 'JPY')!
+    expect(q.rate).toBeCloseTo(9.2593, 3)
+    expect(q.updatedAt).toBe('2026-10-12T00:00:00.000Z')
+  })
+  it('예상과 다른 응답은 모두 null', () => {
+    expect(parseErApi({ result: 'error' }, 'JPY')).toBeNull()
+    expect(parseErApi({ result: 'success', rates: {} }, 'JPY')).toBeNull()
+    expect(parseErApi({ result: 'success', rates: { JPY: 0 } }, 'JPY')).toBeNull()
+    expect(parseErApi({ result: 'success', rates: { JPY: 'abc' } }, 'JPY')).toBeNull()
+    expect(parseErApi(null, 'JPY')).toBeNull()
+    expect(parseFrankfurter({ base: 'USD', rates: { JPY: 150 } }, 'JPY')).toBeNull()
+    expect(parseFrankfurter('x', 'JPY')).toBeNull()
+  })
+  const ok = (json: unknown): Response => ({ ok: true, json: async () => json }) as Response
+  const now = () => new Date('2026-10-12T05:00:00Z')
+
+  it('첫 제공처가 되면 그 값을 쓴다', async () => {
+    const calls: string[] = []
+    const f: Fetcher = async (url) => (calls.push(url), ok(er))
+    const q = await fetchRate('JPY', f, now)
+    expect(q.rate).toBeCloseTo(9.2593, 3)
+    expect(calls).toHaveLength(1)
+  })
+  it('첫 제공처가 실패하면 다음 제공처로 넘어간다', async () => {
+    const f: Fetcher = async (url) => {
+      if (url.includes('er-api')) throw new Error('blocked')
+      return ok({ base: 'KRW', date: '2026-10-12', rates: { JPY: 0.1 } })
+    }
+    const q = await fetchRate('JPY', f, now)
+    expect(q.rate).toBeCloseTo(10, 5)
+    expect(q.source).toBe('api.frankfurter.dev')
+  })
+  it('HTTP 오류와 이상한 응답이 이어지면 던진다', async () => {
+    const bad: Fetcher = async (url) => (url.includes('er-api') ? ({ ok: false } as Response) : ok({ hello: 'world' }))
+    await expect(fetchRate('JPY', bad, now)).rejects.toThrow('환율을 가져오지 못했어요')
+    const down: Fetcher = async () => {
+      throw new Error('offline')
+    }
+    await expect(fetchRate('JPY', down, now)).rejects.toThrow()
+  })
+  it('시각이 없는 응답은 지금 시각으로 채우고, 원화는 호출 없이 1', async () => {
+    const f: Fetcher = async () => ok({ result: 'success', rates: { JPY: 0.1 } })
+    expect((await fetchRate('JPY', f, now)).updatedAt).toBe('2026-10-12T05:00:00.000Z')
+    const never: Fetcher = async () => {
+      throw new Error('호출되면 안 됨')
+    }
+    expect((await fetchRate('KRW', never, now)).rate).toBe(1)
+  })
+  it('환율 표시 단위: 엔은 100엔, 동은 1만 동, 달러·바트는 1단위', () => {
+    expect(rateUnit(9.26)).toBe(100)
+    expect(rateUnit(0.055)).toBe(10000)
+    expect(rateUnit(1392)).toBe(1)
+    expect(rateLabel('JPY', 9.2593)).toBe('100 JPY = 926원')
+    expect(rateLabel('VND', 0.055)).toBe('10,000 VND = 550원')
+    expect(rateLabel('USD', 1392.4)).toBe('1 USD = 1,392원')
+    expect(rateLabel('THB', 40)).toBe('1 THB = 40원')
+    expect(rateLabel('JPY', 0)).toBe('환율 미설정')
+  })
+  it('환율 입력 기준 단위: 모르면 통화별 기본값, 알면 환율 크기에 맞춤', () => {
+    expect(defaultUnit('JPY')).toBe(100)
+    expect(defaultUnit('VND')).toBe(10000)
+    expect(defaultUnit('USD')).toBe(1)
+    expect(unitFor('JPY', 0)).toBe(100)
+    expect(unitFor('USD', 1392)).toBe(1)
+    expect(unitFor('JPY', 9.26)).toBe(100)
+  })
+  it('원화 환산과 오래된 환율 판단', () => {
+    expect(toKrw(1500, 9.2593)).toBe(13889)
+    expect(toKrw(0, 9.2)).toBe(0)
+    expect(isStale('2026-10-12T00:00:00Z', new Date('2026-10-12T05:00:00Z'))).toBe(false)
+    expect(isStale('2026-10-11T00:00:00Z', new Date('2026-10-12T05:00:00Z'))).toBe(true)
+    expect(isStale('', new Date())).toBe(true)
+    expect(isStale('not a date', new Date())).toBe(true)
+  })
+})
+
+describe('ledger', () => {
+  const exp = (id: string, category: 'food' | 'shopping' | 'flight', amount: number, rate = 1, sourceId = '') => ({
+    id, date: '2026-11-05', title: id, category, amount, currency: rate === 1 ? 'KRW' : 'JPY', rate, sourceId,
+  })
+  it('지출을 원화로 환산해 합산하고 분류별로 나눈다 (기록 당시 환율 사용)', () => {
+    const list = [exp('a', 'food', 1000, 9.2), exp('b', 'food', 5000), exp('c', 'shopping', 2000, 9.5)]
+    expect(krwOf(list[0])).toBe(9200)
+    expect(actualTotal(list)).toBe(9200 + 5000 + 19000)
+    expect(actualByCategory(list)).toMatchObject({ food: 14200, shopping: 19000, flight: 0 })
+    expect(actualTotal([])).toBe(0)
+  })
+  it('계획 비용을 가계부 분류로 합친다', () => {
+    const t = trip({
+      flights: [flight({ cost: 200000 })],
+      stays: [stay({ cost: 300000 })],
+      items: [
+        { ...item('a', 'd', '', 10000), category: 'food' },
+        { ...item('b', 'd', '', 5000), category: 'move' },
+        { ...item('c', 'd', '', 7000), category: 'stay' },
+        { ...item('d', 'd', '', 3000), category: 'etc' },
+      ],
+      shopping: [{ id: 's', name: '라면', where: '', price: 4000, bought: false }],
+    })
+    expect(plannedByCategory(t)).toEqual({ flight: 200000, stay: 307000, food: 10000, move: 5000, sight: 0, shopping: 4000, etc: 3000 })
+  })
+  it('아직 기록하지 않은 계획 비용만 모은다 (비용 없는 것·못 산 쇼핑·이미 기록한 것 제외)', () => {
+    const t = trip({
+      flights: [flight({ id: 'f1', cost: 100000 }), flight({ id: 'f2', cost: 0 })],
+      stays: [stay({ id: 's1', cost: 200000 })],
+      items: [{ ...item('i1', '2026-11-06', '', 8000), category: 'food' }, item('i2', '2026-11-06', '', 0)],
+      shopping: [
+        { id: 'p1', name: '초콜릿', where: '', price: 12000, bought: true },
+        { id: 'p2', name: '술', where: '', price: 30000, bought: false },
+      ],
+      expenses: [exp('x', 'flight', 100000, 1, 'f1')],
+    })
+    expect(unrecordedPlanned(t).map((p) => p.id)).toEqual(['s1', 'i1', 'p1'])
+    const e = expenseFromPlanned(unrecordedPlanned(t)[1], '2026-11-05')
+    expect(e).toMatchObject({ title: 'i1', category: 'food', amount: 8000, currency: 'KRW', rate: 1, sourceId: 'i1', date: '2026-11-06' })
+  })
+  it('쇼핑처럼 날짜가 없는 계획은 대체 날짜로 기록한다', () => {
+    const t = trip({ shopping: [{ id: 'p1', name: '초콜릿', where: '', price: 12000, bought: true }] })
+    expect(expenseFromPlanned(unrecordedPlanned(t)[0], '2026-11-07').date).toBe('2026-11-07')
+  })
+  it('지출 환율: 원화는 1, 카드 청구액을 알면 역산, 아니면 여행 환율, 모르면 null', () => {
+    expect(rateForExpense('KRW', 5000, 0, 0)).toBe(1)
+    expect(rateForExpense('JPY', 1000, 9500, 9.2)).toBe(9.5)
+    expect(rateForExpense('JPY', 1000, 0, 9.2)).toBe(9.2)
+    expect(rateForExpense('JPY', 1000, 0, 0)).toBeNull()
+  })
+  it('기본 날짜와 1인당 금액', () => {
+    expect(defaultExpenseDate(trip(), '2026-11-06')).toBe('2026-11-06')
+    expect(defaultExpenseDate(trip(), '2026-10-01')).toBe('2026-11-05')
+    expect(perPerson(100001, 2)).toBe(50001)
+    expect(perPerson(100, 0)).toBe(100)
+  })
+})
+
+describe('공유 텍스트: 나라·인원·통화', () => {
+  const t = trip({ name: '오사카 여행', destination: '오사카', country: 'JP', currency: 'JPY', rate: 9.2593, travelers: 2 })
+  it('해외 여행은 나라, 인원, 통화와 환율을 적는다', () => {
+    const text = formatItinerary(t)
+    expect(text).toContain('나라: 일본')
+    expect(text).toContain('인원: 2명')
+    expect(text).toContain('통화: JPY (100 JPY = 926원)')
+  })
+  it('국내 1인 여행에는 그런 줄이 없다', () => {
+    const text = formatItinerary(trip())
+    expect(text).not.toContain('나라:')
+    expect(text).not.toContain('인원:')
+    expect(text).not.toContain('통화:')
+  })
+  it('도우미에게 물어볼 때 쓰는 글은 여행지 나라를 분명히 적는다', () => {
+    const text = formatForAssistant(t)
+    expect(text).toContain('여행지: 일본 오사카')
+    expect(text).toContain('같은 이름의 장소가 여러 나라에 있으면')
+    expect(text).toContain('도움이 필요한 것:')
+    expect(formatForAssistant(trip())).toContain('여행지: 제주')
+  })
+})
+
+describe('packingPresetsFor', () => {
+  const names = (domestic: boolean) => packingPresetsFor(domestic).flatMap((g) => g.items)
+  it('국내에서는 해외 전용 준비물을 빼고 신분증을 넣는다', () => {
+    expect(names(true)).not.toContain('여권')
+    expect(names(true)).not.toContain('멀티 어댑터')
+    expect(names(true)).toContain('신분증')
+    expect(names(true)).toContain('보조배터리')
+  })
+  it('해외에서는 모두 있고 신분증은 없다', () => {
+    expect(names(false)).toContain('여권')
+    expect(names(false)).toContain('멀티 어댑터')
+    expect(names(false)).not.toContain('신분증')
+    expect(names(false).length).toBe(PACKING_PRESETS.flatMap((g) => g.items).length)
+  })
+})
+
+describe('parseStore: 나라·환율·가계부', () => {
+  it('예전 데이터: 나라가 없으면 여행지로 추측하고, 없으면 국내 원화', () => {
+    const s = parseStore(
+      JSON.stringify({
+        version: 1,
+        trips: [
+          { id: 'a', destination: '대만', startDate: '2026-10-12', endDate: '2026-10-13' },
+          { id: 'b', destination: '제주', startDate: '2026-10-12', endDate: '2026-10-13' },
+        ],
+      }),
+    )
+    expect(s?.trips[0]).toMatchObject({ country: 'TW', currency: 'TWD', rate: 0, travelers: 1, expenses: [] })
+    expect(s?.trips[1]).toMatchObject({ country: 'KR', currency: 'KRW', rate: 1 })
+  })
+  it('새 필드를 검증해서 읽고 망가진 지출은 버린다', () => {
+    const s = parseStore(
+      JSON.stringify({
+        version: 1,
+        trips: [
+          {
+            id: 't', destination: '오사카', country: 'JP', currency: 'JPY', rate: 9.3, rateUpdatedAt: '2026-10-12T00:00:00Z', rateSource: 'manual', travelers: 3.4,
+            startDate: '2026-10-12', endDate: '2026-10-13',
+            expenses: [
+              { id: 'e1', date: '2026-10-12', title: '라멘', category: 'food', amount: 1000, currency: 'JPY', rate: 9.3, sourceId: 'i1' },
+              { id: 'e2', date: '2026-10-12', title: '이상', category: 'weird', amount: -5, currency: 'jpy', rate: 0 },
+              { id: 'bad' },
+              null,
+            ],
+          },
+        ],
+      }),
+    )
+    const t = s!.trips[0]
+    expect(t).toMatchObject({ country: 'JP', currency: 'JPY', rate: 9.3, rateSource: 'manual', travelers: 3 })
+    expect(t.expenses).toHaveLength(2)
+    expect(t.expenses[0]).toMatchObject({ amount: 1000, rate: 9.3, sourceId: 'i1' })
+    expect(t.expenses[1]).toMatchObject({ category: 'etc', amount: 0, currency: 'KRW', rate: 1 })
+  })
+  it('알 수 없는 나라 코드와 이상한 통화 코드는 안전한 값으로 바꾼다', () => {
+    const s = parseStore(JSON.stringify({ version: 1, trips: [{ id: 't', destination: '제주', country: 'XX', currency: 'won', startDate: '2026-10-12', endDate: '2026-10-13' }] }))
+    expect(s!.trips[0]).toMatchObject({ country: 'KR', currency: 'KRW' })
   })
 })

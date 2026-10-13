@@ -11,6 +11,8 @@ function count(trip: Trip, key: StepKey): number {
       return trip.items.length
     case 'prep':
       return trip.shopping.length + trip.packing.length
+    case 'ledger':
+      return trip.expenses.length
     default:
       return 0
   }

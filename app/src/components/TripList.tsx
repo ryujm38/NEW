@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { parseStore } from '../lib/storage'
-import { budgetBreakdown, eachDate, formatWon, newId } from '../lib/trip'
+import { budgetBreakdown, createTrip, eachDate, formatWon } from '../lib/trip'
 import type { StepKey, Store, Trip } from '../types'
 import { TripForm, type TripFormValues } from './TripForm'
 
@@ -22,7 +22,7 @@ export function TripList({ store, saveFailed, onOpen, onCreate, onReplaceAll }: 
   const exportRef = useRef<HTMLTextAreaElement>(null)
 
   const create = (v: TripFormValues) => {
-    const trip: Trip = { id: newId(), ...v, items: [], flights: [], stays: [], shopping: [], ideas: [], packing: [], createdAt: new Date().toISOString() }
+    const trip = createTrip(v)
     onCreate(trip)
     setCreating(false)
     // 새 여행도 캘린더가 먼저 보인다. 비어 있으면 거기서 항공권부터 등록하도록 안내한다.

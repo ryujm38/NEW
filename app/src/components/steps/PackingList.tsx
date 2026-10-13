@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { newId } from '../../lib/trip'
-import { PACKING_PRESETS } from '../../lib/presets'
+import { isDomestic } from '../../lib/countries'
+import { packingPresetsFor } from '../../lib/presets'
 import type { Trip } from '../../types'
 import { ConfirmButton } from '../ConfirmButton'
 import { QuickAdd } from '../QuickAdd'
@@ -15,7 +16,7 @@ export function PackingList({ trip, onChange }: Props) {
   const [presetsOpen, setPresetsOpen] = useState(trip.packing.length === 0)
   const have = new Set(trip.packing.map((p) => p.name))
   const packedCount = trip.packing.filter((p) => p.packed).length
-  const groups = PACKING_PRESETS.map((g) => ({ ...g, items: g.items.filter((n) => !have.has(n)) })).filter((g) => g.items.length > 0)
+  const groups = packingPresetsFor(isDomestic(trip.country)).map((g) => ({ ...g, items: g.items.filter((n) => !have.has(n)) })).filter((g) => g.items.length > 0)
   const remainingPresets = groups.reduce((n, g) => n + g.items.length, 0)
 
   const add = (name: string) => onChange((t) => ({ ...t, packing: [...t.packing, { id: newId(), name, packed: false }] }))

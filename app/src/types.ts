@@ -79,6 +79,36 @@ export interface PackingItem {
   packed: boolean
 }
 
+/** 가계부 분류. 일정 분류(Category)와 항공·숙소·쇼핑을 합친 것이다. */
+export const LEDGER_CATEGORIES = {
+  flight: '항공',
+  stay: '숙소',
+  food: '식사',
+  move: '교통',
+  sight: '관광',
+  shopping: '쇼핑',
+  etc: '기타',
+} as const
+
+export type LedgerCategory = keyof typeof LEDGER_CATEGORIES
+
+/** 여행 중에 실제로 쓴 돈 한 건 */
+export interface Expense {
+  id: string
+  /** yyyy-mm-dd */
+  date: string
+  title: string
+  category: LedgerCategory
+  /** currency 단위의 금액 */
+  amount: number
+  /** 'KRW' 또는 여행의 현지 통화 */
+  currency: string
+  /** 기록할 때의 환율(1 currency = rate 원). 원화면 1. 나중에 환율이 바뀌어도 이 지출은 그대로다. */
+  rate: number
+  /** 계획에서 가져온 지출이면 원래 항목(항공·숙소·일정·쇼핑)의 id. 직접 입력이면 빈 문자열 */
+  sourceId: string
+}
+
 export interface Trip {
   id: string
   name: string
@@ -87,8 +117,20 @@ export interface Trip {
   startDate: string
   /** yyyy-mm-dd */
   endDate: string
-  /** 0이면 예산 미설정 */
+  /** 나라 코드(ISO 3166-1 alpha-2). 'KR'이면 국내 여행 */
+  country: string
+  /** 0이면 예산 미설정. 원화 */
   budget: number
+  /** 여행 인원. 1인당 비용 계산에 쓴다 */
+  travelers: number
+  /** 현지 통화 코드. 국내 여행이면 'KRW' */
+  currency: string
+  /** 1 currency = rate 원. 0이면 아직 모름 */
+  rate: number
+  /** 환율을 받아온(입력한) 시각 ISO. 모르면 빈 문자열 */
+  rateUpdatedAt: string
+  /** 'manual'(직접 입력) 또는 받아온 곳의 도메인. 모르면 빈 문자열 */
+  rateSource: string
   /** 배열 순서가 하루 안의 표시 순서다 */
   items: Item[]
   flights: Flight[]
@@ -96,6 +138,7 @@ export interface Trip {
   shopping: ShoppingItem[]
   ideas: Idea[]
   packing: PackingItem[]
+  expenses: Expense[]
   createdAt: string
 }
 
@@ -111,6 +154,7 @@ export const STEPS = [
   { key: 'stays', label: '숙소' },
   { key: 'plan', label: '일정' },
   { key: 'prep', label: '준비' },
+  { key: 'ledger', label: '가계부' },
 ] as const
 
 export type StepKey = (typeof STEPS)[number]['key']
