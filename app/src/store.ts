@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { loadStore, saveStore } from './lib/storage'
-import { STEPS, type StepKey, type Store, type Trip } from './types'
+import { STEPS, type Store, type Trip, type ViewKey } from './types'
 
 export function useStore() {
   const [store, setStore] = useState<Store>(loadStore)
@@ -31,35 +31,44 @@ export function useStore() {
 
 export interface TripRoute {
   id: string
-  step: StepKey
+  step: ViewKey
+  /** 일정 화면에서 바로 보여줄 날짜(yyyy-mm-dd) */
+  day?: string
 }
 
-/** 해시 기반 라우팅: #/trip/<id>/<단계>. 뒤로가기 버튼이 모바일에서 그대로 동작한다. 단계를 생략하면 '일정'. */
+/**
+ * 해시 기반 라우팅. 뒤로가기 버튼이 모바일에서 그대로 동작한다.
+ *   #/trip/<id>                  캘린더(개요)
+ *   #/trip/<id>/<단계>            세부 단계
+ *   #/trip/<id>/plan/<yyyy-mm-dd> 일정 화면에서 그 날짜로 이동
+ */
 function readRoute(): TripRoute | null {
-  const m = /^#\/trip\/([^/]+)(?:\/([a-z]+))?$/.exec(window.location.hash)
+  const m = /^#\/trip\/([^/]+)(?:\/([a-z]+)(?:\/(\d{4}-\d{2}-\d{2}))?)?$/.exec(window.location.hash)
   if (!m) return null
-  const step = STEPS.find((s) => s.key === m[2])?.key ?? 'plan'
-  return { id: decodeURIComponent(m[1]), step }
+  const step: ViewKey = STEPS.find((s) => s.key === m[2])?.key ?? 'overview'
+  return { id: decodeURIComponent(m[1]), step, day: step === 'plan' ? m[3] : undefined }
 }
 
-const sameRoute = (a: TripRoute | null, b: TripRoute | null) => a?.id === b?.id && a?.step === b?.step
+const sameRoute = (a: TripRoute | null, b: TripRoute | null) => a?.id === b?.id && a?.step === b?.step && a?.day === b?.day
 
-export function useTripRoute(): [TripRoute | null, (id: string | null, step?: StepKey) => void] {
+export function useTripRoute(): [TripRoute | null, (id: string | null, step?: ViewKey, day?: string) => void] {
   const [route, setRoute] = useState<TripRoute | null>(readRoute)
 
   useEffect(() => {
-    const onChange = () => setRoute((prev) => {
-      const next = readRoute()
-      return sameRoute(prev, next) ? prev : next
-    })
+    const onChange = () =>
+      setRoute((prev) => {
+        const next = readRoute()
+        return sameRoute(prev, next) ? prev : next
+      })
     window.addEventListener('hashchange', onChange)
     return () => window.removeEventListener('hashchange', onChange)
   }, [])
 
-  const go = useCallback((id: string | null, step: StepKey = 'plan') => {
-    setRoute(id ? { id, step } : null)
+  const go = useCallback((id: string | null, step: ViewKey = 'overview', day?: string) => {
+    setRoute(id ? { id, step, day: step === 'plan' ? day : undefined } : null)
     try {
-      window.location.hash = id ? `/trip/${encodeURIComponent(id)}/${step}` : '/'
+      const path = step === 'overview' ? '' : `/${step}${step === 'plan' && day ? `/${day}` : ''}`
+      window.location.hash = id ? `/trip/${encodeURIComponent(id)}${path}` : '/'
     } catch {
       // 주소 해시를 바꿀 수 없는 환경(임베디드 뷰어)에서도 화면 전환은 동작해야 한다.
     }

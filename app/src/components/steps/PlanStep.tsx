@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   completion,
   dateLabel,
@@ -26,16 +26,28 @@ import { QuickAdd } from '../QuickAdd'
 interface Props {
   trip: Trip
   onChange: (fn: (t: Trip) => Trip) => void
+  /** 캘린더에서 날짜를 눌러 들어왔을 때 바로 보여줄 날짜 */
+  focusDay?: string
 }
 
-export function PlanStep({ trip, onChange }: Props) {
+const dayId = (date: string) => `day-${date}`
+
+export function PlanStep({ trip, onChange, focusDay }: Props) {
   // 'new:<date>' 이면 해당 날짜에 자세히 추가 중, 그 외에는 수정 중인 item id
   const [editing, setEditing] = useState<string | null>(null)
+  // 동작 버튼(지도·순서·수정·삭제)을 펼친 일정
+  const [openId, setOpenId] = useState<string | null>(null)
   const [hideDone, setHideDone] = useState(false)
   const [returnToStay, setReturnToStay] = useState(true)
+  const [ideasOpen, setIdeasOpen] = useState(trip.ideas.length > 0)
 
   const dates = eachDate(trip.startDate, trip.endDate)
   const all = completion(trip.items)
+
+  // 캘린더에서 날짜를 눌러 들어오면 그 날짜가 맨 위에 오도록 스크롤한다.
+  useEffect(() => {
+    if (focusDay) document.getElementById(dayId(focusDay))?.scrollIntoView({ block: 'start' })
+  }, [focusDay])
 
   const addItem = (date: string, v: ItemValues) => {
     onChange((t) => ({ ...t, items: [...t.items, { id: newId(), date, done: false, ...v }] }))
@@ -74,7 +86,25 @@ export function PlanStep({ trip, onChange }: Props) {
         </div>
       </div>
 
-      <IdeasPanel trip={trip} dates={dates} onChange={onChange} />
+      {dates.length > 1 && (
+        <nav className="dayjump" aria-label="날짜로 이동">
+          {dates.map((date, idx) => (
+            <button
+              key={date}
+              className="chip"
+              aria-label={`${idx + 1}일차로 이동`}
+              onClick={() => document.getElementById(dayId(date))?.scrollIntoView({ block: 'start' })}
+            >
+              {idx + 1}
+            </button>
+          ))}
+        </nav>
+      )}
+
+      <details className="ideas-wrap" open={ideasOpen} onToggle={(e) => setIdeasOpen(e.currentTarget.open)}>
+        <summary>후보지 보관함 ({trip.ideas.length})</summary>
+        <IdeasPanel trip={trip} dates={dates} onChange={onChange} />
+      </details>
 
       <div className="days">
         {dates.map((date, idx) => {
@@ -87,7 +117,7 @@ export function PlanStep({ trip, onChange }: Props) {
           const warnings = dayWarnings(trip, date)
           const route = routeUrl(trip, date, { returnToStay })
           return (
-            <section className="day" key={date} aria-label={`${idx + 1}일차`}>
+            <section className="day" id={dayId(date)} key={date} aria-label={`${idx + 1}일차`}>
               <div className="day-head">
                 <h3>
                   Day {idx + 1} <span className="muted">{dateLabel(date)}</span>
@@ -130,8 +160,9 @@ export function PlanStep({ trip, onChange }: Props) {
               <ul className="items">
                 {visible.map((item, i) => {
                   const links = mapLinks(item, trip.destination)
+                  const open = openId === item.id
                   return (
-                    <li key={item.id} className={`card item${item.done ? ' done' : ''}`}>
+                    <li key={item.id} className={`card item compact${item.done ? ' done' : ''}`}>
                       {editing === item.id ? (
                         <ItemForm
                           initial={item}
@@ -154,44 +185,64 @@ export function PlanStep({ trip, onChange }: Props) {
                             <div className="item-body">
                               <strong>{item.title}</strong>
                               <span className={`tag tag-${item.category}`}>{CATEGORIES[item.category]}</span>
-                              {item.place && <div className="muted">📍 {item.place}</div>}
-                              {item.note && <div className="muted note">{item.note}</div>}
-                              {item.cost > 0 && <div className="cost">{formatWon(item.cost)}</div>}
+                              {(item.place || item.cost > 0) && (
+                                <div className="muted item-meta">
+                                  {item.place && <span>📍 {item.place}</span>}
+                                  {item.cost > 0 && <span className="cost">{formatWon(item.cost)}</span>}
+                                </div>
+                              )}
+                              {open && item.note && <div className="muted note">{item.note}</div>}
                             </div>
-                          </div>
-                          <div className="item-actions">
-                            <a href={links.naver} target="_blank" rel="noreferrer noopener">
-                              네이버지도
-                            </a>
-                            <a href={links.google} target="_blank" rel="noreferrer noopener">
-                              구글지도
-                            </a>
-                            <span className="spacer" />
                             <button
-                              className="icon"
-                              aria-label={`${item.title} 위로`}
-                              disabled={hideDone || i === 0}
-                              onClick={() => onChange((t) => ({ ...t, items: moveItem(t.items, item.id, -1) }))}
+                              className="icon more"
+                              aria-label={`${item.title} 더보기`}
+                              aria-expanded={open}
+                              onClick={() => setOpenId(open ? null : item.id)}
                             >
-                              ↑
+                              ⋯
                             </button>
-                            <button
-                              className="icon"
-                              aria-label={`${item.title} 아래로`}
-                              disabled={hideDone || i === visible.length - 1}
-                              onClick={() => onChange((t) => ({ ...t, items: moveItem(t.items, item.id, 1) }))}
-                            >
-                              ↓
-                            </button>
-                            <button className="ghost" onClick={() => setEditing(item.id)}>
-                              수정
-                            </button>
-                            <ConfirmButton
-                              label="삭제"
-                              prompt={`'${item.title}' 삭제?`}
-                              onConfirm={() => onChange((t) => ({ ...t, items: t.items.filter((x) => x.id !== item.id) }))}
-                            />
                           </div>
+                          {open && (
+                            <div className="item-actions">
+                              <a href={links.naver} target="_blank" rel="noreferrer noopener">
+                                네이버지도
+                              </a>
+                              <a href={links.google} target="_blank" rel="noreferrer noopener">
+                                구글지도
+                              </a>
+                              <span className="spacer" />
+                              <button
+                                className="icon"
+                                aria-label={`${item.title} 위로`}
+                                disabled={hideDone || i === 0}
+                                onClick={() => onChange((t) => ({ ...t, items: moveItem(t.items, item.id, -1) }))}
+                              >
+                                ↑
+                              </button>
+                              <button
+                                className="icon"
+                                aria-label={`${item.title} 아래로`}
+                                disabled={hideDone || i === visible.length - 1}
+                                onClick={() => onChange((t) => ({ ...t, items: moveItem(t.items, item.id, 1) }))}
+                              >
+                                ↓
+                              </button>
+                              <button
+                                className="ghost"
+                                onClick={() => {
+                                  setEditing(item.id)
+                                  setOpenId(null)
+                                }}
+                              >
+                                수정
+                              </button>
+                              <ConfirmButton
+                                label="삭제"
+                                prompt={`'${item.title}' 삭제?`}
+                                onConfirm={() => onChange((t) => ({ ...t, items: t.items.filter((x) => x.id !== item.id) }))}
+                              />
+                            </div>
+                          )}
                         </>
                       )}
                     </li>

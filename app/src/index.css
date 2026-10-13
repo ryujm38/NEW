@@ -8,6 +8,8 @@
   --primary-text: #ffffff;
   --danger: #b42318;
   --warn: #b54708;
+  --flight: #1d4ed8;
+  --stay: #7e22ce;
   --radius: 12px;
   color-scheme: light;
 }
@@ -23,6 +25,8 @@
     --primary-text: #062a26;
     --danger: #ff8a80;
     --warn: #fdb022;
+    --flight: #8ab4ff;
+    --stay: #d8b4fe;
     color-scheme: dark;
   }
 }
@@ -37,6 +41,8 @@
   --primary-text: #062a26;
   --danger: #ff8a80;
   --warn: #fdb022;
+  --flight: #8ab4ff;
+  --stay: #d8b4fe;
   color-scheme: dark;
 }
 
@@ -265,19 +271,27 @@ button.icon {
 /* 일차 */
 .days {
   display: grid;
-  gap: 8px 20px;
+  gap: 8px;
   grid-template-columns: 1fr;
 }
 
 .day {
   margin-top: 16px;
   min-width: 0;
+  scroll-margin-top: env(safe-area-inset-top, 0px);
 }
 
 .day-head {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
+  /* 스크롤해도 지금 어느 날짜를 보고 있는지 알 수 있게 고정한다 */
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 2;
+  background: var(--bg);
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
 }
 
 .items {
@@ -374,9 +388,6 @@ button.icon {
 /* 태블릿·PC: 더 넓게, 여러 열로 */
 @media (min-width: 720px) {
   .trips {
-    grid-template-columns: 1fr 1fr;
-  }
-  .days {
     grid-template-columns: 1fr 1fr;
   }
 }
@@ -694,4 +705,215 @@ h3 {
 
 .prep h2 + section h3 {
   margin-top: 8px;
+}
+
+/* 한 줄로 줄인 일정 항목 */
+.item.compact {
+  padding: 8px 12px;
+  margin: 6px 0;
+}
+
+.item.compact .item-main {
+  align-items: flex-start;
+}
+
+.item.compact .item-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  margin: 0;
+}
+
+.icon.more {
+  flex: none;
+  margin-left: auto;
+  font-weight: 700;
+}
+
+.dayjump {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin: 4px 0 8px;
+}
+
+.dayjump .chip {
+  flex: none;
+  min-width: 40px;
+  padding: 0 10px;
+}
+
+.ideas-wrap {
+  margin: 4px 0 8px;
+}
+
+.ideas-wrap > summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+/* 캘린더 */
+.calendar {
+  margin-top: 12px;
+}
+
+.cal-title {
+  font-size: 1.1rem;
+  margin: 0 0 8px;
+}
+
+.cal-head,
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.cal-head {
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.cal-blank {
+  min-height: 72px;
+}
+
+.cal-cell {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 2px;
+  min-height: 72px;
+  height: auto;
+  padding: 6px 4px;
+  min-width: 0;
+  overflow: hidden;
+  text-align: left;
+}
+
+.cal-cell.today {
+  border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+
+.cal-cell.all-done {
+  opacity: 0.65;
+}
+
+.cal-date {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.cal-dayno {
+  display: none;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.cal-marks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+}
+
+.dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.dot-flight {
+  background: var(--flight);
+}
+
+.dot-stay {
+  background: var(--stay);
+}
+
+.cal-count {
+  font-size: 0.7rem;
+  color: var(--primary);
+}
+
+.cal-lines {
+  display: none;
+}
+
+.cal-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 8px 0;
+}
+
+/* 세부 페이지로 들어가는 입구 */
+.entry-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.entry {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
+  min-height: 64px;
+  height: auto;
+  padding: 10px 14px;
+  text-align: left;
+}
+
+@media (min-width: 720px) {
+  .cal-cell {
+    min-height: 116px;
+    padding: 8px;
+    gap: 4px;
+  }
+  .cal-blank {
+    min-height: 116px;
+  }
+  .cal-dayno {
+    display: inline;
+  }
+  .cal-lines {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    width: 100%;
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+  .cal-lines > span {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .entry-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+.guide {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  margin: 12px 0;
 }

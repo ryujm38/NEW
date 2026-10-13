@@ -23,8 +23,9 @@ export default function App() {
     return (
       <TripView
         trip={trip}
-        step={route.step}
-        onStep={(step) => go(trip.id, step)}
+        view={route.step}
+        day={route.day}
+        onView={(view, day) => go(trip.id, view, day)}
         onChange={(fn) => updateTrip(trip.id, fn)}
         onBack={() => go(null)}
         onDelete={() => {

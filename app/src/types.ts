@@ -114,3 +114,6 @@ export const STEPS = [
 ] as const
 
 export type StepKey = (typeof STEPS)[number]['key']
+
+/** 여행 안의 화면. 'overview'는 들어가자마자 보이는 캘린더, 나머지는 세부 단계. */
+export type ViewKey = StepKey | 'overview'

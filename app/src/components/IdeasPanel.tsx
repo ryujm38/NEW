@@ -63,9 +63,6 @@ export function IdeasPanel({ trip, dates, onChange }: Props) {
 
   return (
     <section className="ideas" aria-label="후보지 보관함">
-      <h3>
-        후보지 보관함 <span className="muted">{trip.ideas.length}</span>
-      </h3>
       <p className="muted">가고 싶은 곳을 먼저 모아 두고, 날짜를 골라 일정에 넣으세요. 넣으면 보관함에서는 빠져요.</p>
 
       <QuickAdd

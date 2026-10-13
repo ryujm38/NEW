@@ -217,6 +217,63 @@ export function makeRoundTrip(inp: RoundTripInput, startDate: string, endDate: s
 }
 
 // ---------------------------------------------------------------------------
+// 여행 캘린더
+// ---------------------------------------------------------------------------
+
+/** 0(일)~6(토) */
+export function weekdayOf(date: string): number {
+  return new Date(parse(date)).getUTCDay()
+}
+
+/**
+ * 여행 기간만 달력(일~토) 모양의 주 단위 행으로 만든다. 첫 주 앞과 마지막 주 뒤의 기간 밖 칸은 null.
+ * 1주 여행이 일요일에 시작하면 1행, 2주 여행이 수요일에 시작하면 3행이 된다.
+ */
+export function calendarWeeks(start: string, end: string): (string | null)[][] {
+  const days = eachDate(start, end)
+  if (days.length === 0) return []
+  const cells: (string | null)[] = [...new Array<null>(weekdayOf(days[0])).fill(null), ...days]
+  while (cells.length % 7 !== 0) cells.push(null)
+  const weeks: (string | null)[][] = []
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7))
+  return weeks
+}
+
+/** '2026년 11월' 또는 달이 바뀌면 '2026년 11월 ~ 12월'(해가 바뀌면 연도도 표시) */
+export function monthLabel(start: string, end: string): string {
+  const [sy, sm] = start.split('-').map(Number)
+  const [ey, em] = end.split('-').map(Number)
+  if (sy === ey && sm === em) return `${sy}년 ${sm}월`
+  return sy === ey ? `${sy}년 ${sm}월 ~ ${em}월` : `${sy}년 ${sm}월 ~ ${ey}년 ${em}월`
+}
+
+export interface DaySummary {
+  items: number
+  done: number
+  /** 그날 출발하거나 도착하는 항공 수 */
+  flights: number
+  checkIns: number
+  checkOuts: number
+}
+
+export function daySummary(trip: Pick<Trip, 'items' | 'flights' | 'stays'>, date: string): DaySummary {
+  const day = itemsForDate(trip.items, date)
+  return {
+    items: day.length,
+    done: day.filter((i) => i.done).length,
+    flights: trip.flights.filter((f) => f.departDate === date || f.arriveDate === date).length,
+    checkIns: trip.stays.filter((s) => s.checkIn === date).length,
+    checkOuts: trip.stays.filter((s) => s.checkOut === date).length,
+  }
+}
+
+/** 사용자의 현지 시간 기준 오늘 날짜(yyyy-mm-dd) */
+export function todayString(now: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+}
+
+// ---------------------------------------------------------------------------
 // 등록한 항공·숙소를 일정 짤 때 꺼내 쓰는 장치들
 // ---------------------------------------------------------------------------
 

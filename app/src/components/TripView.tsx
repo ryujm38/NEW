@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { eachDate, formatItinerary } from '../lib/trip'
-import type { StepKey, Trip } from '../types'
+import type { StepKey, Trip, ViewKey } from '../types'
 import { BudgetSummary } from './BudgetSummary'
 import { ConfirmButton } from './ConfirmButton'
 import { BasicStep } from './steps/BasicStep'
@@ -10,25 +10,29 @@ import { PrepStep } from './steps/PrepStep'
 import { StaysStep } from './steps/StaysStep'
 import { StepNav } from './StepNav'
 import { Stepper } from './Stepper'
+import { TripOverview } from './TripOverview'
 
 interface Props {
   trip: Trip
-  step: StepKey
-  onStep: (step: StepKey) => void
+  /** 'overview'면 캘린더, 아니면 세부 단계 */
+  view: ViewKey
+  /** 일정 화면에서 바로 보여줄 날짜 */
+  day?: string
+  onView: (view: ViewKey, day?: string) => void
   onChange: (fn: (t: Trip) => Trip) => void
   onBack: () => void
   onDelete: () => void
 }
 
-export function TripView({ trip, step, onStep, onChange, onBack, onDelete }: Props) {
+export function TripView({ trip, view, day, onView, onChange, onBack, onDelete }: Props) {
   const [notice, setNotice] = useState('')
   // 공유 시트와 클립보드가 모두 막혔을 때 직접 복사할 수 있게 보여주는 텍스트
   const [shareText, setShareText] = useState<string | null>(null)
 
-  // 단계를 옮기면 맨 위에서 시작한다.
+  // 화면을 옮기면 맨 위에서 시작한다. 특정 날짜로 가는 경우에는 일정 화면이 그 날짜로 스크롤한다.
   useEffect(() => {
-    window.scrollTo({ top: 0 })
-  }, [step])
+    if (!day) window.scrollTo({ top: 0 })
+  }, [view, day])
 
   const share = async () => {
     const text = formatItinerary(trip)
@@ -59,13 +63,20 @@ export function TripView({ trip, step, onStep, onChange, onBack, onDelete }: Pro
     plan: trip.items.length === 0,
     prep: trip.shopping.length === 0 && trip.packing.length === 0,
   }
+  const step = view === 'overview' ? null : view
 
   return (
     <main className="page">
       <header className="topbar">
-        <button className="ghost" onClick={onBack} aria-label="여행 목록으로">
-          ← 목록
-        </button>
+        {step ? (
+          <button className="ghost" onClick={() => onView('overview')} aria-label="캘린더로">
+            ← 캘린더
+          </button>
+        ) : (
+          <button className="ghost" onClick={onBack} aria-label="여행 목록으로">
+            ← 목록
+          </button>
+        )}
         <div className="topbar-actions">
           <button className="ghost" onClick={share}>
             공유
@@ -86,16 +97,22 @@ export function TripView({ trip, step, onStep, onChange, onBack, onDelete }: Pro
         <textarea className="export-box" readOnly rows={8} value={shareText} aria-label="공유할 일정 텍스트" onFocus={(e) => e.currentTarget.select()} />
       )}
 
-      <Stepper trip={trip} step={step} onStep={onStep} />
-      {step !== 'basic' && <BudgetSummary trip={trip} />}
+      {!step && <TripOverview trip={trip} onOpen={(s, d) => onView(s, d)} />}
 
-      {step === 'basic' && <BasicStep trip={trip} onChange={onChange} onNext={() => onStep('flights')} />}
-      {step === 'flights' && <FlightsStep trip={trip} onChange={onChange} />}
-      {step === 'stays' && <StaysStep trip={trip} onChange={onChange} />}
-      {step === 'plan' && <PlanStep trip={trip} onChange={onChange} />}
-      {step === 'prep' && <PrepStep trip={trip} onChange={onChange} />}
+      {step && (
+        <>
+          <Stepper trip={trip} step={step} onStep={(s) => onView(s)} />
+          {step !== 'basic' && step !== 'plan' && <BudgetSummary trip={trip} />}
 
-      {step !== 'basic' && <StepNav step={step} onStep={onStep} empty={emptyStep[step]} />}
+          {step === 'basic' && <BasicStep trip={trip} onChange={onChange} onNext={() => onView('flights')} />}
+          {step === 'flights' && <FlightsStep trip={trip} onChange={onChange} />}
+          {step === 'stays' && <StaysStep trip={trip} onChange={onChange} />}
+          {step === 'plan' && <PlanStep trip={trip} onChange={onChange} focusDay={day} />}
+          {step === 'prep' && <PrepStep trip={trip} onChange={onChange} />}
+
+          {step !== 'basic' && <StepNav step={step} onStep={(s) => onView(s)} empty={emptyStep[step]} />}
+        </>
+      )}
     </main>
   )
 }

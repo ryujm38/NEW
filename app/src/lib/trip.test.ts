@@ -6,6 +6,7 @@ import {
   MAX_WAYPOINTS,
   addMinutes,
   budgetBreakdown,
+  calendarWeeks,
   clampItems,
   completion,
   dateLabel,
@@ -13,6 +14,7 @@ import {
   dayEvents,
   dayWarnings,
   dayWindow,
+  daySummary,
   duplicateTimes,
   eachDate,
   formatItinerary,
@@ -21,15 +23,18 @@ import {
   ideaToItem,
   makeRoundTrip,
   mapLinks,
+  monthLabel,
   moveItem,
   nights,
   placeSuggestions,
   routeUrl,
   sortDayByTime,
   sortFlights,
+  todayString,
   totalCost,
   uncoveredNights,
   validateDates,
+  weekdayOf,
 } from './trip'
 
 const item = (id: string, date: string, time = '', cost = 0): Item => ({
@@ -614,5 +619,73 @@ describe('parseStore: 후보지·준비물', () => {
     )
     expect(s?.trips[0].ideas).toEqual([{ id: 'i', title: '우도', place: '', category: 'sight', note: '', cost: 0 }])
     expect(s?.trips[0].packing).toEqual([{ id: 'p', name: '여권', packed: true }])
+  })
+})
+
+describe('weekdayOf / calendarWeeks', () => {
+  it('요일을 구한다 (일=0)', () => {
+    expect(weekdayOf('2026-11-08')).toBe(0)
+    expect(weekdayOf('2026-11-05')).toBe(4)
+    expect(weekdayOf('2028-02-29')).toBe(2)
+  })
+  it('일요일에 시작하는 1주 여행은 1행, 빈 칸이 없다', () => {
+    const w = calendarWeeks('2026-11-08', '2026-11-14')
+    expect(w).toHaveLength(1)
+    expect(w[0]).toEqual(['2026-11-08', '2026-11-09', '2026-11-10', '2026-11-11', '2026-11-12', '2026-11-13', '2026-11-14'])
+  })
+  it('목요일에 시작하는 4일 여행은 앞뒤를 빈 칸으로 채운 1행', () => {
+    const w = calendarWeeks('2026-11-05', '2026-11-08')
+    expect(w).toEqual([[null, null, null, null, '2026-11-05', '2026-11-06', '2026-11-07'], ['2026-11-08', null, null, null, null, null, null]])
+  })
+  it('주 시작에 맞춘 2주 여행은 2행', () => {
+    expect(calendarWeeks('2026-11-08', '2026-11-21')).toHaveLength(2)
+  })
+  it('중간에 시작하는 2주 여행은 3행이고 모든 날짜가 정확히 한 번씩 들어간다', () => {
+    const w = calendarWeeks('2026-11-05', '2026-11-18')
+    expect(w).toHaveLength(3)
+    const filled = w.flat().filter((d): d is string => d !== null)
+    expect(filled).toEqual(eachDate('2026-11-05', '2026-11-18'))
+    expect(w.every((row) => row.length === 7)).toBe(true)
+  })
+  it('월 경계를 넘어도 이어진다', () => {
+    const filled = calendarWeeks('2026-10-30', '2026-11-03').flat().filter(Boolean)
+    expect(filled).toEqual(['2026-10-30', '2026-10-31', '2026-11-01', '2026-11-02', '2026-11-03'])
+  })
+  it('잘못된 기간은 빈 배열', () => {
+    expect(calendarWeeks('2026-11-08', '2026-11-01')).toEqual([])
+  })
+})
+
+describe('monthLabel', () => {
+  it('같은 달 / 달이 바뀜 / 해가 바뀜', () => {
+    expect(monthLabel('2026-11-05', '2026-11-18')).toBe('2026년 11월')
+    expect(monthLabel('2026-11-28', '2026-12-04')).toBe('2026년 11월 ~ 12월')
+    expect(monthLabel('2026-12-28', '2027-01-04')).toBe('2026년 12월 ~ 2027년 1월')
+  })
+})
+
+describe('daySummary / todayString', () => {
+  const t = trip({
+    flights: [flight({ id: 'f1' }), flight({ id: 'f2', departDate: '2026-11-08', arriveDate: '2026-11-09' })],
+    stays: [stay({ checkIn: '2026-11-05', checkOut: '2026-11-07' })],
+    items: [item('a', '2026-11-05'), { ...item('b', '2026-11-05'), done: true }, item('c', '2026-11-06')],
+  })
+  it('그날의 일정 수, 완료 수, 항공, 체크인·체크아웃을 센다', () => {
+    expect(daySummary(t, '2026-11-05')).toEqual({ items: 2, done: 1, flights: 1, checkIns: 1, checkOuts: 0 })
+    expect(daySummary(t, '2026-11-07')).toEqual({ items: 0, done: 0, flights: 0, checkIns: 0, checkOuts: 1 })
+  })
+  it('출발과 도착이 다른 날이면 두 날 모두에 항공이 표시된다', () => {
+    expect(daySummary(t, '2026-11-08').flights).toBe(1)
+    expect(daySummary(t, '2026-11-09').flights).toBe(1)
+  })
+  it('아무것도 없는 날', () => {
+    expect(daySummary(t, '2026-11-20')).toEqual({ items: 0, done: 0, flights: 0, checkIns: 0, checkOuts: 0 })
+  })
+  it('같은 날 출발·도착하는 항공은 한 번만 센다', () => {
+    expect(daySummary(trip({ flights: [flight()] }), '2026-11-05').flights).toBe(1)
+  })
+  it('오늘 날짜를 현지 기준으로 만든다', () => {
+    expect(todayString(new Date(2026, 0, 5, 23, 59))).toBe('2026-01-05')
+    expect(todayString(new Date(2026, 11, 31, 0, 0))).toBe('2026-12-31')
   })
 })

@@ -25,8 +25,8 @@ export function TripList({ store, saveFailed, onOpen, onCreate, onReplaceAll }: 
     const trip: Trip = { id: newId(), ...v, items: [], flights: [], stays: [], shopping: [], ideas: [], packing: [], createdAt: new Date().toISOString() }
     onCreate(trip)
     setCreating(false)
-    // 기본 정보를 입력했으니 다음 단계(항공권)부터 이어서 안내한다.
-    onOpen(trip.id, 'flights')
+    // 새 여행도 캘린더가 먼저 보인다. 비어 있으면 거기서 항공권부터 등록하도록 안내한다.
+    onOpen(trip.id)
   }
 
   const toggleExport = () => setExportText((cur) => (cur === null ? JSON.stringify(store, null, 2) : null))
