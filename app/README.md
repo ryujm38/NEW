@@ -51,6 +51,7 @@ npm install
 npm run dev      # 개발 서버
 npm test         # 단위 테스트 (날짜 계산, 달력 배치, 환율 해석, 가계부 계산, 나라 추측, 정렬, 예산 내역, 자동 일정, 빈 밤, 경로 링크, 일정 가능 시간대, 저장 데이터 호환)
 npm run lint
+npm run e2e        # 브라우저 시험(빌드→서버→시험 전부). Chromium이 필요해요: e2e/README.md
 npm run build    # dist/ 생성 (PWA 포함)
 npm run preview  # 빌드 결과 미리보기
 ```
