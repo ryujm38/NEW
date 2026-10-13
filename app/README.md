@@ -1,6 +1,6 @@
 # 여행 플래너 (가칭)
 
-일정, 예산, 지도 링크를 한곳에서 정리하는 반응형 웹 앱. 폰·태블릿·PC 브라우저에서 쓰고, 홈 화면에 추가하면 앱처럼 열려요(PWA).
+일정, 예산, 지도 링크를 한곳에서 정리하는 반응형 웹 앱. 폰·태블릿·PC 브라우저에서 쓰고, 홈 화면에 추가하면 앱처럼 열려요(PWA). 어디에 올리고 어떻게 설치하는지는 [`../docs/03-hosting-and-install.md`](../docs/03-hosting-and-install.md)를 보세요.
 
 ## 지금 되는 것 (MVP)
 
@@ -57,7 +57,7 @@ npm run preview  # 빌드 결과 미리보기
 
 ## 배포 (GitHub Pages)
 
-**지금은 공개 배포를 하지 않아요.** `.github/workflows/deploy.yml`은 자동 실행을 꺼 두었고, 공개할 때만 Actions 탭에서 수동으로 실행하면 lint → 테스트 → 빌드 → 배포가 돌아요. 주소는 `https://<사용자>.github.io/NEW/`예요. 이 저장소가 공개 저장소라서 Pages를 켜면 누구나 접속할 수 있어요.
+**지금은 공개 배포를 하지 않아요.** 사업으로 쓸 거라면 GitHub Pages(공식 약관상 사업·SaaS 불가)와 Vercel Hobby(비상업용)는 피하고 Cloudflare Pages 등을 권해요. 호스팅 비교와 올리는 방법은 `../docs/03-hosting-and-install.md`에 있어요. 아래 GitHub Pages 설정은 참고용이에요. `.github/workflows/deploy.yml`은 자동 실행을 꺼 두었고, 공개할 때만 Actions 탭에서 수동으로 실행하면 lint → 테스트 → 빌드 → 배포가 돌아요. 주소는 `https://<사용자>.github.io/NEW/`예요. 이 저장소가 공개 저장소라서 Pages를 켜면 누구나 접속할 수 있어요.
 
 **공개할 때 처음 한 번만:** 저장소 Settings → Pages → Build and deployment → Source를 **GitHub Actions**로 바꿔 주세요. 이걸 켜기 전에는 배포 단계가 실패해요.
 
@@ -78,9 +78,18 @@ npm run build:single   # dist-single/index.html(전체 문서), dist-single/frag
 
 이 버전은 서비스 워커를 쓰지 않아서 오프라인 설치(PWA)는 안 돼요. 또 이런 뷰어에서는 `confirm()`, 공유 시트, 파일 다운로드가 막혀 있어서, 삭제 확인은 앱 안의 버튼으로, 공유와 백업은 복사할 수 있는 텍스트로 대신 제공해요.
 
+## 아이콘 다시 만들기
+
+`public/icon.svg`(둥근 모서리)와 `scripts/icon-maskable.svg`(꽉 찬 사각형)를 고친 뒤 PNG를 다시 만들어요. Chromium과 `playwright-core`가 필요하고 프로젝트 의존성은 아니에요.
+
+```bash
+CHROMIUM_PATH=/path/to/chromium node scripts/make-icons.mjs
+```
+
 ## 구조
 
 - `src/lib/trip.ts` 날짜·예산·정렬·자동 일정·장소 맥락 등 순수 로직 (테스트 대상)
+- `src/lib/install.ts` 앱으로 설치 안내·저장소 보존 요청
 - `src/lib/fx.ts` 환율 받아오기·해석·표시, `src/lib/ledger.ts` 가계부 계산, `src/lib/countries.ts`·`currencies.ts` 나라·통화 데이터
 - `src/lib/storage.ts` localStorage 읽기/쓰기와 데이터 검증
 - `src/store.ts` 상태 훅, 해시 라우팅(`#/trip/<id>` 캘린더, `#/trip/<id>/<단계>`, `#/trip/<id>/plan/<날짜>`)
@@ -93,7 +102,7 @@ npm run build:single   # dist-single/index.html(전체 문서), dist-single/frag
 - 비공개 미리보기(Artifact)처럼 외부 접속이 막힌 뷰어에서는 자동 환율이 동작하지 않고 직접 입력만 가능해요.
 - 나라 목록은 한국인이 많이 가는 곳 위주예요. 없는 나라는 '기타'를 고르고 도시·지역에 적으세요. 나라별 기본 통화는 추천값이에요(캄보디아·몰디브는 달러로 해 뒀어요).
 - 일정·항공·숙소의 비용은 원화로만 입력해요. 외화 환산은 가계부에서만 해요.
-- PWA 아이콘이 SVG 하나뿐이라, 일부 기기의 홈 화면 아이콘이 기본 모양으로 나올 수 있어요. 배포 전에 192/512px PNG가 필요해요.
+- 홈 화면 아이콘(PNG 192·512, 마스크용, 아이폰용)을 갖췄지만, 실제 안드로이드·아이폰에서 어떻게 보이는지는 확인하지 못했어요.
 - 장소는 글자로만 저장해요. 좌표·장소 검색 자동완성은 없어요. 그래서 경로는 지도 앱이 장소 이름을 찾아 주는 데 기대고 있어요.
 - 일정 가능 시간대의 여유 시간(도착 후 1시간, 출발 전 2시간)은 고정값이에요. 국내선·국제선 구분이나 개인별 조정은 아직 없어요.
 - 경로 링크는 구글지도 기준이고, 경유지는 9곳까지만 반영돼요.

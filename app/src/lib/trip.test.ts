@@ -26,6 +26,7 @@ import {
   unrecordedPlanned,
 } from './ledger'
 import { packingPresetsFor, PACKING_PRESETS } from './presets'
+import { isIosDevice } from './install'
 import { parseStore } from './storage'
 import {
   MAX_TRIP_DAYS,
@@ -1020,5 +1021,20 @@ describe('parseStore: 나라·환율·가계부', () => {
   it('알 수 없는 나라 코드와 이상한 통화 코드는 안전한 값으로 바꾼다', () => {
     const s = parseStore(JSON.stringify({ version: 1, trips: [{ id: 't', destination: '제주', country: 'XX', currency: 'won', startDate: '2026-10-12', endDate: '2026-10-13' }] }))
     expect(s!.trips[0]).toMatchObject({ country: 'KR', currency: 'KRW' })
+  })
+})
+
+describe('isIosDevice', () => {
+  it('아이폰·아이패드(UA)를 알아본다', () => {
+    expect(isIosDevice('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15', 'iPhone', 5)).toBe(true)
+    expect(isIosDevice('Mozilla/5.0 (iPad; CPU OS 16_0 like Mac OS X)', 'iPad', 5)).toBe(true)
+  })
+  it('데스크톱 사파리처럼 보이는 아이패드는 터치 지점 수로 구분한다', () => {
+    expect(isIosDevice('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Safari', 'MacIntel', 5)).toBe(true)
+  })
+  it('맥·윈도우·안드로이드는 아니다', () => {
+    expect(isIosDevice('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Safari', 'MacIntel', 0)).toBe(false)
+    expect(isIosDevice('Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120', 'Win32', 0)).toBe(false)
+    expect(isIosDevice('Mozilla/5.0 (Linux; Android 14; Pixel 8) Chrome/120 Mobile', 'Linux armv81', 5)).toBe(false)
   })
 })

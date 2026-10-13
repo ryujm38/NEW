@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { parseStore } from '../lib/storage'
 import { budgetBreakdown, createTrip, eachDate, formatWon } from '../lib/trip'
 import type { StepKey, Store, Trip } from '../types'
+import { InstallHint } from './InstallHint'
 import { TripForm, type TripFormValues } from './TripForm'
 
 interface Props {
@@ -63,6 +64,8 @@ export function TripList({ store, saveFailed, onOpen, onCreate, onReplaceAll }: 
     <main className="page">
       <h1>내 여행</h1>
       <p className="muted">일정과 예산, 지도 링크를 한곳에서. 데이터는 이 기기에 저장돼요.</p>
+
+      <InstallHint />
 
       {saveFailed && (
         <p className="error" role="alert">

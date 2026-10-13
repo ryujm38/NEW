@@ -4,7 +4,7 @@ import { defineConfig } from 'vitest/config'
 
 const pwa = VitePWA({
   registerType: 'autoUpdate',
-  includeAssets: ['favicon.svg'],
+  includeAssets: ['icon.svg', 'apple-touch-icon.png'],
   manifest: {
     name: '여행 플래너',
     short_name: '여행 플래너',
@@ -15,9 +15,16 @@ const pwa = VitePWA({
     scope: '.',
     theme_color: '#0f766e',
     background_color: '#f6f7f8',
-    icons: [{ src: 'favicon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
+    categories: ['travel', 'lifestyle'],
+    icons: [
+      { src: 'icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+      // 안드로이드가 아이콘을 원·둥근 사각형 등으로 잘라 쓸 수 있게 여백을 둔 버전
+      { src: 'icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+      { src: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
+    ],
   },
-  workbox: { globPatterns: ['**/*.{js,css,html,svg}'] },
+  workbox: { globPatterns: ['**/*.{js,css,html,svg,png,webmanifest}'] },
 })
 
 // https://vite.dev/config/
