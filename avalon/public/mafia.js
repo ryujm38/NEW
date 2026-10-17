@@ -135,12 +135,10 @@ function renderMafia() {
     ${mfDockButtons(me)}
     <div class="foot">
       <button data-act="mafiaInfo">🎭 내 역할</button>
-      ${S.voteHistory.length ? '<button data-act="mafiaHist">📜 투표 기록</button>' : ''}
       ${isHost ? '<button data-act="hostmenu">⚙ 방장</button>' : ''}
     </div>
   </div>
   ${ui.mInfo ? `<div class="overlay" data-act="closeall"><div class="sheet">${mfRoleCard()}<button data-act="closeall">닫기</button></div></div>` : ''}
-  ${ui.mHist ? `<div class="overlay" data-act="closeall"><div class="sheet"><h2>📜 투표 기록</h2>${mfHistoryHtml()}<button data-act="closeall">닫기</button></div></div>` : ''}
   ${ui.hostOpen && isHost ? mfHostMenuHtml() : ''}`;
 }
 
@@ -170,38 +168,6 @@ function mfRoleBanner(me) {
   if (!me || !me.role || S.phase === 'roles' || S.phase === 'over') return '';
   const r = MAFIA_ROLE[me.role];
   return `<div class="mbanner ${r.cls}">${r.icon} 나는 <b>${r.name}</b>${me.alive ? '' : ' · 💀 죽었어요 (지켜보기만 할 수 있어요)'}</div>`;
-}
-
-// 낮마다 투표 / 찬반 투표 기록
-function mfHistoryHtml() {
-  if (!S.voteHistory.length) return '<p class="dim">아직 투표 기록이 없어요.</p>';
-  const names = (ids) => (ids.length ? ids.map(mfName).join(', ') : '<span class="dim">없음</span>');
-  return S.voteHistory.slice().reverse().map((h) => {
-    const byTarget = {};
-    const abstain = [];
-    Object.entries(h.votes).forEach(([voter, t]) => {
-      if (t) (byTarget[t] = byTarget[t] || []).push(voter);
-      else abstain.push(voter);
-    });
-    const rows = Object.entries(byTarget).sort((a, b) => b[1].length - a[1].length)
-      .map(([t, voters]) => `<div class="small"><b>${mfName(t)}</b> ${voters.length}표 <span class="dim">← ${names(voters)}</span></div>`).join('');
-    let result;
-    if (h.trial) {
-      const kill = Object.entries(h.trial.votes).filter(([, v]) => v).map(([id]) => id);
-      const spare = Object.entries(h.trial.votes).filter(([, v]) => !v).map(([id]) => id);
-      result = `<div class="small" style="margin-top:6px"><b>⚖️ 찬반 투표 — ${mfName(h.accused)}님</b></div>
-        <div class="small"><span class="n">☠️ 찬성 ${kill.length}</span> <span class="dim">${names(kill)}</span></div>
-        <div class="small"><span class="y">🙏 반대 ${spare.length}</span> <span class="dim">${names(spare)}</span></div>
-        <div class="small"><b class="${h.executed ? 'n' : 'y'}">${h.executed ? `${mfName(h.executed)}님 처형` : `${mfName(h.accused)}님 생존`}</b></div>`;
-    } else if (h.accused) {
-      result = `<div class="small" style="margin-top:6px"><b>⚖️ ${mfName(h.accused)}님 처형 후보 — 찬반 투표 진행 중</b></div>`;
-    } else {
-      result = '<div class="small" style="margin-top:6px"><b class="y">처형 후보 없음 (동률 또는 전원 기권)</b></div>';
-    }
-    return `<div class="card" style="margin-bottom:8px"><b>${h.day}일차</b>
-      <div class="small dim" style="margin-top:4px">1차 투표</div>${rows || '<div class="small dim">모두 기권</div>'}
-      ${abstain.length && rows ? `<div class="small dim">기권: ${names(abstain)}</div>` : ''}${result}</div>`;
-  }).join('');
 }
 
 function mfLog() {
@@ -330,7 +296,6 @@ function mafiaSync() {
   if (S.kind !== 'mafia') {
     ui.mSel = null;
     ui.mInfo = false;
-    ui.mHist = false;
     return;
   }
   const na = S.nightAction;
@@ -393,7 +358,6 @@ function mafiaClick(act, el) {
     case 'ready': send({ t: 'ready' }); return true;
     case 'mafiaSend': mafiaSendChat(); return true;
     case 'mafiaInfo': ui.mInfo = true; render(); return true;
-    case 'mafiaHist': ui.mHist = true; render(); return true;
     case 'mafiaOpt': return true; // 체크박스는 change 이벤트로 처리
     default: return false;
   }

@@ -52,7 +52,6 @@ function createRoom(code) {
     trial: {},
     lastNight: null,
     lastVote: null,
-    voteHistory: [], // 낮마다 투표/찬반 투표 기록 (개표된 것만)
     policeLog: [],
     chat: [],
     log: [],
@@ -154,7 +153,7 @@ function start(room, byId) {
     p.alive = true;
   });
   Object.assign(room, {
-    gameNo: room.gameNo + 1, day: 1, night: null, votes: {}, accused: null, trial: {}, lastNight: null, lastVote: null, voteHistory: [],
+    gameNo: room.gameNo + 1, day: 1, night: null, votes: {}, accused: null, trial: {}, lastNight: null, lastVote: null,
     policeLog: [], chat: [], log: [], winner: null, pendingWinner: null,
     readyIds: new Set(), acks: new Set(), phase: 'roles',
   });
@@ -172,7 +171,7 @@ function backToLobby(room, byId) {
   });
   if (!getPlayer(room, room.hostId)) room.hostId = room.players[0] ? room.players[0].id : null;
   Object.assign(room, {
-    phase: 'lobby', day: 0, night: null, votes: {}, accused: null, trial: {}, lastNight: null, lastVote: null, voteHistory: [], policeLog: [], chat: [], log: [],
+    phase: 'lobby', day: 0, night: null, votes: {}, accused: null, trial: {}, lastNight: null, lastVote: null, policeLog: [], chat: [], log: [],
     winner: null, pendingWinner: null, readyIds: new Set(), acks: new Set(),
   });
   return {};
@@ -316,8 +315,7 @@ function resolveVote(room) {
   const top = Math.max(0, ...Object.values(counts));
   const leaders = Object.keys(counts).filter((t) => counts[t] === top);
   const accused = top > 0 && leaders.length === 1 ? leaders[0] : null;
-  room.lastVote = { day: room.day, votes: { ...room.votes }, counts, accused, executed: null, trial: null };
-  room.voteHistory.push(room.lastVote);
+  room.lastVote = { votes: { ...room.votes }, counts, accused, executed: null, trial: null };
   if (accused) {
     room.accused = accused;
     room.trial = {};
@@ -510,7 +508,6 @@ function viewFor(room, viewerId) {
     nightAction,
     policeLog: me && me.role === 'police' ? room.policeLog : null,
     lastNight: started && room.phase !== 'roles' && room.phase !== 'night' ? room.lastNight : null,
-    voteHistory: started ? room.voteHistory : [],
     lastVote: room.phase === 'voteResult' || room.phase === 'trial' || over ? room.lastVote : null,
     canChat,
     chat: room.chat.filter((c) => c.ch === 'all' || (c.ch === 'mafia' && isMafia)),
