@@ -7,7 +7,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
 const common = require('./common');
-const engines = { avalon: require('./game'), uno: require('./uno'), bang: require('./bang'), mafia: require('./mafia'), splendor: require('./splendor') };
+const engines = { avalon: require('./game'), uno: require('./uno'), bang: require('./bang'), mafia: require('./mafia'), splendor: require('./splendor'), marble: require('./marble') };
 
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MIME = {

@@ -377,6 +377,9 @@ function botTurn(room, rnd) {
     must(sp.takeGems(room, who, shuffled.length >= 3 ? shuffled.slice(0, 3) : shuffled), 'take fallback');
     return;
   }
+  // 다른 선택지가 없으면 살 수 있는 카드는 반드시 산다 (넘기기는 아무것도 못 할 때만 가능)
+  if (myRes.length) { must(sp.buy(room, who, { reserved: myRes[0].id }), 'buy reserved fallback'); return; }
+  if (buyable.length) { must(sp.buy(room, who, { level: buyable[0].level, index: buyable[0].index }), 'buy fallback'); return; }
   must(sp.pass(room, who), 'pass');
 }
 

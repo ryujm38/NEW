@@ -495,3 +495,49 @@ test('스플렌더 방: 3명이 접속해 시작하고, 예약 카드는 본인�
     httpServer.close();
   }
 });
+
+test('부루마블 방: 설정은 방장만, 시작 후 차례인 사람만 굴리고, 다른 게임 요청은 거부된다', async () => {
+  const { httpServer } = createAppServer();
+  await new Promise((r) => httpServer.listen(0, '127.0.0.1', r));
+  const port = httpServer.address().port;
+  const cs = [];
+  try {
+    for (let i = 0; i < 3; i++) {
+      const c = client(port);
+      await c.open;
+      cs.push(c);
+    }
+    cs[0].send({ t: 'create', name: '방장', game: 'marble' });
+    await cs[0].until((c) => c.code);
+    assert.strictEqual(cs[0].state.kind, 'marble');
+    for (let i = 1; i < 3; i++) {
+      cs[i].send({ t: 'join', code: cs[0].code, name: `친구${i}` });
+      await cs[i].until((c) => c.state);
+    }
+    cs[1].send({ t: 'setting', key: 'maxRounds', value: 20 });
+    await cs[1].until((c) => c.errors.length === 1);
+    cs[0].send({ t: 'setting', key: 'maxRounds', value: 20 });
+    await Promise.all(cs.map((c) => c.until((x) => x.state.settings.maxRounds === 20)));
+    cs[0].send({ t: 'start' });
+    await Promise.all(cs.map((c) => c.until((x) => x.state.phase === 'play')));
+    assert.ok(cs.every((c) => c.state.tiles.length === 32));
+    const mover = cs.find((c) => c.state.mode === 'roll');
+    const others = cs.filter((c) => c !== mover);
+    others[0].send({ t: 'roll' });
+    await others[0].until((c) => c.errors.length >= 1);
+    mover.send({ t: 'roll' });
+    await Promise.all(cs.map((c) => c.until((x) => x.state.dice !== null)));
+    assert.strictEqual(cs[0].state.diceBy, mover.id);
+    // 다른 게임 요청은 거부
+    others[1].send({ t: 'vote', approve: true });
+    others[1].send({ t: 'draw' });
+    others[1].send({ t: 'take', colors: ['w'] });
+    await others[1].until((c) => c.errors.length >= 3);
+    cs[0].send({ t: 'again' });
+    await Promise.all(cs.map((c) => c.until((x) => x.state.phase === 'lobby')));
+  } finally {
+    cs.forEach((c) => c.ws.terminate());
+    httpServer.closeAllConnections?.();
+    httpServer.close();
+  }
+});
