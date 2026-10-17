@@ -453,3 +453,50 @@ test('1일차 낮에 시민이 처형되면 그 뒤에 첫 밤이 온다', () =>
   assert.strictEqual(P(room, 5).alive, false);
   assert.strictEqual(room.day, 1);
 });
+
+
+test('경찰 조사: 기본은 마피아 여부만, 옵션을 켜면 직업까지 (본인에게만)', () => {
+  // 기본: role 항목 자체가 없다
+  const base = mk(ROLES6);
+  assert.strictEqual(base.settings.policeReveal, false);
+  night(base, 2, 3); // 의사를 조사
+  const log = m.viewFor(base, id(base, 2)).policeLog;
+  assert.deepStrictEqual(log, [{ day: 1, target: id(base, 3), mafia: false }]);
+  assert.ok(!('role' in log[0]));
+
+  // 켜면: 마피아/의사/시민 모두 직업이 보인다
+  const on = m.createRoom('MT');
+  ROLES6.forEach((_, i) => m.addPlayer(on, `p${i}`));
+  assert.ok(m.setSetting(on, on.players[1].id, 'policeReveal', true).error); // 방장만
+  assert.deepStrictEqual(m.setSetting(on, on.hostId, 'policeReveal', true), {});
+  m.start(on, on.hostId);
+  on.players.forEach((p, i) => { p.role = ROLES6[i]; });
+  on.players.forEach((p) => m.ack(on, p.id));
+  on.players.forEach((p) => m.ready(on, p.id));
+  on.players.forEach((p) => m.vote(on, p.id, null));
+  on.players.forEach((p) => m.ack(on, p.id));
+  assert.strictEqual(on.phase, 'night');
+  night(on, 2, 3);
+  assert.deepStrictEqual(m.viewFor(on, id(on, 2)).policeLog, [{ day: 1, target: id(on, 3), mafia: false, role: 'doctor' }]);
+  // 경찰이 아닌 사람에게는 조사 기록이 없다
+  assert.strictEqual(m.viewFor(on, id(on, 0)).policeLog, null);
+  assert.strictEqual(m.viewFor(on, id(on, 3)).policeLog, null);
+  // 마피아를 조사하면 마피아 직업이 나온다
+  const on2 = m.createRoom('MT');
+  ROLES6.forEach((_, i) => m.addPlayer(on2, `p${i}`));
+  m.setSetting(on2, on2.hostId, 'policeReveal', true);
+  m.start(on2, on2.hostId);
+  on2.players.forEach((p, i) => { p.role = ROLES6[i]; });
+  on2.players.forEach((p) => m.ack(on2, p.id));
+  on2.players.forEach((p) => m.ready(on2, p.id));
+  on2.players.forEach((p) => m.vote(on2, p.id, null));
+  on2.players.forEach((p) => m.ack(on2, p.id));
+  night(on2, 2, 0);
+  assert.deepStrictEqual(m.viewFor(on2, id(on2, 2)).policeLog, [{ day: 1, target: id(on2, 0), mafia: true, role: 'mafia' }]);
+});
+
+test('시작하면 옵션을 바꿀 수 없다 (경찰 직업 공개 포함)', () => {
+  const room = mk(ROLES6);
+  assert.ok(m.setSetting(room, room.hostId, 'policeReveal', true).error);
+  assert.strictEqual(room.settings.policeReveal, false);
+});

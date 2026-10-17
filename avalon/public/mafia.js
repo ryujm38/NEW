@@ -12,7 +12,7 @@ const MAFIA_RULES_HTML = `
 <li><b>낮</b>: 밤에 일어난 일이 공개되고 토론해요(채팅 또는 음성). 산 사람의 과반이 "토론 끝"을 누르면 투표로 넘어가요.</li>
 <li><b>투표</b>: 각자 한 명(또는 기권)에게 투표해요. 혼자 가장 많은 표를 받은 사람이 처형되고, 동률이면 아무도 처형되지 않아요.</li>
 <li>마피아가 모두 죽으면 <b>시민팀 승리</b>. 마피아 수가 나머지 생존자 수 이상이 되면 <b>마피아팀 승리</b>.</li>
-<li>죽은 사람은 말할 수 없어요. 직업을 공개할지는 방장이 대기실에서 정해요.</li>
+<li>죽은 사람은 말할 수 없어요. 직업을 공개할지는 방장이 대기실에서 정해요. 경찰은 기본적으로 "마피아인지 아닌지"만 알지만, 방장이 옵션을 켜면 직업까지 알아요.</li>
 </ul></details>`;
 
 const MAFIA_ROLE = {
@@ -33,11 +33,13 @@ const mfName = (id) => (mfPlayer(id) ? esc(mfPlayer(id).name) : '?');
 const mfMe = () => mfPlayer(S.me);
 
 function mafiaLobbyOptions(isHost) {
-  const on = S.settings.revealRoles;
-  return `<label class="opt ${isHost ? '' : 'ro'}">
-    <input type="checkbox" data-act="mafiaReveal" ${on ? 'checked' : ''} ${isHost ? '' : 'disabled'} />
-    <span>죽은 사람의 직업 공개${isHost ? '' : ' (방장이 정해요)'}</span>
+  const opt = (key, label, hint) => `<label class="opt ${isHost ? '' : 'ro'}">
+    <input type="checkbox" data-act="mafiaOpt" data-key="${key}" ${S.settings[key] ? 'checked' : ''} ${isHost ? '' : 'disabled'} />
+    <span>${label}<small class="dim" style="display:block;font-size:12px">${hint}</small></span>
   </label>`;
+  return `${opt('revealRoles', '죽은 사람의 직업 공개', '꺼 두면 게임이 끝날 때까지 정체를 알 수 없어요')}
+    ${opt('policeReveal', '경찰에게 직업까지 알려주기', '꺼 두면 경찰은 "마피아인지 아닌지"만 알아요 (기본)')}
+    ${isHost ? '' : '<p class="small dim" style="margin:0 0 6px">옵션은 방장이 정해요.</p>'}`;
 }
 
 function mfRoleTag(p) {
@@ -62,7 +64,10 @@ function mfRoleCard() {
 
 function mfPoliceLog() {
   if (!S.policeLog || !S.policeLog.length) return '';
-  return `<div class="card"><b>🕵️ 조사 기록</b>${S.policeLog.map((l) => `<div class="small" style="margin-top:4px">${l.day}번째 밤 · ${mfName(l.target)}님 → <b class="${l.mafia ? 'n' : 'y'}">${l.mafia ? '마피아!' : '마피아 아님'}</b></div>`).join('')}</div>`;
+  const result = (l) => (l.role
+    ? `${MAFIA_ROLE[l.role].icon} ${MAFIA_ROLE[l.role].name}`
+    : l.mafia ? '마피아!' : '마피아 아님');
+  return `<div class="card"><b>🕵️ 조사 기록</b>${S.policeLog.map((l) => `<div class="small" style="margin-top:4px">${l.day}번째 밤 · ${mfName(l.target)}님 → <b class="${l.mafia ? 'n' : 'y'}">${result(l)}</b></div>`).join('')}</div>`;
 }
 
 function mfChatHtml() {
@@ -298,8 +303,8 @@ document.addEventListener('keydown', (e) => {
   }
 });
 document.addEventListener('change', (e) => {
-  if (e.target && e.target.dataset && e.target.dataset.act === 'mafiaReveal') {
-    send({ t: 'setting', key: 'revealRoles', value: e.target.checked });
+  if (e.target && e.target.dataset && e.target.dataset.act === 'mafiaOpt') {
+    send({ t: 'setting', key: e.target.dataset.key, value: e.target.checked });
   }
 });
 
@@ -324,7 +329,7 @@ function mafiaClick(act, el) {
     case 'ready': send({ t: 'ready' }); return true;
     case 'mafiaSend': mafiaSendChat(); return true;
     case 'mafiaInfo': ui.mInfo = true; render(); return true;
-    case 'mafiaReveal': return true; // 체크박스는 change 이벤트로 처리
+    case 'mafiaOpt': return true; // 체크박스는 change 이벤트로 처리
     default: return false;
   }
 }

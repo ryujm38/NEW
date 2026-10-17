@@ -5,7 +5,7 @@
 // 진행: 역할 확인 → [낮(토론) → 투표(처형) → 결과 → 밤] 반복. 게임은 낮부터 시작한다.
 //   (1일차 낮에는 아직 밤사이 일어난 일이 없다. 1일차 낮 → 1번째 밤 → 2일차 낮 …)
 //   밤: 마피아가 함께 한 명을 지목(표가 갈리면 최다득표 중 무작위), 의사가 한 명을 보호(자기 자신 가능),
-//       경찰이 한 명을 조사(마피아 여부를 본인만 확인). 마피아의 표적을 의사가 지켰으면 아무도 죽지 않는다.
+//       경찰이 한 명을 조사(마피아 여부를 본인만 확인. 방장이 옵션을 켜면 직업까지). 마피아의 표적을 의사가 지켰으면 아무도 죽지 않는다.
 //   낮: 살아 있는 사람의 과반이 "토론 끝"을 누르면 투표로 넘어간다.
 //   투표: 살아 있는 사람이 각자 한 명(또는 기권)에게 투표. 단독 최다득표자가 처형되고, 동률이면 아무도 처형되지 않는다.
 // 승리: 마피아가 모두 죽으면 시민팀, 마피아 수가 나머지 생존자 수 이상이면 마피아팀.
@@ -42,7 +42,7 @@ function createRoom(code) {
     phase: 'lobby', // lobby | roles | night | day | vote | voteResult | over
     gameNo: 0,
     day: 0,
-    settings: { revealRoles: true }, // 죽은 사람의 직업을 공개할지
+    settings: { revealRoles: true, policeReveal: false }, // 죽은 사람의 직업 공개 / 경찰에게 직업까지 알려줄지
     night: null, // { mafia: {id: target}, doctor, police } (undefined = 아직, null = 하지 않음)
     readyIds: new Set(),
     acks: new Set(),
@@ -133,8 +133,8 @@ function pickRandomTop(counts) {
 function setSetting(room, byId, key, value) {
   if (byId !== room.hostId) return { error: '방장만 바꿀 수 있어요.' };
   if (room.phase !== 'lobby') return { error: '게임 시작 전에만 바꿀 수 있어요.' };
-  if (key !== 'revealRoles') return { error: '알 수 없는 설정이에요.' };
-  room.settings.revealRoles = !!value;
+  if (key !== 'revealRoles' && key !== 'policeReveal') return { error: '알 수 없는 설정이에요.' };
+  room.settings[key] = !!value;
   return {};
 }
 
@@ -262,7 +262,8 @@ function night(room, id, targetId) {
       if (n.police !== undefined) return { error: '이미 선택했어요.' };
       if (t.id === id) return { error: '자기 자신은 조사할 수 없어요.' };
       n.police = t.id;
-      room.policeLog.push({ day: room.day, target: t.id, mafia: t.role === 'mafia' });
+      // 기본은 마피아 여부만. 방장이 켜면 직업까지 알려준다 (꺼져 있으면 role 항목 자체가 없다)
+      room.policeLog.push({ day: room.day, target: t.id, mafia: t.role === 'mafia', ...(room.settings.policeReveal ? { role: t.role } : {}) });
       break;
     default:
       return { error: '밤에 할 수 있는 일이 없어요. 눈을 감고 기다리세요.' };
