@@ -34,6 +34,7 @@ const ui = {
   bInfo: false,
   mSel: null, // 마피아: 고른 대상
   mInfo: false,
+  mHist: false, // 마피아: 투표 기록 창
   mText: '', // 마피아: 채팅 입력 중인 글
   unoSel: null,
   game: allGames().includes(load(GAME_KEY)) ? load(GAME_KEY) : 'avalon', // 새 방을 만들 때 고른 게임
@@ -85,7 +86,7 @@ function connect() {
       if (!S.hand || !S.hand.some((c) => c.id === ui.unoSel && c.playable)) ui.unoSel = null;
       if (S.phase === 'lobby' || (prev && S.gameNo !== prev.gameNo)) ui.bInfo = ui.bPick = false;
       if (typeof bangSync === 'function') bangSync();
-      if (S.phase === 'lobby' || (prev && S.gameNo !== prev.gameNo)) ui.mInfo = false;
+      if (S.phase === 'lobby' || (prev && S.gameNo !== prev.gameNo)) ui.mInfo = ui.mHist = false;
       if (typeof mafiaSync === 'function') mafiaSync();
       uiGames().forEach((g) => g.sync && g.sync());
       if (S.kind !== 'uno' || S.turnId !== S.me) ui.colorOpen = false;
@@ -95,7 +96,7 @@ function connect() {
       S = null;
       ui.roleOpen = ui.historyOpen = ui.hostOpen = ui.colorOpen = false;
       ui.unoSel = ui.bSel = ui.bPick = ui.bSid = ui.bStore = null;
-      ui.bInfo = ui.mInfo = false;
+      ui.bInfo = ui.mInfo = ui.mHist = false;
       ui.mSel = null;
       ui.mText = '';
       if (m.kicked) showToast('방장이 내보냈어요.');
@@ -555,7 +556,7 @@ $app.addEventListener('click', (e) => {
     case 'card': send({ t: 'card', success: el.dataset.v === '1' }); break;
     case 'role': ui.roleOpen = true; render(); break;
     case 'history': ui.historyOpen = true; render(); break;
-    case 'closeall': ui.roleOpen = ui.historyOpen = ui.hostOpen = ui.colorOpen = ui.bInfo = ui.mInfo = false; ui.bPick = null; uiGames().forEach((g) => g.closeAll && g.closeAll()); render(); break;
+    case 'closeall': ui.roleOpen = ui.historyOpen = ui.hostOpen = ui.colorOpen = ui.bInfo = ui.mInfo = ui.mHist = false; ui.bPick = null; uiGames().forEach((g) => g.closeAll && g.closeAll()); render(); break;
     default: break;
   }
 });
