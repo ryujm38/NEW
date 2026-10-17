@@ -293,3 +293,69 @@ test('아발론 방에 우노 요청을 보내면 거부된다', async () => {
   await s.cs[0].until((c) => c.errors.length === 2);
   close(s);
 });
+
+test('뱅 방: 4명이 접속해 시작하고, 자기 역할과 손패만 받고, 재접속해도 같고, 다른 게임 요청은 거부', async () => {
+  const { httpServer } = createAppServer();
+  await new Promise((r) => httpServer.listen(0, '127.0.0.1', r));
+  const port = httpServer.address().port;
+  const cs = [];
+  try {
+    for (let i = 0; i < 4; i++) {
+      const c = client(port);
+      await c.open;
+      cs.push(c);
+    }
+    cs[0].send({ t: 'create', name: '방장', game: 'bang' });
+    await cs[0].until((c) => c.code);
+    assert.strictEqual(cs[0].state.kind, 'bang');
+    for (let i = 1; i < 4; i++) {
+      cs[i].send({ t: 'join', code: cs[0].code, name: `친구${i}` });
+      await cs[i].until((c) => c.state);
+    }
+    cs[0].send({ t: 'start' });
+    await Promise.all(cs.map((c) => c.until((x) => x.state.phase === 'play')));
+    const meOf = (c) => c.state.players.find((p) => p.id === c.id);
+    assert.ok(cs.every((c) => meOf(c).role && c.state.hand.length >= 4));
+    // 다른 사람의 정체(보안관 제외)와 손패는 보이지 않는다
+    for (const c of cs) {
+      for (const p of c.state.players) {
+        if (p.id !== c.id && p.role !== 'sheriff') assert.strictEqual(p.role, null);
+        assert.ok(!('hand' in p));
+      }
+    }
+    assert.strictEqual(cs.filter((c) => meOf(c).role === 'sheriff').length, 1);
+
+    // 아발론/우노 전용 요청은 거부
+    cs[0].send({ t: 'vote', approve: true });
+    cs[0].send({ t: 'ack' });
+    await cs[0].until((c) => c.errors.length >= 2);
+
+    // 차례가 아닌 사람이 카드를 내면 거부, 차례인 사람이 끝내면 진행
+    const turnId = cs[0].state.turnId;
+    const mover = cs.find((c) => c.id === turnId);
+    const other = cs.find((c) => c.id !== turnId);
+    other.send({ t: 'play', card: other.state.hand[0].id });
+    await other.until((c) => c.errors.length >= 1);
+    mover.send({ t: 'end' });
+    await mover.until((c) => c.state.turnId !== turnId || c.state.mode === 'discard');
+
+    // 재접속해도 같은 손패
+    const victim = cs[2];
+    const handBefore = victim.state.hand.map((x) => x.id).join();
+    victim.ws.terminate();
+    await cs[0].until((c) => c.state.players.some((p) => !p.connected));
+    const back = client(port);
+    await back.open;
+    back.send({ t: 'resume', code: victim.code, token: victim.token });
+    await back.until((c) => c.state);
+    assert.strictEqual(back.state.hand.map((x) => x.id).join(), handBefore);
+    cs.push(back);
+
+    cs[0].send({ t: 'again' });
+    await cs[0].until((c) => c.state.phase === 'lobby');
+  } finally {
+    cs.forEach((c) => c.ws.terminate());
+    httpServer.closeAllConnections?.();
+    httpServer.close();
+  }
+});

@@ -6,7 +6,8 @@ const SESSION_KEY = 'avalon-session';
 const NAME_KEY = 'avalon-name';
 const GAME_KEY = 'avalon-game';
 const APP_NAME = '택미린솔록면';
-const GAME_NAME = { avalon: '아발론', uno: '우노' };
+const GAME_NAME = { avalon: '아발론', uno: '우노', bang: '뱅!' };
+const GAMES = Object.keys(GAME_NAME);
 
 let ws = null;
 let online = false;
@@ -20,8 +21,13 @@ const ui = {
   historyOpen: false,
   hostOpen: false,
   colorOpen: false,
+  bSel: null, // 뱅: 고른 손패 카드
+  bPick: null, // 뱅: 패닉!/캣 발루 대상 고르는 중
+  bSid: null, // 뱅: 시드 능력으로 버릴 카드 고르는 중
+  bStore: null, // 뱅: 잡화점에서 고른 카드
+  bInfo: false,
   unoSel: null,
-  game: load(GAME_KEY) === 'uno' ? 'uno' : 'avalon', // 새 방을 만들 때 고른 게임
+  game: GAMES.includes(load(GAME_KEY)) ? load(GAME_KEY) : 'avalon', // 새 방을 만들 때 고른 게임
   toast: '',
 };
 let session = loadJson(SESSION_KEY);
@@ -68,13 +74,16 @@ function connect() {
       }
       if (S.phase === 'lobby' || (prev && S.gameNo !== prev.gameNo)) ui.roleOpen = ui.historyOpen = ui.hostOpen = ui.colorOpen = false;
       if (!S.hand || !S.hand.some((c) => c.id === ui.unoSel && c.playable)) ui.unoSel = null;
+      if (S.phase === 'lobby' || (prev && S.gameNo !== prev.gameNo)) ui.bInfo = ui.bPick = false;
+      if (typeof bangSync === 'function') bangSync();
       if (S.kind !== 'uno' || S.turnId !== S.me) ui.colorOpen = false;
       render();
     } else if (m.t === 'gone') {
       clearSession();
       S = null;
       ui.roleOpen = ui.historyOpen = ui.hostOpen = ui.colorOpen = false;
-      ui.unoSel = null;
+      ui.unoSel = ui.bSel = ui.bPick = ui.bSid = ui.bStore = null;
+      ui.bInfo = false;
       if (m.kicked) showToast('방장이 내보냈어요.');
       render();
     } else if (m.t === 'error') {
@@ -138,7 +147,7 @@ const AVALON_RULES_HTML = `
 <li>선이 3번 성공해도 <b>암살자가 멀린을 맞히면 악의 역전승</b>입니다.</li>
 </ul></details>`;
 
-const rulesHtml = (kind) => (kind === 'uno' ? UNO_RULES_HTML : AVALON_RULES_HTML);
+const rulesHtml = (kind) => ({ uno: UNO_RULES_HTML, bang: BANG_RULES_HTML }[kind] || AVALON_RULES_HTML);
 
 function sideLabel(team) {
   return team === 'good' ? '선의 세력' : '악의 세력';
@@ -152,6 +161,7 @@ function render() {
   if (!S) html = renderHome();
   else if (S.phase === 'lobby') html = renderLobby();
   else if (S.kind === 'uno') html = renderUno();
+  else if (S.kind === 'bang') html = renderBang();
   else html = renderGame();
   document.title = S ? `${APP_NAME}:${GAME_NAME[S.kind]}` : APP_NAME;
   const toast = ui.toast ? `<div class="toast">${esc(ui.toast)}</div>` : '';
@@ -179,6 +189,7 @@ function renderHome() {
     <div class="row" style="margin-bottom:12px">
       ${gameBtn('avalon', '🛡️ 아발론', '5~10명')}
       ${gameBtn('uno', '🃏 우노', '2~10명')}
+      ${gameBtn('bang', '🤠 뱅!', '4~7명')}
     </div>
     <button class="primary" data-act="create">${GAME_NAME[ui.game]} 방 만들기</button>
   </div>
@@ -188,7 +199,7 @@ function renderHome() {
     </label>
     <button data-act="join">들어가기</button>
   </div>
-  <div class="card">${AVALON_RULES_HTML}${UNO_RULES_HTML}</div>`;
+  <div class="card">${AVALON_RULES_HTML}${UNO_RULES_HTML}${BANG_RULES_HTML}</div>`;
 }
 
 function renderLobby() {
@@ -442,9 +453,10 @@ $app.addEventListener('click', (e) => {
   if (act === 'closeall' && el.classList.contains('overlay') && e.target !== el) return;
   if (el.dataset.confirm && !window.confirm(el.dataset.confirm)) return;
   if (typeof unoClick === 'function' && unoClick(act, el)) return;
+  if (typeof bangClick === 'function' && bangClick(act, el)) return;
   switch (act) {
     case 'setgame':
-      ui.game = el.dataset.game === 'uno' ? 'uno' : 'avalon';
+      ui.game = GAMES.includes(el.dataset.game) ? el.dataset.game : 'avalon';
       save(GAME_KEY, ui.game);
       render();
       break;
@@ -480,7 +492,7 @@ $app.addEventListener('click', (e) => {
     case 'card': send({ t: 'card', success: el.dataset.v === '1' }); break;
     case 'role': ui.roleOpen = true; render(); break;
     case 'history': ui.historyOpen = true; render(); break;
-    case 'closeall': ui.roleOpen = ui.historyOpen = ui.hostOpen = ui.colorOpen = false; render(); break;
+    case 'closeall': ui.roleOpen = ui.historyOpen = ui.hostOpen = ui.colorOpen = ui.bInfo = false; ui.bPick = null; render(); break;
     default: break;
   }
 });

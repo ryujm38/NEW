@@ -215,3 +215,54 @@ button.pulse { animation: pulse 0.9s ease-in-out infinite; }
 /* 실패 카드 2장이 필요한 원정 표시 */
 .q .need { position: absolute; top: -6px; right: -4px; width: 20px; height: 20px; border-radius: 50%; background: var(--evil); color: #2b0805; font-size: 12px; font-style: normal; font-weight: 800; display: grid; place-items: center; }
 .need.inline { position: static; display: inline-grid; width: 16px; height: 16px; font-size: 11px; vertical-align: -3px; background: var(--evil); color: #2b0805; border-radius: 50%; place-items: center; font-style: normal; font-weight: 800; }
+
+/* 뱅! */
+.bplayers { display: grid; gap: 8px; }
+.bp { position: relative; text-align: left; background: var(--panel); border: 2px solid var(--line); border-radius: 12px; padding: 9px 12px; min-height: 0; font-weight: 500; font-size: 15px; width: 100%; display: block; }
+.bp .bn { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.bp .bn b { font-size: 16px; }
+.bp .ch { margin-left: auto; font-size: 12px; color: var(--dim); }
+.bp .bn .dot { position: static; }
+.bp .bs { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 3px; font-size: 13px; }
+.bp .be { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 5px; }
+.bp.me { border-color: #5b628a; }
+.bp.turn { border-color: var(--gold); background: #2c2813; }
+.bp.wait { box-shadow: 0 0 0 3px #e0564a66; }
+.bp.dead { opacity: 0.45; }
+.bp.target { border-color: var(--gold); box-shadow: 0 0 0 3px #e0b34a88; background: #2c2813; cursor: pointer; }
+.hearts { color: var(--evil); letter-spacing: 1px; font-size: 15px; }
+.hearts i { color: #4a3036; font-style: normal; }
+.hc { color: var(--dim); }
+.tag.eq { font-size: 11px; font-weight: 600; }
+.tag.near { color: var(--ok); border-color: var(--ok); }
+.tag.role { font-weight: 700; }
+.tag.role.sheriff { color: var(--gold); border-color: var(--gold); }
+.tag.role.deputy { color: var(--good); border-color: var(--good); }
+.tag.role.outlaw { color: var(--evil); border-color: var(--evil); }
+.tag.role.renegade { color: #b98af0; border-color: #b98af0; }
+.bpend { background: #3a1f1c; border: 1px solid var(--evil); border-radius: 12px; padding: 10px 12px; text-align: center; }
+.bpile { display: flex; justify-content: space-around; align-items: center; font-size: 13px; color: var(--dim); gap: 8px; flex-wrap: wrap; }
+.bpile span { display: inline-flex; align-items: center; gap: 6px; }
+.bdesc { background: var(--panel2); border-radius: 10px; padding: 8px 10px; margin: 0 0 10px; }
+
+.bhand { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; padding-top: 10px; }
+.bc { position: relative; width: 62px; height: 88px; border-radius: 9px; border: 2px solid #6b5a3a; background: #e9dcb8; color: #2a2314; padding: 4px 3px; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: space-between; font-size: 11px; font-weight: 700; cursor: pointer; flex: none; transition: transform 0.12s; }
+.bc.blue { background: #bfd6ee; border-color: #3a5f86; color: #10243a; }
+.bc.gun { background: #d3d3d8; border-color: #5b5b66; color: #1d1d24; }
+.bc .rk { align-self: flex-start; font-size: 12px; line-height: 1; }
+.bc .rk.red { color: #c0302a; }
+.bc .ic { font-size: 26px; line-height: 1; }
+.bc .nm { font-size: 11px; line-height: 1.1; text-align: center; word-break: keep-all; }
+.bc .nm i { display: block; font-style: normal; font-size: 9px; color: #6b2a24; }
+.bc.mini { width: 40px; height: 54px; cursor: default; font-size: 9px; padding: 2px; }
+.bc.mini .ic { font-size: 16px; }
+.bc.mini .nm { display: none; }
+.bc.okc { box-shadow: 0 0 0 2px var(--gold), 0 0 10px #e0b34a99; }
+.bc.noc { opacity: 0.4; }
+.bc.sel { transform: translateY(-12px) scale(1.06); box-shadow: 0 0 0 3px #fff, 0 6px 14px #000a; }
+
+/* 뱅!: 조작 영역과 손패는 화면 아래에 붙여 둔다 (플레이어 목록이 길어도 카드가 보이게) */
+.bdock { position: sticky; bottom: 0; z-index: 5; margin-top: auto; display: flex; flex-direction: column; gap: 10px; padding: 14px 0 6px; background: linear-gradient(to bottom, transparent, var(--bg) 16px); }
+.bdock .panel { padding: 12px; }
+.bdock .bhand { padding-top: 12px; }
+.bdock .foot { margin-top: 0; padding-top: 0; }
