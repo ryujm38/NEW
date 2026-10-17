@@ -190,6 +190,8 @@ function toVote(room) {
   assert.strictEqual(room.phase, 'vote');
 }
 const alive = (room) => room.players.filter((p) => p.alive);
+// 찬반 투표: 후보를 뺀 모두가 같은 선택을 한다
+const trialAll = (room, kill) => alive(room).filter((p) => p.id !== room.accused).forEach((p) => m.judge(room, p.id, kill));
 
 test('투표: 단독 최다득표자가 처형되고, 동률/전원 기권이면 아무도 처형 안 됨', () => {
   const room = mk(ROLES6);
@@ -216,6 +218,11 @@ test('투표: 단독 최다득표자가 처형되고, 동률/전원 기권이면
   const t0 = id(room3, 5);
   alive(room3).forEach((p) => { if (p.id !== t0) m.vote(room3, p.id, t0); });
   m.vote(room3, t0, null);
+  assert.strictEqual(room3.phase, 'trial'); // 단독 최다득표자는 처형 후보가 되어 찬반 투표로 간다
+  assert.strictEqual(room3.accused, t0);
+  assert.strictEqual(room3.lastVote.executed, null);
+  trialAll(room3, true);
+  assert.strictEqual(room3.phase, 'voteResult');
   assert.strictEqual(room3.lastVote.executed, t0);
   assert.strictEqual(getAlive(room3, 5), false);
 });
@@ -244,6 +251,7 @@ test('승리: 마피아가 모두 처형되면 시민팀 (결과 확인 뒤 종�
   const mafia = id(room, 0);
   alive(room).forEach((p) => { if (p.id !== mafia) m.vote(room, p.id, mafia); });
   m.vote(room, mafia, null);
+  trialAll(room, true);
   assert.strictEqual(room.phase, 'voteResult');
   assert.strictEqual(room.pendingWinner, 'citizen');
   alive(room).forEach((p) => m.ack(room, p.id));
@@ -268,6 +276,7 @@ test('승리: 처형으로 마피아 수가 같아지면 마피아팀', () => {
   const target = id(room, 6); // 시민 처형 → 마피아2 vs 3 → 아직 진행
   alive(room).forEach((p) => { if (p.id !== target) m.vote(room, p.id, target); });
   m.vote(room, target, null);
+  trialAll(room, true);
   assert.strictEqual(room.pendingWinner, null);
   alive(room).forEach((p) => m.ack(room, p.id));
   assert.strictEqual(room.phase, 'night');
@@ -381,6 +390,12 @@ test('5~12명이 무작위로 끝까지 두면 반드시 끝나고 승자가 맞
               assert.deepStrictEqual(m.vote(room, p.id, t), {});
             }
             break;
+          case 'trial':
+            for (const p of live) {
+              if (room.phase !== 'trial') break;
+              if (p.id !== room.accused) assert.deepStrictEqual(m.judge(room, p.id, Math.random() < 0.6), {});
+            }
+            break;
           default:
             assert.fail(`예상 못한 단계 ${room.phase}`);
         }
@@ -432,6 +447,7 @@ test('1일차 낮의 투표로도 처형되고, 마지막 마피아를 처형하
   const mafia = id(room, 0);
   room.players.forEach((p) => { if (p.id !== mafia) m.vote(room, p.id, mafia); });
   m.vote(room, mafia, null);
+  trialAll(room, true);
   assert.strictEqual(room.lastVote.executed, mafia);
   assert.strictEqual(room.pendingWinner, 'citizen');
   room.players.filter((p) => p.alive).forEach((p) => m.ack(room, p.id));
@@ -446,6 +462,7 @@ test('1일차 낮에 시민이 처형되면 그 뒤에 첫 밤이 온다', () =>
   const target = id(room, 5);
   room.players.forEach((p) => { if (p.id !== target) m.vote(room, p.id, target); });
   m.vote(room, target, null);
+  trialAll(room, true);
   assert.strictEqual(room.lastVote.executed, target);
   assert.strictEqual(room.pendingWinner, null);
   room.players.filter((p) => p.alive).forEach((p) => m.ack(room, p.id));
@@ -499,4 +516,130 @@ test('시작하면 옵션을 바꿀 수 없다 (경찰 직업 공개 포함)', (
   const room = mk(ROLES6);
   assert.ok(m.setSetting(room, room.hostId, 'policeReveal', true).error);
   assert.strictEqual(room.settings.policeReveal, false);
+});
+
+
+// ---- 찬반 투표 ----
+
+// 1일차 낮에 후보 한 명을 만든다 (나머지가 후보에게 투표)
+function toTrial(roles, accusedIdx) {
+  const room = mkDay(roles);
+  room.players.forEach((p) => m.ready(room, p.id));
+  const target = id(room, accusedIdx);
+  room.players.forEach((p) => { if (p.id !== target) m.vote(room, p.id, target); });
+  m.vote(room, target, null);
+  assert.strictEqual(room.phase, 'trial');
+  return room;
+}
+
+test('찬반 투표: 후보는 투표할 수 없고, 찬성이 반대보다 많을 때만 처형된다', () => {
+  const room = toTrial(ROLES6, 5);
+  const target = id(room, 5);
+  assert.strictEqual(room.accused, target);
+  assert.ok(m.judge(room, target, true).error); // 후보 본인
+  assert.ok(m.judge(room, id(room, 0), 'yes').error); // 찬성/반대가 아닌 값
+  assert.ok(m.vote(room, id(room, 0), id(room, 1)).error); // 1차 투표는 이미 끝남
+  assert.deepStrictEqual(m.judge(room, id(room, 0), true), {});
+  assert.ok(m.judge(room, id(room, 0), false).error); // 중복
+  // 5명 중 찬성 2 (0,1) : 반대 3 (2,3,4) → 살아남는다
+  m.judge(room, id(room, 1), true);
+  m.judge(room, id(room, 2), false);
+  m.judge(room, id(room, 3), false);
+  assert.strictEqual(room.phase, 'trial');
+  m.judge(room, id(room, 4), false);
+  assert.strictEqual(room.phase, 'voteResult');
+  assert.strictEqual(room.lastVote.executed, null);
+  assert.strictEqual(room.lastVote.accused, target);
+  assert.deepStrictEqual([room.lastVote.trial.kill, room.lastVote.trial.spare], [2, 3]);
+  assert.strictEqual(P(room, 5).alive, true);
+  room.players.forEach((p) => m.ack(room, p.id));
+  assert.strictEqual(room.phase, 'night');
+
+  // 찬성 3 : 반대 2 → 처형
+  const r2 = toTrial(ROLES6, 5);
+  [0, 1, 2].forEach((i) => m.judge(r2, id(r2, i), true));
+  [3, 4].forEach((i) => m.judge(r2, id(r2, i), false));
+  assert.strictEqual(r2.phase, 'voteResult');
+  assert.strictEqual(r2.lastVote.executed, id(r2, 5));
+  assert.strictEqual(P(r2, 5).alive, false);
+});
+
+test('찬반 투표: 동수면 살고, 죽은 사람/아직 아닌 단계에서는 거부', () => {
+  // 6명 중 후보 1명 → 투표자 5명이라 동수가 안 나온다. 마피아 7명 규모에서 후보 + 투표자 짝수로 만든다.
+  const room = toTrial(ROLES5, 4); // 투표자 4명
+  assert.ok(m.judge(room, id(room, 0), true).error === undefined);
+  m.judge(room, id(room, 1), true);
+  m.judge(room, id(room, 2), false);
+  m.judge(room, id(room, 3), false); // 2 : 2
+  assert.strictEqual(room.phase, 'voteResult');
+  assert.strictEqual(room.lastVote.executed, null);
+  assert.strictEqual(P(room, 4).alive, true);
+  assert.strictEqual(room.pendingWinner, null);
+  room.players.forEach((p) => m.ack(room, p.id));
+  assert.strictEqual(room.phase, 'night'); // 아무도 안 죽었으니 밤으로
+
+  // 낮/투표 단계에서는 찬반 투표를 할 수 없다
+  const day = mkDay(ROLES6);
+  assert.ok(m.judge(day, id(day, 0), true).error);
+  day.players.forEach((p) => m.ready(day, p.id));
+  assert.strictEqual(day.phase, 'vote');
+  assert.ok(m.judge(day, id(day, 0), true).error);
+
+  // 죽은 사람은 투표할 수 없다
+  const dead = toTrial(ROLES6, 5);
+  P(dead, 4).alive = false;
+  assert.ok(m.judge(dead, id(dead, 4), true).error);
+});
+
+test('찬반 투표: 마지막 마피아를 찬성으로 처형하면 시민팀 승리, 반대면 게임이 계속된다', () => {
+  const room = toTrial(ROLES5, 0);
+  trialAll(room, true);
+  assert.strictEqual(room.pendingWinner, 'citizen');
+  room.players.filter((p) => p.alive).forEach((p) => m.ack(room, p.id));
+  assert.strictEqual(room.phase, 'over');
+  assert.strictEqual(room.winner, 'citizen');
+
+  const r2 = toTrial(ROLES5, 0);
+  trialAll(r2, false);
+  assert.strictEqual(r2.pendingWinner, null);
+  assert.strictEqual(P(r2, 0).alive, true);
+  r2.players.forEach((p) => m.ack(r2, p.id));
+  assert.strictEqual(r2.phase, 'night');
+});
+
+test('찬반 투표: 상태 보기 — 남의 표는 개표 전에 안 보이고, 개표 뒤에 모두 공개된다', () => {
+  const room = toTrial(ROLES6, 5);
+  const target = id(room, 5);
+  m.judge(room, id(room, 0), true);
+  m.judge(room, id(room, 1), false);
+  const v0 = m.viewFor(room, id(room, 0));
+  const v2 = m.viewFor(room, id(room, 2));
+  assert.strictEqual(v0.phase, 'trial');
+  assert.strictEqual(v0.accusedId, target);
+  assert.strictEqual(v0.judgeCount, 5);
+  assert.deepStrictEqual(v0.myJudge, { kill: true });
+  assert.strictEqual(v2.myJudge, null);
+  assert.ok(v0.players.find((p) => p.id === id(room, 1)).voted);
+  assert.ok(!v0.players.find((p) => p.id === id(room, 2)).voted);
+  assert.strictEqual(v0.players.find((p) => p.id === target).voted, null); // 후보는 투표자가 아님
+  assert.strictEqual(v0.lastVote.trial, null); // 개표 전
+  assert.ok(!JSON.stringify(v2).includes('"kill":false')); // 남의 선택이 새어 나가지 않는다
+  assert.strictEqual(v0.canChat, 'all'); // 찬반 투표 중에도 토론 채팅
+  assert.deepStrictEqual(m.chat(room, id(room, 3), '후보는 수상해'), {});
+  [2, 3, 4].forEach((i) => m.judge(room, id(room, i), i === 2));
+  const after = m.viewFor(room, id(room, 3));
+  assert.strictEqual(after.phase, 'voteResult');
+  assert.deepStrictEqual(after.lastVote.trial.votes[id(room, 0)], true);
+  assert.deepStrictEqual([after.lastVote.trial.kill, after.lastVote.trial.spare], [2, 3]);
+});
+
+test('찬반 투표: 방장 force는 안 한 사람을 반대로 세어 개표한다', () => {
+  const room = toTrial(ROLES6, 5);
+  const nonHost = room.players.find((p) => p.id !== room.hostId);
+  assert.ok(m.force(room, nonHost.id).error);
+  [0, 1].forEach((i) => m.judge(room, id(room, i), true));
+  assert.deepStrictEqual(m.force(room, room.hostId), {}); // 나머지 3명은 반대
+  assert.strictEqual(room.phase, 'voteResult');
+  assert.deepStrictEqual([room.lastVote.trial.kill, room.lastVote.trial.spare], [2, 3]);
+  assert.strictEqual(room.lastVote.executed, null);
 });

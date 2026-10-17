@@ -10,7 +10,8 @@ const MAFIA_RULES_HTML = `
 <li><b>밤</b>: 마피아는 함께 한 명을 골라 죽여요. <b>의사</b>는 한 명을 지켜요(자기 자신도 가능). <b>경찰</b>은 한 명을 조사해 마피아인지 알아내요(본인만 확인).</li>
 <li>마피아의 표적을 의사가 지켰다면 아무도 죽지 않아요. 마피아의 표가 갈리면 최다득표 중 무작위예요.</li>
 <li><b>낮</b>: 밤에 일어난 일이 공개되고 토론해요(채팅 또는 음성). 산 사람의 과반이 "토론 끝"을 누르면 투표로 넘어가요.</li>
-<li><b>투표</b>: 각자 한 명(또는 기권)에게 투표해요. 혼자 가장 많은 표를 받은 사람이 처형되고, 동률이면 아무도 처형되지 않아요.</li>
+<li><b>투표</b>: 각자 한 명(또는 기권)에게 투표해요. 혼자 가장 많은 표를 받은 사람이 <b>처형 후보</b>가 되고, 동률이면 아무도 후보가 되지 않아요.</li>
+<li><b>찬반 투표</b>: 후보를 뺀 산 사람이 "처형(찬성)" 또는 "살리기(반대)"를 골라요. <b>찬성이 반대보다 많아야</b> 처형돼요(동수면 살아요). 후보 본인은 투표할 수 없어요.</li>
 <li>마피아가 모두 죽으면 <b>시민팀 승리</b>. 마피아 수가 나머지 생존자 수 이상이 되면 <b>마피아팀 승리</b>.</li>
 <li>죽은 사람은 말할 수 없어요. 직업을 공개할지는 방장이 대기실에서 정해요. 경찰은 기본적으로 "마피아인지 아닌지"만 알지만, 방장이 옵션을 켜면 직업까지 알아요.</li>
 </ul></details>`;
@@ -93,7 +94,7 @@ function renderMafia() {
   if (phase === 'night' && S.nightAction && !S.nightAction.done) pickable = new Set(S.nightAction.options);
   if (phase === 'vote' && me && me.alive && !S.myVote) pickable = new Set(S.players.filter((p) => p.alive && p.id !== S.me).map((p) => p.id));
 
-  const counts = S.lastVote && phase === 'voteResult' ? S.lastVote.counts : {};
+  const counts = S.lastVote && (phase === 'voteResult' || phase === 'trial') ? S.lastVote.counts : {};
   const rows = S.players.map((p) => {
     const cls = ['mp'];
     if (!p.alive) cls.push('dead');
@@ -102,7 +103,11 @@ function renderMafia() {
     if (sel === p.id) cls.push('sel');
     const marks = [];
     if (phase === 'day' && p.alive && p.ready) marks.push('<span class="tag">✋ 토론 끝</span>');
-    if (phase === 'vote' && p.alive && p.voted) marks.push('<span class="tag">🗳 투표함</span>');
+    if ((phase === 'vote' || phase === 'trial') && p.alive && p.voted) marks.push('<span class="tag">🗳 투표함</span>');
+    if (phase === 'trial' && p.id === S.accusedId) marks.push('<span class="tag" style="color:var(--evil)">⚖️ 처형 후보</span>');
+    if (phase === 'voteResult' && S.lastVote && S.lastVote.trial && S.lastVote.trial.votes[p.id] !== undefined) {
+      marks.push(S.lastVote.trial.votes[p.id] ? '<span class="tag" style="color:var(--evil)">☠️ 찬성</span>' : '<span class="tag" style="color:var(--ok)">🙏 반대</span>');
+    }
     if (phase === 'night' && S.nightAction && S.nightAction.team) {
       const picked = S.nightAction.team.filter((t) => t.target === p.id).map((t) => mfName(t.voter));
       if (picked.length) marks.push(`<span class="tag" style="color:var(--evil)">🔪 ${picked.join(', ')} 지목</span>`);
@@ -116,14 +121,14 @@ function renderMafia() {
       : `<div class="${cls.join(' ')}">${body}</div>`;
   }).join('');
 
-  const title = { roles: '역할 확인', night: `🌙 ${S.day}번째 밤`, day: `☀️ ${S.day}일차 낮`, vote: `🗳 ${S.day}일차 투표`, voteResult: '투표 결과', over: '게임 끝' }[phase];
+  const title = { roles: '역할 확인', night: `🌙 ${S.day}번째 밤`, day: `☀️ ${S.day}일차 낮`, vote: `🗳 ${S.day}일차 투표`, trial: `⚖️ ${S.day}일차 찬반 투표`, voteResult: '투표 결과', over: '게임 끝' }[phase];
 
   return `
   <div class="top"><span>방 <b>${esc(S.code)}</b></span><span>마피아 · ${title}</span></div>
   ${mfRoleBanner(me)}
   ${mfPanel(me, isHost)}
   <div class="mplayers">${rows}</div>
-  ${phase === 'day' || phase === 'vote' || (phase === 'night' && S.canChat) || (over && S.chat.length) ? mfChatHtml() : ''}
+  ${phase === 'day' || phase === 'vote' || phase === 'trial' || (phase === 'night' && S.canChat) || (over && S.chat.length) ? mfChatHtml() : ''}
   ${mfPoliceLog()}
   ${mfLog()}
   <div class="bdock">
@@ -152,6 +157,9 @@ function mfDockButtons(me) {
     return `<div class="row">${sel
       ? `<button class="no" data-act="mafiaVote">${mfName(sel)}님에게 투표</button>`
       : '<button disabled>대상을 고르세요</button>'}<button class="ghost" data-act="mafiaAbstain">기권</button></div>`;
+  }
+  if (S.phase === 'trial' && S.accusedId !== S.me && !S.myJudge) {
+    return '<div class="row"><button class="no" data-act="mafiaJudge" data-kill="1">☠️ 처형 (찬성)</button><button class="primary" data-act="mafiaJudge" data-kill="0">🙏 살리기 (반대)</button></div>';
   }
   return '';
 }
@@ -223,9 +231,26 @@ function mfPanel(me, isHost) {
       return `<div class="card panel"><h2>🗳 투표</h2><p class="big gold">${t ? `${mfName(t)}님에게 투표했어요` : '기권했어요'}</p>
         ${progress(votedN, S.aliveCount, '투표')}${isHost ? '<button class="ghost" data-act="force">기다리지 않고 개표</button>' : ''}</div>`;
     }
-    return `<div class="card panel"><h2>🗳 투표 — 처형할 사람</h2>
-      <p class="small dim">단독 최다득표자가 처형돼요. 동률이면 아무도 처형되지 않아요.</p>
+    return `<div class="card panel"><h2>🗳 투표 — 처형 후보</h2>
+      <p class="small dim">단독 최다득표자가 처형 후보가 되고, 이어서 찬반 투표를 해요. 동률이면 아무도 후보가 되지 않아요.</p>
       <p class="center">아래 목록에서 한 명을 누르면 맨 아래에 투표 버튼이 나와요.</p>${progress(votedN, S.aliveCount, '투표')}</div>`;
+  }
+
+  if (phase === 'trial') {
+    const lv = S.lastVote;
+    const judgedN = S.players.filter((p) => p.voted).length;
+    const voters = S.judgeCount;
+    const tally = lv ? Object.values(lv.counts).reduce((a, b) => a + b, 0) : 0;
+    const head = `<h2>⚖️ 찬반 투표</h2><p class="big bad">${mfName(S.accusedId)}님을 처형할까요?</p>
+      <p class="small dim center" style="margin-top:-4px">${lv ? `${mfName(S.accusedId)}님이 ${lv.counts[S.accusedId]}표를 받았어요 (총 ${tally}표). ` : ''}찬성이 반대보다 많아야 처형돼요. 동수면 살아요.</p>`;
+    if (S.me === S.accusedId) {
+      return `<div class="card panel">${head}<p class="center dim">당신이 처형 후보예요. 투표할 수 없어요.</p>${progress(judgedN, voters, '찬반 투표')}${isHost ? '<button class="ghost" data-act="force">기다리지 않고 개표</button>' : ''}</div>`;
+    }
+    if (!alive) return `<div class="card panel">${head}<p class="dim center">당신은 죽어서 투표할 수 없어요.</p>${progress(judgedN, voters, '찬반 투표')}</div>`;
+    if (S.myJudge) {
+      return `<div class="card panel">${head}<p class="big gold">${S.myJudge.kill ? '☠️ 처형(찬성)에 투표했어요' : '🙏 살리기(반대)에 투표했어요'}</p>${progress(judgedN, voters, '찬반 투표')}${isHost ? '<button class="ghost" data-act="force">기다리지 않고 개표</button>' : ''}</div>`;
+    }
+    return `<div class="card panel">${head}<p class="center">아래 버튼으로 투표하세요.</p>${progress(judgedN, voters, '찬반 투표')}${isHost ? '<button class="ghost" data-act="force">기다리지 않고 개표</button>' : ''}</div>`;
   }
 
   if (phase === 'voteResult') {
@@ -235,8 +260,9 @@ function mfPanel(me, isHost) {
     const needAck = S.players.filter((p) => p.alive && p.connected).length;
     const meAcked = me && S.players.find((p) => p.id === S.me).acked;
     return `<div class="card panel"><h2>⚖️ 투표 결과</h2>
-      <p class="big ${lv && lv.executed ? 'bad' : 'gold'}">${lv && lv.executed ? `${mfName(lv.executed)}님이 처형됐어요` : '아무도 처형되지 않았어요'}</p>
-      <div style="margin:8px 0">${rows}</div>
+      <p class="big ${lv && lv.executed ? 'bad' : 'gold'}">${lv && lv.executed ? `${mfName(lv.executed)}님이 처형됐어요` : lv && lv.accused ? `${mfName(lv.accused)}님은 처형되지 않았어요` : '아무도 처형 후보가 되지 않았어요'}</p>
+      ${lv && lv.trial ? `<p class="center"><b class="n">찬성 ${lv.trial.kill}</b> : <b class="y">반대 ${lv.trial.spare}</b></p>` : ''}
+      <div style="margin:8px 0"><div class="small dim">1차 투표</div>${rows}</div>
       ${alive ? (meAcked ? progress(acked, needAck, '확인') : '<button class="primary" data-act="ack">확인</button>') : ''}
       ${isHost ? '<button class="ghost" data-act="force">기다리지 않고 넘어가기</button>' : ''}</div>`;
   }
@@ -325,6 +351,9 @@ function mafiaClick(act, el) {
     case 'mafiaAbstain':
       if (window.confirm('기권할까요?')) send({ t: 'vote', target: null });
       ui.mSel = null;
+      return true;
+    case 'mafiaJudge':
+      send({ t: 'judge', kill: el.dataset.kill === '1' });
       return true;
     case 'ready': send({ t: 'ready' }); return true;
     case 'mafiaSend': mafiaSendChat(); return true;

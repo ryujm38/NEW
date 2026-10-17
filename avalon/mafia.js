@@ -7,7 +7,8 @@
 //   밤: 마피아가 함께 한 명을 지목(표가 갈리면 최다득표 중 무작위), 의사가 한 명을 보호(자기 자신 가능),
 //       경찰이 한 명을 조사(마피아 여부를 본인만 확인. 방장이 옵션을 켜면 직업까지). 마피아의 표적을 의사가 지켰으면 아무도 죽지 않는다.
 //   낮: 살아 있는 사람의 과반이 "토론 끝"을 누르면 투표로 넘어간다.
-//   투표: 살아 있는 사람이 각자 한 명(또는 기권)에게 투표. 단독 최다득표자가 처형되고, 동률이면 아무도 처형되지 않는다.
+//   투표: 살아 있는 사람이 각자 한 명(또는 기권)에게 투표. 단독 최다득표자가 "처형 후보"가 되고, 동률이면 아무도 처형되지 않는다.
+//   찬반 투표: 후보를 뺀 산 사람이 각자 "처형(찬성)" 또는 "살리기(반대)"를 고른다. 찬성이 반대보다 많을 때만 처형(동수면 생존).
 // 승리: 마피아가 모두 죽으면 시민팀, 마피아 수가 나머지 생존자 수 이상이면 마피아팀.
 // 채팅: 낮/투표에는 산 사람 전체 채팅, 밤에는 마피아끼리만. (목소리 없이도 할 수 있게)
 
@@ -39,7 +40,7 @@ function createRoom(code) {
     code,
     hostId: null,
     players: [],
-    phase: 'lobby', // lobby | roles | night | day | vote | voteResult | over
+    phase: 'lobby', // lobby | roles | night | day | vote | trial | voteResult | over
     gameNo: 0,
     day: 0,
     settings: { revealRoles: true, policeReveal: false }, // 죽은 사람의 직업 공개 / 경찰에게 직업까지 알려줄지
@@ -47,6 +48,8 @@ function createRoom(code) {
     readyIds: new Set(),
     acks: new Set(),
     votes: {},
+    accused: null,
+    trial: {},
     lastNight: null,
     lastVote: null,
     policeLog: [],
@@ -150,7 +153,7 @@ function start(room, byId) {
     p.alive = true;
   });
   Object.assign(room, {
-    gameNo: room.gameNo + 1, day: 1, night: null, votes: {}, lastNight: null, lastVote: null,
+    gameNo: room.gameNo + 1, day: 1, night: null, votes: {}, accused: null, trial: {}, lastNight: null, lastVote: null,
     policeLog: [], chat: [], log: [], winner: null, pendingWinner: null,
     readyIds: new Set(), acks: new Set(), phase: 'roles',
   });
@@ -168,7 +171,7 @@ function backToLobby(room, byId) {
   });
   if (!getPlayer(room, room.hostId)) room.hostId = room.players[0] ? room.players[0].id : null;
   Object.assign(room, {
-    phase: 'lobby', day: 0, night: null, votes: {}, lastNight: null, lastVote: null, policeLog: [], chat: [], log: [],
+    phase: 'lobby', day: 0, night: null, votes: {}, accused: null, trial: {}, lastNight: null, lastVote: null, policeLog: [], chat: [], log: [],
     winner: null, pendingWinner: null, readyIds: new Set(), acks: new Set(),
   });
   return {};
@@ -193,6 +196,8 @@ function startDay(room) {
   room.phase = 'day';
   room.readyIds = new Set();
   room.votes = {};
+  room.accused = null;
+  room.trial = {};
   say(room, `☀️ ${room.day}일차 낮이 밝았어요.`);
 }
 
@@ -309,15 +314,47 @@ function resolveVote(room) {
   });
   const top = Math.max(0, ...Object.values(counts));
   const leaders = Object.keys(counts).filter((t) => counts[t] === top);
-  const executed = top > 0 && leaders.length === 1 ? leaders[0] : null;
-  room.lastVote = { votes: { ...room.votes }, counts, executed };
-  if (executed) {
-    const v = getPlayer(room, executed);
+  const accused = top > 0 && leaders.length === 1 ? leaders[0] : null;
+  room.lastVote = { votes: { ...room.votes }, counts, accused, executed: null, trial: null };
+  if (accused) {
+    room.accused = accused;
+    room.trial = {};
+    room.phase = 'trial';
+    say(room, `⚖️ ${nameOf(room, accused)}님이 처형 후보예요. 찬반 투표를 해주세요.`);
+    return;
+  }
+  say(room, '⚖️ 투표 결과 아무도 처형 후보가 되지 않았어요.');
+  room.pendingWinner = null;
+  room.phase = 'voteResult';
+  room.acks = new Set();
+}
+
+const judges = (room) => alive(room).filter((p) => p.id !== room.accused);
+
+function judge(room, id, kill) {
+  if (room.phase !== 'trial') return { error: '지금은 찬반 투표 시간이 아니에요.' };
+  const me = getPlayer(room, id);
+  if (!me || !me.alive) return { error: '죽은 사람은 투표할 수 없어요.' };
+  if (id === room.accused) return { error: '처형 후보는 투표할 수 없어요.' };
+  if (typeof kill !== 'boolean') return { error: '찬성 또는 반대를 고르세요.' };
+  if (id in room.trial) return { error: '이미 투표했어요.' };
+  room.trial[id] = kill;
+  if (judges(room).every((p) => p.id in room.trial)) resolveTrial(room);
+  return {};
+}
+
+function resolveTrial(room) {
+  const kill = Object.values(room.trial).filter((v) => v).length;
+  const spare = Object.values(room.trial).filter((v) => !v).length;
+  const v = getPlayer(room, room.accused);
+  room.lastVote.trial = { votes: { ...room.trial }, kill, spare };
+  if (kill > spare) {
     v.alive = false;
-    say(room, `⚖️ 투표 결과 ${v.name}님이 처형됐어요${roleTag(room, v)}.`);
+    room.lastVote.executed = v.id;
+    say(room, `⚖️ 찬성 ${kill} : 반대 ${spare}. ${v.name}님이 처형됐어요${roleTag(room, v)}.`);
     room.pendingWinner = winnerOf(room);
   } else {
-    say(room, '⚖️ 투표 결과 아무도 처형되지 않았어요.');
+    say(room, `⚖️ 찬성 ${kill} : 반대 ${spare}. ${v.name}님은 처형되지 않았어요.`);
     room.pendingWinner = null;
   }
   room.phase = 'voteResult';
@@ -370,6 +407,12 @@ function force(room, byId) {
       });
       resolveVote(room);
       break;
+    case 'trial':
+      judges(room).forEach((p) => {
+        if (!(p.id in room.trial)) room.trial[p.id] = false; // 안 한 사람은 반대(살리기)로 센다
+      });
+      resolveTrial(room);
+      break;
     case 'night': {
       const n = room.night;
       aliveMafia(room).forEach((p) => {
@@ -395,7 +438,7 @@ function chat(room, id, rawText) {
   const text = String(rawText ?? '').replace(/\s+/g, ' ').trim().slice(0, CHAT_MAX);
   if (!text) return { error: '내용을 입력하세요.' };
   let ch;
-  if (room.phase === 'day' || room.phase === 'vote') ch = 'all';
+  if (room.phase === 'day' || room.phase === 'vote' || room.phase === 'trial') ch = 'all';
   else if (room.phase === 'night' && me.role === 'mafia') ch = 'mafia';
   else return { error: room.phase === 'night' ? '밤에는 마피아만 채팅할 수 있어요.' : '지금은 채팅할 수 없어요.' };
   room.chat.push({ id, name: me.name, text, ch, day: room.day });
@@ -431,7 +474,7 @@ function viewFor(room, viewerId) {
 
   let canChat = null;
   if (me && me.alive) {
-    if (room.phase === 'day' || room.phase === 'vote') canChat = 'all';
+    if (room.phase === 'day' || room.phase === 'vote' || room.phase === 'trial') canChat = 'all';
     else if (room.phase === 'night' && isMafia) canChat = 'mafia';
   }
 
@@ -453,16 +496,19 @@ function viewFor(room, viewerId) {
       alive: p.alive,
       role: started && roleVisible(p) ? p.role : null,
       ready: room.phase === 'day' ? room.readyIds.has(p.id) : null,
-      voted: room.phase === 'vote' ? p.id in room.votes : null,
+      voted: room.phase === 'vote' ? p.id in room.votes : room.phase === 'trial' && p.id !== room.accused ? p.id in room.trial : null,
       acked: room.phase === 'roles' || room.phase === 'voteResult' ? room.acks.has(p.id) : null,
     })),
     aliveCount: started ? alive(room).length : 0,
     readyCount: room.phase === 'day' ? room.readyIds.size : 0,
     myVote: room.phase === 'vote' && me && me.id in room.votes ? { target: room.votes[me.id] } : null,
+    accusedId: room.phase === 'trial' ? room.accused : null,
+    myJudge: room.phase === 'trial' && me && me.id in room.trial ? { kill: room.trial[me.id] } : null,
+    judgeCount: room.phase === 'trial' ? judges(room).length : 0,
     nightAction,
     policeLog: me && me.role === 'police' ? room.policeLog : null,
     lastNight: started && room.phase !== 'roles' && room.phase !== 'night' ? room.lastNight : null,
-    lastVote: room.phase === 'voteResult' || over ? room.lastVote : null,
+    lastVote: room.phase === 'voteResult' || room.phase === 'trial' || over ? room.lastVote : null,
     canChat,
     chat: room.chat.filter((c) => c.ch === 'all' || (c.ch === 'mafia' && isMafia)),
     log: room.log,
@@ -478,6 +524,7 @@ const actions = {
   ack: (room, id) => ack(room, id),
   ready: (room, id) => ready(room, id),
   vote: (room, id, msg) => vote(room, id, msg.target ?? null),
+  judge: (room, id, msg) => judge(room, id, msg.kill),
   night: (room, id, msg) => night(room, id, msg.target),
   chat: (room, id, msg) => chat(room, id, msg.text),
   setting: (room, id, msg) => setSetting(room, id, msg.key, msg.value),
@@ -502,6 +549,7 @@ module.exports = {
   night,
   ready,
   vote,
+  judge,
   ack,
   force,
   chat,

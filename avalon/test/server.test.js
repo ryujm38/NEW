@@ -444,8 +444,16 @@ test('마피아 방: 5명이 접속해 밤·낮·투표를 진행하고, 역할/
     live.forEach((c) => c.send({ t: 'ready' }));
     await Promise.all(cs.map((c) => c.until((x) => x.state.phase === 'vote')));
     live.forEach((c) => c.send({ t: 'vote', target: c === mafia ? police.id : mafia.id }));
+    // 단독 최다득표자(마피아)가 처형 후보가 되어 찬반 투표로 넘어간다
+    await Promise.all(cs.map((c) => c.until((x) => x.state.phase === 'trial')));
+    assert.strictEqual(cs[0].state.accusedId, mafia.id);
+    const errsBefore = mafia.errors.length;
+    mafia.send({ t: 'judge', kill: false }); // 후보 본인은 투표할 수 없다
+    await mafia.until((c) => c.errors.length > errsBefore);
+    live.filter((c) => c !== mafia).forEach((c) => c.send({ t: 'judge', kill: true }));
     await Promise.all(cs.map((c) => c.until((x) => x.state.phase === 'voteResult' || x.state.phase === 'over')));
     assert.strictEqual(cs[0].state.lastVote.executed, mafia.id);
+    assert.ok(cs[0].state.lastVote.trial.kill > cs[0].state.lastVote.trial.spare);
     live.forEach((c) => c.send({ t: 'ack' }));
     await Promise.all(cs.map((c) => c.until((x) => x.state.phase === 'over')));
     assert.strictEqual(cs[0].state.winner, 'citizen');
