@@ -1,15 +1,25 @@
 'use strict';
-// 6인용 아발론 규칙 엔진. 네트워크와 무관한 순수 로직이라 테스트하기 쉽다.
+// 아발론(5~10인) 규칙 엔진. 네트워크와 무관한 순수 로직이라 테스트하기 쉽다.
 //
-// 6인 구성: 선 4(멀린, 퍼시벌, 충성스러운 신하 2) / 악 2(모르가나, 암살자)
-// 원정 인원: 2, 3, 4, 3, 4 · 6인은 모든 원정이 실패 카드 1장이면 실패
+// 인원별 구성(공식 규칙): 아래 SETUP 표. 항상 멀린, 퍼시벌, 모르가나, 암살자가 들어가고
+// 남는 선 자리는 충성스러운 신하, 남는 악 자리는 악의 하수인이 채운다.
+// 7명 이상이면 4번째 원정은 실패 카드가 2장 나와야 실패한다.
 // 3번 성공하면 암살자가 멀린을 맞힐 기회를 얻고, 3번 실패하거나 원정대가 5번 연속 부결되면 악의 승리
 
 const crypto = require('crypto');
 const { shuffle, newId, newToken, cleanName } = require('./common');
 
-const PLAYER_COUNT = 6;
-const TEAM_SIZES = [2, 3, 4, 3, 4];
+const MIN_PLAYERS = 5;
+const MAX_PLAYERS = 10;
+// 인원 -> 악 수, 라운드별 원정 인원
+const SETUP = {
+  5: { evil: 2, teams: [2, 3, 2, 3, 3] },
+  6: { evil: 2, teams: [2, 3, 4, 3, 4] },
+  7: { evil: 3, teams: [2, 3, 3, 4, 4] },
+  8: { evil: 3, teams: [3, 4, 4, 5, 5] },
+  9: { evil: 3, teams: [3, 4, 4, 5, 5] },
+  10: { evil: 4, teams: [3, 4, 4, 5, 5] },
+};
 const MAX_REJECTS = 5;
 const WINS_NEEDED = 3;
 
@@ -34,13 +44,34 @@ const ROLES = {
     name: '모르가나',
     desc: '퍼시벌에게 멀린처럼 보입니다. 퍼시벌을 속이세요. 동료 악을 알고 있습니다.',
   },
+  minion: {
+    team: 'evil',
+    name: '악의 하수인',
+    desc: '특별한 능력은 없지만 멀린에게는 정체가 보입니다. 동료 악을 알고 있어요. 원정에 들어가 몰래 실패시키고, 토론에서는 선인 척하세요.',
+  },
   assassin: {
     team: 'evil',
     name: '암살자',
     desc: '선이 3번 성공해도 멀린을 맞히면 역전승합니다. 토론 내내 누가 멀린인지 관찰하세요. 동료 악을 알고 있습니다.',
   },
 };
-const ROLE_POOL = ['merlin', 'percival', 'servant', 'servant', 'morgana', 'assassin'];
+
+// 인원수에 맞는 구성: 선은 멀린+퍼시벌+신하들, 악은 모르가나+암살자+하수인들
+function setupFor(n) {
+  const { evil, teams } = SETUP[n];
+  const good = n - evil;
+  const roles = [
+    'merlin', 'percival', ...Array(good - 2).fill('servant'),
+    'morgana', 'assassin', ...Array(evil - 2).fill('minion'),
+  ];
+  return {
+    good,
+    evil,
+    teams,
+    roles,
+    failsNeeded: teams.map((_, i) => (i === 3 && n >= 7 ? 2 : 1)),
+  };
+}
 
 const ACK_PHASES = new Set(['roles', 'voteResult', 'questResult']);
 
@@ -52,6 +83,7 @@ function createRoom(code) {
     players: [], // 좌석 순서 = 배열 순서
     phase: 'lobby',
     gameNo: 0, // 시작할 때마다 +1
+    setup: setupFor(MIN_PLAYERS + 1), // 시작할 때 인원수에 맞게 다시 정한다
     round: 0,
     leader: 0,
     rejects: 0,
@@ -74,7 +106,7 @@ function addPlayer(room, rawName) {
   const name = cleanName(rawName);
   if (!name) return { error: '이름을 입력하세요.' };
   if (room.phase !== 'lobby') return { error: '이미 게임이 시작됐어요.' };
-  if (room.players.length >= PLAYER_COUNT) return { error: '방이 가득 찼어요. (6명)' };
+  if (room.players.length >= MAX_PLAYERS) return { error: `방이 가득 찼어요. (${MAX_PLAYERS}명)` };
   if (room.players.some((p) => p.name === name)) return { error: '같은 이름이 이미 있어요. 다른 이름을 쓰세요.' };
   const player = { id: newId(), token: newToken(), name, connected: true, role: null };
   room.players.push(player);
@@ -99,7 +131,7 @@ function connectedIds(room) {
 }
 
 function teamSize(room) {
-  return TEAM_SIZES[room.round];
+  return room.setup.teams[room.round];
 }
 
 function roleOf(room, id) {
@@ -117,17 +149,20 @@ function teamOf(room, id) {
 function start(room, byId) {
   if (byId !== room.hostId) return { error: '방장만 시작할 수 있어요.' };
   if (room.phase !== 'lobby') return { error: '이미 시작됐어요.' };
-  if (room.players.length !== PLAYER_COUNT) return { error: `정확히 ${PLAYER_COUNT}명이 모여야 해요.` };
+  if (room.players.length < MIN_PLAYERS || room.players.length > MAX_PLAYERS) {
+    return { error: `${MIN_PLAYERS}~${MAX_PLAYERS}명이 모여야 해요.` };
+  }
   if (room.players.some((p) => !p.connected)) return { error: '접속이 끊긴 사람이 있어요.' };
 
   room.gameNo += 1;
   room.players = shuffle(room.players); // 좌석(리더 순서)을 섞는다
-  const roles = shuffle(ROLE_POOL);
+  room.setup = setupFor(room.players.length);
+  const roles = shuffle(room.setup.roles);
   room.players.forEach((p, i) => {
     p.role = roles[i];
   });
   room.round = 0;
-  room.leader = crypto.randomInt(PLAYER_COUNT);
+  room.leader = crypto.randomInt(room.players.length);
   room.rejects = 0;
   room.draft = [];
   room.team = [];
@@ -175,7 +210,7 @@ function backToLobby(room, byId) {
 function restart(room, byId) {
   if (byId !== room.hostId) return { error: '방장만 할 수 있어요.' };
   if (room.phase === 'lobby') return { error: '대기실에서는 "게임 시작"을 누르세요.' };
-  if (room.players.length !== PLAYER_COUNT || room.players.some((p) => !p.connected)) {
+  if (room.players.length < MIN_PLAYERS || room.players.some((p) => !p.connected)) {
     return { error: '접속이 끊긴 사람이 있어요. 대기실로 돌아가서 정리하세요.' };
   }
   const prev = room.phase;
@@ -218,7 +253,7 @@ function maybeAdvance(room) {
 }
 
 function nextLeader(room) {
-  room.leader = (room.leader + 1) % PLAYER_COUNT;
+  room.leader = (room.leader + 1) % room.players.length;
   room.draft = [];
   room.team = [];
   room.votes = {};
@@ -300,13 +335,13 @@ function vote(room, id, approve) {
   if (!getPlayer(room, id)) return { error: '플레이어가 아니에요.' };
   if (id in room.votes) return { error: '이미 투표했어요.' };
   room.votes[id] = !!approve;
-  if (Object.keys(room.votes).length === PLAYER_COUNT) resolveVote(room);
+  if (Object.keys(room.votes).length === room.players.length) resolveVote(room);
   return {};
 }
 
 function resolveVote(room) {
   const yes = Object.values(room.votes).filter(Boolean).length;
-  const approved = yes > PLAYER_COUNT / 2; // 동수는 부결
+  const approved = yes > room.players.length / 2; // 동수는 부결
   const entry = {
     round: room.round + 1,
     attempt: room.rejects + 1,
@@ -336,7 +371,8 @@ function submitCard(room, id, success) {
 
 function resolveQuest(room) {
   const fails = Object.values(room.cards).filter((ok) => !ok).length;
-  const result = { ok: fails === 0, fails };
+  const needed = room.setup.failsNeeded[room.round]; // 7명 이상의 4번째 원정은 2장
+  const result = { ok: fails < needed, fails, needed };
   room.results.push(result);
   room.current.quest = result;
   room.phase = 'questResult';
@@ -370,13 +406,24 @@ function nightInfo(room, id) {
       names: shuffle(others.filter((p) => p.role === 'merlin' || p.role === 'morgana').map((p) => p.name)),
     };
   }
-  if (role === 'morgana' || role === 'assassin') {
+  if (ROLES[role].team === 'evil') { // 모르가나, 암살자, 하수인 모두 동료 악을 안다
     return {
       title: '악의 동료',
       names: others.filter((p) => ROLES[p.role].team === 'evil').map((p) => p.name),
     };
   }
   return null;
+}
+
+// 이번 판에 들어간 역할 목록은 모두에게 공개되는 정보다
+function compositionOf(setup) {
+  const counts = {};
+  setup.roles.forEach((r) => { counts[r] = (counts[r] || 0) + 1; });
+  return {
+    good: setup.good,
+    evil: setup.evil,
+    roles: Object.entries(counts).map(([key, count]) => ({ key, name: ROLES[key].name, team: ROLES[key].team, count })),
+  };
 }
 
 function viewFor(room, viewerId) {
@@ -389,15 +436,17 @@ function viewFor(room, viewerId) {
 
   const view = {
     kind: 'avalon',
-    minPlayers: PLAYER_COUNT,
-    maxPlayers: PLAYER_COUNT,
+    minPlayers: MIN_PLAYERS,
+    maxPlayers: MAX_PLAYERS,
     code: room.code,
     me: viewerId,
     hostId: room.hostId,
     phase,
     gameNo: room.gameNo,
     round: room.round,
-    teamSizes: TEAM_SIZES,
+    teamSizes: room.setup.teams,
+    failsNeeded: room.setup.failsNeeded,
+    composition: inGame ? compositionOf(room.setup) : null,
     teamSize: inGame && !over ? teamSize(room) : null,
     rejects: room.rejects,
     maxRejects: MAX_REJECTS,
@@ -461,8 +510,10 @@ const actions = {
 module.exports = {
   actions,
   afterDisconnect: maybeAdvance,
-  PLAYER_COUNT,
-  TEAM_SIZES,
+  MIN_PLAYERS,
+  MAX_PLAYERS,
+  SETUP,
+  setupFor,
   MAX_REJECTS,
   ROLES,
   createRoom,

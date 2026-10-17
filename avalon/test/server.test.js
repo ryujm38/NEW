@@ -75,15 +75,31 @@ test('정적 파일과 헬스체크, 상위 폴더 접근 차단', async () => {
   }
 });
 
-test('7번째 사람은 못 들어오고, 이름 중복은 거부된다', async () => {
+test('아발론 방은 10명까지만 들어오고, 같은 이름은 거부된다', async () => {
   const s = await setup();
-  const extra = client(s.port);
-  await extra.open;
-  extra.send({ t: 'join', code: s.cs[0].code, name: '일곱째' });
-  await extra.until((c) => c.errors.length);
-  assert.match(extra.errors[0], /가득/);
-  s.cs.push(extra);
-  close(s);
+  try {
+    const dup = client(s.port);
+    await dup.open;
+    s.cs.push(dup);
+    dup.send({ t: 'join', code: s.cs[0].code, name: '친구1' }); // 이미 있는 이름
+    await dup.until((c) => c.errors.length);
+    assert.match(dup.errors[0], /같은 이름/);
+    for (let i = 0; i < 4; i++) {
+      const c = client(s.port);
+      await c.open;
+      s.cs.push(c);
+      c.send({ t: 'join', code: s.cs[0].code, name: `추가${i}` });
+      await c.until((x) => x.state);
+    }
+    const extra = client(s.port);
+    await extra.open;
+    s.cs.push(extra);
+    extra.send({ t: 'join', code: s.cs[0].code, name: '열한째' });
+    await extra.until((c) => c.errors.length);
+    assert.match(extra.errors[0], /가득/);
+  } finally {
+    close(s);
+  }
 });
 
 test('6명이 실제 서버로 한 판을 끝까지 + 재접속', async () => {

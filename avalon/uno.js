@@ -16,7 +16,7 @@ const crypto = require('crypto');
 const { shuffle, newId, newToken, cleanName } = require('./common');
 
 const MIN_PLAYERS = 2;
-const MAX_PLAYERS = 8;
+const MAX_PLAYERS = 10;
 const HAND_SIZE = 7;
 const COLORS = ['r', 'y', 'g', 'b'];
 const COLOR_NAME = { r: '빨강', y: '노랑', g: '초록', b: '파랑', w: '와일드' };

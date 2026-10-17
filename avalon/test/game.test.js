@@ -25,16 +25,17 @@ function proposeAs(room, teamIds) {
   assert.ok(!r.error, r.error);
 }
 
-test('방은 6명까지만, 이름 중복 불가', () => {
+test('방은 10명까지만, 이름 중복 불가', () => {
   const room = makeRoom();
-  assert.ok(g.addPlayer(room, '사').error);
+  for (const n of ['사', '아', '자', '차']) assert.ok(!g.addPlayer(room, n).error);
+  assert.ok(g.addPlayer(room, '카').error);
   const r2 = g.createRoom('X');
   g.addPlayer(r2, '가');
   assert.ok(g.addPlayer(r2, '가').error);
   assert.ok(g.addPlayer(r2, '   ').error);
 });
 
-test('6명이 아니면 시작할 수 없고 방장만 시작한다', () => {
+test('5명 미만이면 시작할 수 없고 방장만 시작한다', () => {
   const room = g.createRoom('X');
   g.addPlayer(room, '가');
   assert.ok(g.start(room, room.hostId).error);
@@ -138,7 +139,7 @@ test('5연속 부결이면 악의 승리', () => {
 
 function playQuest(room, failers) {
   // 가결 → 원정 → 결과 확인까지. failers: 실패 카드를 낼 id 목록
-  const size = g.TEAM_SIZES[room.round];
+  const size = room.setup.teams[room.round];
   const team = ids(room).slice(0, size);
   proposeAs(room, team);
   voteAll(room, true);
@@ -159,7 +160,7 @@ test('선은 실패 카드를 낼 수 없다 (서버가 성공으로 처리)', (
   voteAll(room, true);
   everyoneAck(room);
   goodTeam.forEach((id) => g.submitCard(room, id, false));
-  assert.deepStrictEqual(room.results[0], { ok: true, fails: 0 });
+  assert.deepStrictEqual(room.results[0], { ok: true, fails: 0, needed: 1 });
 });
 
 test('원정대가 아니면 카드를 낼 수 없고 두 번 낼 수 없다', () => {
@@ -180,7 +181,7 @@ test('실패 3번이면 악의 승리 (6인은 실패 카드 1장이면 원정 �
   const evil = room.players.filter((p) => p.role === 'morgana' || p.role === 'assassin').map((p) => p.id);
   for (let i = 0; i < 3; i++) {
     // 팀 앞쪽에 악 1명이 반드시 들어가도록 좌석 기준이 아니라 직접 구성
-    const size = g.TEAM_SIZES[room.round];
+    const size = room.setup.teams[room.round];
     const others = ids(room).filter((id) => !evil.includes(id));
     const team = [evil[0], ...others.slice(0, size - 1)];
     proposeAs(room, team);
@@ -351,4 +352,166 @@ test('끝난 뒤 바로 다시 하기도 된다', () => {
   assert.deepStrictEqual(g.restart(room, room.hostId), {});
   assert.strictEqual(room.phase, 'roles');
   assert.strictEqual(room.winner, null);
+});
+
+
+// ---- 5~10명 ----
+
+function startedN(n) {
+  const room = g.createRoom('TESTN');
+  for (let i = 0; i < n; i++) g.addPlayer(room, `p${i}`);
+  assert.deepStrictEqual(g.start(room, room.hostId), {});
+  return room;
+}
+const roleCount = (room) => {
+  const count = {};
+  room.players.forEach((p) => { count[p.role] = (count[p.role] || 0) + 1; });
+  return count;
+};
+
+test('인원별 선/악 구성과 원정 인원이 공식 표와 같다 (5~10명)', () => {
+  const table = {
+    5: { good: 3, evil: 2, teams: [2, 3, 2, 3, 3] },
+    6: { good: 4, evil: 2, teams: [2, 3, 4, 3, 4] },
+    7: { good: 4, evil: 3, teams: [2, 3, 3, 4, 4] },
+    8: { good: 5, evil: 3, teams: [3, 4, 4, 5, 5] },
+    9: { good: 6, evil: 3, teams: [3, 4, 4, 5, 5] },
+    10: { good: 6, evil: 4, teams: [3, 4, 4, 5, 5] },
+  };
+  for (const [n, want] of Object.entries(table)) {
+    const room = startedN(Number(n));
+    const c = roleCount(room);
+    assert.strictEqual(c.merlin, 1, `${n}명 멀린`);
+    assert.strictEqual(c.percival, 1);
+    assert.strictEqual(c.morgana, 1);
+    assert.strictEqual(c.assassin, 1);
+    assert.strictEqual(c.servant || 0, want.good - 2, `${n}명 신하`);
+    assert.strictEqual(c.minion || 0, want.evil - 2, `${n}명 하수인`);
+    const good = room.players.filter((p) => g.ROLES[p.role].team === 'good').length;
+    assert.strictEqual(good, want.good);
+    assert.deepStrictEqual(room.setup.teams, want.teams);
+    const v = g.viewFor(room, room.players[0].id);
+    assert.deepStrictEqual(v.teamSizes, want.teams);
+    assert.deepStrictEqual([v.composition.good, v.composition.evil], [want.good, want.evil]);
+    assert.strictEqual(v.composition.roles.reduce((a, r) => a + r.count, 0), Number(n));
+    assert.strictEqual(v.minPlayers, 5);
+    assert.strictEqual(v.maxPlayers, 10);
+  }
+});
+
+test('4번째 원정은 7명 이상일 때만 실패 카드 2장이 필요하다', () => {
+  for (const n of [5, 6, 7, 8, 9, 10]) {
+    const room = startedN(n);
+    assert.deepStrictEqual(room.setup.failsNeeded, [1, 1, 1, n >= 7 ? 2 : 1, 1], `${n}명`);
+  }
+  // 7명: 4번째 원정에 악 둘 + 선 둘이 가서 실패 1장만 나오면 성공, 2장이면 실패
+  for (const failers of [1, 2]) {
+    const room = startedN(7);
+    everyoneAck(room);
+    room.round = 3;
+    const evil = room.players.filter((p) => g.ROLES[p.role].team === 'evil').map((p) => p.id);
+    const good = room.players.filter((p) => g.ROLES[p.role].team === 'good').map((p) => p.id);
+    const team = [evil[0], evil[1], good[0], good[1]];
+    assert.strictEqual(team.length, room.setup.teams[3]);
+    proposeAs(room, team);
+    voteAll(room, true);
+    everyoneAck(room);
+    team.forEach((id) => g.submitCard(room, id, !(id === evil[0] || (failers === 2 && id === evil[1]))));
+    const r = room.results[room.results.length - 1];
+    assert.strictEqual(r.fails, failers);
+    assert.strictEqual(r.needed, 2);
+    assert.strictEqual(r.ok, failers === 1);
+  }
+  // 6명은 4번째 원정도 1장이면 실패
+  const six = started();
+  everyoneAck(six);
+  six.round = 3;
+  const e = six.players.find((p) => g.ROLES[p.role].team === 'evil').id;
+  const gs = six.players.filter((p) => g.ROLES[p.role].team === 'good').map((p) => p.id);
+  const team6 = [e, gs[0], gs[1]];
+  proposeAs(six, team6);
+  voteAll(six, true);
+  everyoneAck(six);
+  team6.forEach((id) => g.submitCard(six, id, id !== e));
+  assert.strictEqual(six.results[six.results.length - 1].ok, false);
+});
+
+test('과반 찬성 기준은 인원에 맞게 바뀐다 (동수는 부결)', () => {
+  const cases = [[5, 2, false], [5, 3, true], [7, 3, false], [7, 4, true], [8, 4, false], [8, 5, true], [10, 5, false], [10, 6, true]];
+  for (const [n, yes, approved] of cases) {
+    const room = startedN(n);
+    everyoneAck(room);
+    proposeAs(room, ids(room).slice(0, room.setup.teams[0]));
+    ids(room).forEach((id, i) => g.vote(room, id, i < yes));
+    assert.strictEqual(room.phase, 'voteResult', `${n}명 ${yes}표`);
+    assert.strictEqual(room.current.approved, approved, `${n}명 중 ${yes}명 찬성`);
+  }
+});
+
+test('인원이 늘어도 투표는 전원이 해야 공개되고, 리더는 인원수만큼 돈다', () => {
+  const room = startedN(9);
+  everyoneAck(room);
+  proposeAs(room, ids(room).slice(0, 3));
+  ids(room).slice(0, 8).forEach((id) => g.vote(room, id, true));
+  assert.strictEqual(room.phase, 'vote');
+  g.vote(room, ids(room)[8], true);
+  assert.strictEqual(room.phase, 'voteResult');
+  const l0 = room.leader;
+  everyoneAck(room); // 가결 → 원정
+  ids(room).slice(0, 3).forEach((id) => g.submitCard(room, id, true));
+  everyoneAck(room);
+  assert.strictEqual(room.leader, (l0 + 1) % 9);
+});
+
+test('밤 정보: 멀린은 하수인까지 모든 악을, 악은 서로를, 퍼시벌은 멀린+모르가나만', () => {
+  const room = startedN(10);
+  const evil = room.players.filter((p) => g.ROLES[p.role].team === 'evil');
+  const names = (role) => g.viewFor(room, room.players.find((p) => p.role === role).id).roleInfo.night.names.sort();
+  assert.deepStrictEqual(names('merlin'), evil.map((p) => p.name).sort());
+  assert.deepStrictEqual(names('percival'), room.players.filter((p) => ['merlin', 'morgana'].includes(p.role)).map((p) => p.name).sort());
+  for (const e of evil) {
+    const night = g.viewFor(room, e.id).roleInfo.night;
+    assert.deepStrictEqual(night.names.sort(), evil.filter((x) => x.id !== e.id).map((x) => x.name).sort());
+  }
+  const servant = room.players.find((p) => p.role === 'servant');
+  assert.strictEqual(g.viewFor(room, servant.id).roleInfo.night, null);
+});
+
+test('하수인은 원정에서 실패 카드를 낼 수 있고 선은 못 낸다', () => {
+  const room = startedN(5);
+  everyoneAck(room);
+  const minionless = room.players.filter((p) => g.ROLES[p.role].team === 'evil')[0];
+  const goodOne = room.players.find((p) => g.ROLES[p.role].team === 'good');
+  proposeAs(room, [minionless.id, goodOne.id]);
+  voteAll(room, true);
+  everyoneAck(room);
+  g.submitCard(room, minionless.id, false);
+  g.submitCard(room, goodOne.id, false);
+  assert.deepStrictEqual(room.results[0], { ok: false, fails: 1, needed: 1 });
+});
+
+test('5~10명 아무 인원이나 끝까지 무작위로 두면 반드시 끝난다', () => {
+  for (const n of [5, 6, 7, 8, 9, 10]) {
+    for (let game = 0; game < 15; game++) {
+      const room = startedN(n);
+      everyoneAck(room);
+      for (let guard = 0; guard < 400 && room.phase !== 'over'; guard++) {
+        if (room.phase === 'propose') {
+          const pick = ids(room).sort(() => Math.random() - 0.5).slice(0, room.setup.teams[room.round]);
+          proposeAs(room, pick);
+        } else if (room.phase === 'vote') {
+          ids(room).forEach((id) => g.vote(room, id, Math.random() < 0.7));
+        } else if (room.phase === 'quest') {
+          room.team.forEach((id) => g.submitCard(room, id, Math.random() < 0.6));
+        } else if (room.phase === 'assassin') {
+          const a = room.players.find((p) => p.role === 'assassin');
+          g.assassinate(room, a.id, room.players.find((p) => p.id !== a.id).id);
+        } else {
+          everyoneAck(room);
+        }
+      }
+      assert.strictEqual(room.phase, 'over', `${n}명`);
+      assert.ok(['good', 'evil'].includes(room.winner));
+    }
+  }
 });

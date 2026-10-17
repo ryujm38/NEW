@@ -127,12 +127,13 @@ const REASONS = {
 };
 
 const AVALON_RULES_HTML = `
-<details><summary>규칙 간단 설명</summary>
-<p><b>6명</b> · 선 4(멀린, 퍼시벌, 충성스러운 신하 2) vs 악 2(모르가나, 암살자)</p>
+<details><summary>아발론 규칙 간단 설명</summary>
+<p><b>5~10명</b> · 선(멀린, 퍼시벌, 충성스러운 신하) vs 악(모르가나, 암살자, 악의 하수인)</p>
 <ul>
-<li>5번의 원정 중 <b>3번 성공</b>하면 선이 앞서고, <b>3번 실패</b>하면 악이 이깁니다.</li>
-<li>원정 인원은 순서대로 <b>2·3·4·3·4명</b>. 실패 카드가 1장만 나와도 그 원정은 실패입니다.</li>
-<li>리더가 원정대를 고르면 모두가 찬성/반대로 투표합니다. 과반 찬성(4명 이상)이면 출발, 아니면 부결되고 리더가 다음 사람에게 넘어갑니다. <b>5번 연속 부결되면 악의 승리</b>.</li>
+<li>인원별 선/악: 5명 3/2 · 6명 4/2 · 7명 4/3 · 8명 5/3 · 9명 6/3 · 10명 6/4. 멀린·퍼시벌·모르가나·암살자는 항상 들어가고, 남는 자리를 신하(선)와 하수인(악)이 채웁니다.</li>
+<li>5번의 원정 중 <b>3번 성공</b>하면 선이 앞서고, <b>3번 실패</b>하면 악이 이깁니다. 원정 인원은 인원수에 따라 다르며 화면 위 동그라미에 표시됩니다.</li>
+<li>실패 카드가 1장만 나와도 그 원정은 실패입니다. 단, <b>7명 이상일 때 4번째 원정은 실패 카드가 2장</b> 나와야 실패예요.</li>
+<li>리더가 원정대를 고르면 모두가 찬성/반대로 투표합니다. <b>과반 찬성</b>이면 출발(동수는 부결), 아니면 리더가 다음 사람에게 넘어갑니다. <b>5번 연속 부결되면 악의 승리</b>.</li>
 <li>원정대원은 몰래 성공/실패 카드를 냅니다. 선은 성공만 낼 수 있고, 악은 둘 중 고릅니다. 결과는 실패 카드 수만 공개됩니다.</li>
 <li>선이 3번 성공해도 <b>암살자가 멀린을 맞히면 악의 역전승</b>입니다.</li>
 </ul></details>`;
@@ -176,8 +177,8 @@ function renderHome() {
     </label>
     <p class="field" style="margin-bottom:6px">무슨 게임을 할까요?</p>
     <div class="row" style="margin-bottom:12px">
-      ${gameBtn('avalon', '🛡️ 아발론', '6명')}
-      ${gameBtn('uno', '🃏 우노', '2~8명')}
+      ${gameBtn('avalon', '🛡️ 아발론', '5~10명')}
+      ${gameBtn('uno', '🃏 우노', '2~10명')}
     </div>
     <button class="primary" data-act="create">${GAME_NAME[ui.game]} 방 만들기</button>
   </div>
@@ -238,11 +239,13 @@ function renderTrack() {
     const r = S.results[i];
     const cls = r ? (r.ok ? 'ok' : 'bad') : i === S.round && S.phase !== 'over' && S.phase !== 'assassin' ? 'cur' : '';
     const label = r ? (r.ok ? '성공' : `실패 ${r.fails}`) : `${size}명`;
-    return `<div class="q ${cls}">${r ? (r.ok ? '✓' : '✗') : size}<small>${label}</small></div>`;
+    const two = S.failsNeeded[i] > 1 ? '<em class="need" title="실패 카드 2장 필요">2</em>' : '';
+    return `<div class="q ${cls}">${r ? (r.ok ? '✓' : '✗') : size}${two}<small>${label}</small></div>`;
   }).join('');
   const rej = Array.from({ length: S.maxRejects }, (_, i) => `<i class="${i < S.rejects ? 'on' : ''}"></i>`).join('');
   return `<div class="card"><div class="track">${circles}</div>
-    <div class="rejects">연속 부결 ${rej}</div></div>`;
+    <div class="rejects">연속 부결 ${rej}</div>
+    ${S.failsNeeded.some((n) => n > 1) ? '<p class="dim small center" style="margin:6px 0 0"><em class="need inline">2</em> 표시 원정은 실패 카드가 2장 나와야 실패예요.</p>' : ''}</div>`;
 }
 
 function playerCard(p, o = {}) {
@@ -280,7 +283,11 @@ function renderGame() {
 
   if (phase === 'roles') {
     const ri = S.roleInfo;
-    panel = `<div class="card panel"><h2>당신의 역할</h2>${roleCardHtml(ri)}
+    const comp = S.composition;
+    const compHtml = comp
+      ? `<p class="dim small center" style="margin:10px 0 0">이번 판 (${S.players.length}명): 선 ${comp.good} · 악 ${comp.evil}<br>${comp.roles.map((r) => `${esc(r.name)}${r.count > 1 ? ` ×${r.count}` : ''}`).join(', ')}</p>`
+      : '';
+    panel = `<div class="card panel"><h2>당신의 역할</h2>${roleCardHtml(ri)}${compHtml}
       ${meP.acked
         ? `<p class="progress">다른 사람을 기다리는 중 (${ackCount}/${connectedCount})</p>${isHost ? '<button class="ghost" data-act="force">기다리지 않고 시작</button>' : ''}`
         : '<button class="primary" data-act="ack" style="margin-top:12px">확인했어요</button>'}
@@ -306,7 +313,7 @@ function renderGame() {
       ${S.myVote === null
         ? `<div class="row"><button class="yes" data-act="vote" data-v="1">찬성</button><button class="no" data-act="vote" data-v="0">반대</button></div>`
         : `<p class="big ${S.myVote ? 'ok' : 'bad'}">${S.myVote ? '찬성' : '반대'}에 투표했어요</p>`}
-      <p class="progress">${votedN}/6명 투표 · 전원이 투표하면 한꺼번에 공개돼요</p>
+      <p class="progress">${votedN}/${S.players.length}명 투표 · 전원이 투표하면 한꺼번에 공개돼요</p>
     </div>`;
   } else if (phase === 'voteResult') {
     const lv = S.lastVote;
@@ -315,7 +322,7 @@ function renderGame() {
     panel = `<div class="card panel">
       <h2>투표 결과</h2>
       <p class="big ${lv.approved ? 'ok' : 'bad'}">${lv.approved ? '가결 — 원정 출발!' : '부결'}</p>
-      <p class="center">찬성 ${yes} · 반대 ${6 - yes}${lv.approved ? '' : ` · 연속 부결 ${S.rejects}/${S.maxRejects}`}</p>
+      <p class="center">찬성 ${yes} · 반대 ${S.players.length - yes}${lv.approved ? '' : ` · 연속 부결 ${S.rejects}/${S.maxRejects}`}</p>
       ${lv.approved || S.rejects < S.maxRejects ? '' : '<p class="big bad">5번째 부결입니다…</p>'}
       ${ackHtml(meP, ackCount, connectedCount, isHost)}
     </div>`;
@@ -333,13 +340,15 @@ function renderGame() {
         <div class="row"><button class="yes" data-act="card" data-v="1">성공</button><button class="no" data-act="card" data-v="0" ${good ? 'disabled' : ''}>실패</button></div>`;
     }
     panel = `<div class="card panel"><h2>원정 중</h2>
-      <p>원정대: <b>${nameList(S.team)}</b></p>${body}
+      <p>원정대: <b>${nameList(S.team)}</b></p>
+      ${S.failsNeeded[S.round] > 1 ? `<p class="small dim">이번 원정은 실패 카드 ${S.failsNeeded[S.round]}장이 나와야 실패예요.</p>` : ''}${body}
       <p class="progress">${S.cardsIn}/${S.team.length}명 제출</p></div>`;
   } else if (phase === 'questResult') {
     const q = S.lastQuest;
     cards = playersHtml((p) => ({ team: marked.has(p.id) }));
     panel = `<div class="card panel"><h2>원정 결과</h2>
       <p class="big ${q.ok ? 'ok' : 'bad'}">${q.ok ? '원정 성공!' : `원정 실패 — 실패 카드 ${q.fails}장`}</p>
+      ${q.needed > 1 ? `<p class="center small">이번 원정은 실패 카드 ${q.needed}장이 나와야 실패예요.</p>` : ''}
       <p class="center dim small">누가 실패를 냈는지는 공개되지 않아요.</p>
       ${ackHtml(meP, ackCount, connectedCount, isHost)}
     </div>`;

@@ -42,16 +42,19 @@ test('덱은 108장: 숫자 76 + 스킵/리버스/+2 각 8 + 와일드 4 + +4 4'
   for (const col of ['r', 'y', 'g', 'b']) assert.strictEqual(count((x) => x.color === col && x.kind === '0'), 1);
 });
 
-test('2~8명, 방장만, 전원 접속해야 시작한다', () => {
+test('2~10명, 방장만, 전원 접속해야 시작한다', () => {
   const one = lobby(1);
   assert.ok(u.start(one, one.hostId).error);
   const two = lobby(2);
   assert.ok(u.start(two, two.players[1].id).error);
   two.players[1].connected = false;
   assert.ok(u.start(two, two.hostId).error);
-  const nine = lobby(8);
-  assert.ok(u.addPlayer(nine, 'p9').error);
-  assert.ok(u.addPlayer(nine, 'p0').error);
+  const full = lobby(10);
+  assert.ok(u.addPlayer(full, 'p10').error); // 공식 최대 10명
+  assert.ok(u.addPlayer(full, 'p0').error);
+  assert.deepStrictEqual(u.start(full, full.hostId), {}); // 10명도 시작된다
+  assert.ok(full.players.every((p) => p.hand.length === 7));
+  assert.strictEqual(full.draw.length, 108 - 70 - 1);
 });
 
 test('시작: 7장씩, 시작 카드는 숫자, 더미 장수가 맞다', () => {
