@@ -148,7 +148,7 @@ function render() {
 
 function renderHome() {
   return `
-  <h1>🛡️ 아발론<small>6명이 폰으로 같이 하는 방</small></h1>
+  <h1>🛡️ 택미린솔록면:아발론<small>6명이 폰으로 같이 하는 아발론</small></h1>
   <div class="card">
     <label class="field">내 이름 (8자까지)
       <input type="text" id="name" maxlength="8" autocomplete="off" value="${esc(ui.name)}" placeholder="예: 민수" />
@@ -437,10 +437,10 @@ function onPick(id) {
 
 async function shareLink() {
   const url = `${location.origin}/?room=${S.code}`;
-  const text = `아발론 하자! 방 코드: ${S.code}`;
+  const text = `택미린솔록면:아발론 하자! 방 코드: ${S.code}`;
   try {
     if (navigator.share) {
-      await navigator.share({ title: '아발론', text, url });
+      await navigator.share({ title: '택미린솔록면:아발론', text, url });
       return;
     }
   } catch (err) {

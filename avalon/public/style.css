@@ -26,7 +26,7 @@ body {
 }
 #app { max-width: 480px; margin: 0 auto; padding: 16px; min-height: 100dvh; display: flex; flex-direction: column; gap: 14px; }
 
-h1 { font-size: 28px; margin: 12px 0 0; text-align: center; letter-spacing: -0.5px; }
+h1 { font-size: 24px; margin: 12px 0 0; text-align: center; letter-spacing: -0.5px; }
 h1 small { display: block; font-size: 14px; color: var(--dim); font-weight: 400; margin-top: 4px; letter-spacing: 0; }
 h2 { font-size: 18px; margin: 0 0 8px; }
 p { margin: 0 0 8px; }

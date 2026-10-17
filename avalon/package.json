@@ -2,7 +2,7 @@
   "name": "avalon-6",
   "version": "1.0.0",
   "private": true,
-  "description": "6인용 아발론 - 폰 브라우저로 방 코드를 입력해 같이 하는 실시간 보드게임",
+  "description": "택미린솔록면:아발론 - 폰 브라우저로 방 코드를 입력해 같이 하는 실시간 보드게임",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
