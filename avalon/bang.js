@@ -6,7 +6,7 @@
 // 작업도 pending도 없으면 지금 턴인 사람의 자유 행동 시간이다.
 //
 // 단순화한 점: 배럴은 맞을 때 자동으로 사용한다. 럭키 듀크는 더 좋은 쪽을 자동으로 고른다.
-// 카드의 무늬/숫자 배치는 원본과 다를 수 있다(전체 비율만 비슷하게 맞췄다).
+// 카드 80장의 종류·장수·무늬·숫자는 실제 덱 목록을 따른다(public/bang-data.js).
 
 const crypto = require('crypto');
 const { shuffle, newId, newToken, cleanName } = require('./common');
@@ -25,14 +25,14 @@ const ROLE_SETS = {
 const BANG_LIKE_TO_NEED = { bang: 'missed', gatling: 'missed', indians: 'bang', duel: 'bang' };
 const TARGETED = new Set(['bang', 'panic', 'catbalou', 'duel', 'jail']);
 
+const RANK_OF = { J: 11, Q: 12, K: 13, A: 14 };
+
+// 무늬·숫자는 public/bang-data.js의 실제 카드 목록을 그대로 쓴다.
 function buildDeck() {
-  const list = [];
-  for (const [key, def] of Object.entries(CARDS)) for (let i = 0; i < def.n; i++) list.push(key);
-  const suits = ['s', 'h', 'd', 'c'];
-  const deck = list.map((key, id) => ({ id, key, suit: suits[id % 4], rank: 2 + (Math.floor(id / 4) % 13) }));
-  const dyn = deck.find((c) => c.key === 'dynamite');
-  dyn.suit = 'h';
-  dyn.rank = 2;
+  const deck = [];
+  for (const [key, list] of Object.entries(DATA.DECK)) {
+    list.forEach((code) => deck.push({ id: deck.length, key, suit: code[0], rank: RANK_OF[code.slice(1)] || Number(code.slice(1)) }));
+  }
   return deck;
 }
 const DECK = buildDeck();

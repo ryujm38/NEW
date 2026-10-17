@@ -57,6 +57,35 @@ test('덱 80장: 종류별 장수, 다이너마이트는 ♥2', () => {
   assert.ok(b.DECK.every((c) => c.rank >= 2 && c.rank <= 14 && 'shdc'.includes(c.suit)));
 });
 
+test('덱 무늬·숫자가 실제 카드 목록과 같다 (무늬별 20장, 뽑기!에 쓰이는 카드의 위치)', () => {
+  const at = (key) => b.DECK.filter((c) => c.key === key).map((c) => `${c.suit}${c.rank}`).sort();
+  const bySuit = {};
+  b.DECK.forEach((c) => { bySuit[c.suit] = (bySuit[c.suit] || 0) + 1; });
+  assert.deepStrictEqual(bySuit, { s: 20, h: 20, d: 20, c: 20 });
+  // 뽑기!로 쓰이는 카드: 배럴(♠Q ♠K), 감옥(♠10 ♠J ♥4), 다이너마이트(♥2)
+  assert.deepStrictEqual(at('barrel'), ['s12', 's13']);
+  assert.deepStrictEqual(at('jail'), ['h4', 's10', 's11']);
+  assert.deepStrictEqual(at('dynamite'), ['h2']);
+  // 무기: 규칙서에 적힌 무늬
+  assert.deepStrictEqual(at('volcanic'), ['c10', 's10']);
+  assert.deepStrictEqual(at('schofield'), ['c11', 'c12', 's13']);
+  assert.deepStrictEqual(at('remington'), ['c13']);
+  assert.deepStrictEqual(at('carabine'), ['c14']);
+  assert.deepStrictEqual(at('winchester'), ['s8']);
+  // 뱅! 25장: ♣2~9, ♦2~A, ♠A, ♥A ♥Q ♥K
+  assert.deepStrictEqual(at('bang'), [
+    'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9', 'd10', 'd11', 'd12', 'd13', 'd14', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7', 'd8', 'd9', 'h12', 'h13', 'h14', 's14',
+  ].sort());
+  assert.deepStrictEqual(at('beer'), ['h10', 'h11', 'h6', 'h7', 'h8', 'h9']);
+  assert.deepStrictEqual(at('missed'), ['c10', 'c11', 'c12', 'c13', 'c14', 's2', 's3', 's4', 's5', 's6', 's7', 's8'].sort());
+  // 80장은 52장 한 벌보다 많아서 같은 무늬·숫자가 여러 번 나온다. 역마차 ♠9는 원본 목록에서도 두 장이다.
+  const dup = {};
+  b.DECK.forEach((c) => { const k = `${c.suit}${c.rank}`; (dup[k] = dup[k] || []).push(c.key); });
+  const multi = Object.entries(dup).filter(([, v]) => v.length > 1);
+  assert.ok(multi.length > 0);
+  assert.deepStrictEqual(dup.s9.sort(), ['stagecoach', 'stagecoach']);
+});
+
 test('4~7명: 역할 구성, 체력, 시작 손패, 정체 공개 범위', () => {
   const want = { 4: [1, 0, 2, 1], 5: [1, 1, 2, 1], 6: [1, 1, 3, 1], 7: [1, 2, 3, 1] };
   for (const n of [4, 5, 6, 7]) {

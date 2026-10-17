@@ -1,7 +1,35 @@
 'use strict';
 // 뱅! 카드·캐릭터·역할 정보. 서버(require)와 화면(<script>)이 같은 파일을 쓴다.
 
+// 덱 80장의 무늬·숫자(A=14)는 공개된 카드 목록 두 곳(wflosin/bang-card-game, zjevik/Bang-card-game)과
+// 공식 규칙서 번역(무기 카드 무늬)을 대조해서 옮겼다. 카드 이름 → ['무늬+숫자', ...]
+const BANG_DECK = {
+  bang: ['c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7', 'd8', 'd9', 'd10', 'dJ', 'dQ', 'dK', 'dA', 'sA', 'hA', 'hQ', 'hK'],
+  missed: ['c10', 'cJ', 'cQ', 'cK', 'cA', 's2', 's3', 's4', 's5', 's6', 's7', 's8'],
+  beer: ['h6', 'h7', 'h8', 'h9', 'h10', 'hJ'],
+  panic: ['hA', 'hJ', 'hQ', 'd8'],
+  catbalou: ['d9', 'd10', 'dJ', 'hK'],
+  stagecoach: ['s9', 's9'],
+  wellsfargo: ['h3'],
+  genstore: ['c9', 'sQ'],
+  indians: ['dA', 'dK'],
+  gatling: ['h10'],
+  duel: ['c8', 'sJ', 'dQ'],
+  saloon: ['h5'],
+  jail: ['s10', 'sJ', 'h4'],
+  dynamite: ['h2'],
+  barrel: ['sQ', 'sK'],
+  scope: ['sA'],
+  mustang: ['h8', 'h9'],
+  volcanic: ['s10', 'c10'],
+  schofield: ['cJ', 'cQ', 'sK'],
+  remington: ['cK'],
+  carabine: ['cA'],
+  winchester: ['s8'],
+};
+
 const BANG_DATA = {
+  DECK: BANG_DECK,
   SUITS: { s: '♠', h: '♥', d: '♦', c: '♣' },
   // type: brown(한 번 쓰고 버림) / blue(앞에 놓는 장비) / gun(무기)
   CARDS: {
