@@ -170,3 +170,36 @@ test('방장이 아니면 시작/내보내기 불가', async () => {
   await s.cs[1].until((c) => c.errors.length === 2);
   close(s);
 });
+
+test('게임 도중 방장의 초기화/다시 시작이 모두의 화면에 반영된다', async () => {
+  const s = await setup();
+  const { cs } = s;
+  const all = (pred) => Promise.all(cs.map((c) => c.until(pred)));
+  cs[0].send({ t: 'start' });
+  await all((x) => x.state.phase === 'roles');
+  cs.forEach((c) => c.send({ t: 'ack' }));
+  await all((x) => x.state.phase === 'propose');
+  const gameNo = cs[0].state.gameNo;
+
+  // 방장이 아닌 사람은 못 한다
+  cs[1].send({ t: 'again' });
+  await cs[1].until((x) => x.errors.length === 1);
+  cs[1].send({ t: 'restart' });
+  await cs[1].until((x) => x.errors.length === 2);
+  assert.strictEqual(cs[1].state.phase, 'propose');
+
+  // 같은 멤버로 바로 다시 시작: 역할 확인 단계로, 판 번호가 오른다
+  cs[0].send({ t: 'restart' });
+  await all((x) => x.state.phase === 'roles' && x.state.gameNo === gameNo + 1);
+  assert.ok(cs.every((c) => c.state.roleInfo));
+
+  // 초기화: 모두 대기실로, 역할은 사라진다
+  cs[0].send({ t: 'again' });
+  await all((x) => x.state.phase === 'lobby');
+  assert.ok(cs.every((c) => c.state.roleInfo === null && c.state.players.length === 6));
+
+  // 다시 시작할 수 있다
+  cs[0].send({ t: 'start' });
+  await all((x) => x.state.phase === 'roles');
+  close(s);
+});

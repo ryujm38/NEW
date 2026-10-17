@@ -268,3 +268,87 @@ test('로비에서만 내보낼 수 있다', () => {
   assert.deepStrictEqual(g.kick(room, room.hostId, other), { kicked: other });
   assert.strictEqual(room.players.length, 5);
 });
+
+function midGame() {
+  const room = started();
+  everyoneAck(room);
+  playQuest(room, []); // 1라운드를 마치고 2라운드 제안 단계
+  proposeAs(room, ids(room).slice(0, 3));
+  ids(room).slice(0, 2).forEach((id) => g.vote(room, id, true)); // 투표 도중
+  assert.strictEqual(room.phase, 'vote');
+  return room;
+}
+
+test('방장은 게임 도중에도 초기화해서 대기실로 돌려보낼 수 있다', () => {
+  const room = midGame();
+  const nonHost = ids(room).find((id) => id !== room.hostId);
+  assert.ok(g.backToLobby(room, nonHost).error);
+  assert.strictEqual(room.phase, 'vote'); // 거부되면 그대로
+  g.getPlayer(room, nonHost).connected = false; // 잠깐 끊긴 사람의 자리는 유지된다
+  assert.deepStrictEqual(g.backToLobby(room, room.hostId), {});
+  assert.strictEqual(room.phase, 'lobby');
+  assert.strictEqual(room.players.length, 6);
+  assert.ok(room.players.every((p) => p.role === null));
+  assert.deepStrictEqual([room.results, room.history, room.votes, room.cards, room.team], [[], [], {}, {}, []]);
+  assert.strictEqual(room.round, 0);
+  assert.strictEqual(room.rejects, 0);
+  const v = g.viewFor(room, room.hostId);
+  assert.strictEqual(v.roleInfo, null);
+  assert.deepStrictEqual(v.results, []);
+  assert.ok(g.backToLobby(room, room.hostId).error); // 이미 대기실
+});
+
+test('초기화 뒤 다시 시작하면 처음 상태로 새 게임이 시작된다', () => {
+  const room = midGame();
+  g.backToLobby(room, room.hostId);
+  g.getPlayer(room, room.players[1].id).connected = true;
+  assert.deepStrictEqual(g.start(room, room.hostId), {});
+  assert.strictEqual(room.phase, 'roles');
+  assert.strictEqual(room.round, 0);
+  assert.deepStrictEqual(room.results, []);
+  assert.deepStrictEqual(room.history, []);
+});
+
+test('방장은 같은 멤버로 바로 처음부터 다시 시작할 수 있다', () => {
+  const room = midGame();
+  const before = room.gameNo;
+  const nonHost = ids(room).find((id) => id !== room.hostId);
+  assert.ok(g.restart(room, nonHost).error);
+  assert.deepStrictEqual(g.restart(room, room.hostId), {});
+  assert.strictEqual(room.gameNo, before + 1);
+  assert.strictEqual(room.phase, 'roles');
+  assert.strictEqual(room.round, 0);
+  assert.strictEqual(room.rejects, 0);
+  assert.deepStrictEqual(room.results, []);
+  assert.deepStrictEqual(room.history, []);
+  assert.deepStrictEqual(room.votes, {});
+  assert.strictEqual(room.acks.size, 0);
+  assert.strictEqual(room.players.length, 6);
+  const count = {};
+  room.players.forEach((p) => { count[p.role] = (count[p.role] || 0) + 1; });
+  assert.deepStrictEqual(count, { merlin: 1, percival: 1, servant: 2, morgana: 1, assassin: 1 });
+});
+
+test('접속이 끊긴 사람이 있으면 바로 다시 시작은 거부되고 진행 중인 게임은 그대로', () => {
+  const room = midGame();
+  g.getPlayer(room, ids(room).find((id) => id !== room.hostId)).connected = false;
+  const r = g.restart(room, room.hostId);
+  assert.ok(r.error);
+  assert.strictEqual(room.phase, 'vote');
+  assert.strictEqual(room.round, 1);
+  assert.strictEqual(room.results.length, 1);
+});
+
+test('끝난 뒤 바로 다시 하기도 된다', () => {
+  const room = started();
+  everyoneAck(room);
+  for (let i = 0; i < 5; i++) {
+    proposeAs(room, ids(room).slice(0, 2));
+    voteAll(room, false);
+    everyoneAck(room);
+  }
+  assert.strictEqual(room.phase, 'over');
+  assert.deepStrictEqual(g.restart(room, room.hostId), {});
+  assert.strictEqual(room.phase, 'roles');
+  assert.strictEqual(room.winner, null);
+});

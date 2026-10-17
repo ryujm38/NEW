@@ -67,6 +67,7 @@ function createRoom(code) {
     hostId: null,
     players: [], // 좌석 순서 = 배열 순서
     phase: 'lobby',
+    gameNo: 0, // 시작할 때마다 +1
     round: 0,
     leader: 0,
     rejects: 0,
@@ -139,6 +140,7 @@ function start(room, byId) {
   if (room.players.length !== PLAYER_COUNT) return { error: `정확히 ${PLAYER_COUNT}명이 모여야 해요.` };
   if (room.players.some((p) => !p.connected)) return { error: '접속이 끊긴 사람이 있어요.' };
 
+  room.gameNo += 1;
   room.players = shuffle(room.players); // 좌석(리더 순서)을 섞는다
   const roles = shuffle(ROLE_POOL);
   room.players.forEach((p, i) => {
@@ -162,17 +164,45 @@ function start(room, byId) {
   return {};
 }
 
+// 방장이 게임을 초기화하고 대기실로 돌려보낸다. 게임 도중에도 할 수 있다.
+// 게임이 끝난 뒤에는 나간 사람을 정리하지만, 도중에는 잠깐 끊긴 사람일 수 있어서 자리를 유지한다.
 function backToLobby(room, byId) {
   if (byId !== room.hostId) return { error: '방장만 할 수 있어요.' };
-  if (room.phase !== 'over') return { error: '게임이 끝난 뒤에만 할 수 있어요.' };
-  room.phase = 'lobby';
-  room.players = room.players.filter((p) => p.connected);
+  if (room.phase === 'lobby') return { error: '이미 대기실이에요.' };
+  if (room.phase === 'over') room.players = room.players.filter((p) => p.connected);
   room.players.forEach((p) => {
     p.role = null;
   });
   if (!getPlayer(room, room.hostId)) room.hostId = room.players[0] ? room.players[0].id : null;
+  room.phase = 'lobby';
+  room.round = 0;
+  room.rejects = 0;
+  room.draft = [];
+  room.team = [];
+  room.votes = {};
+  room.cards = {};
+  room.results = [];
+  room.history = [];
+  room.current = null;
+  room.winner = null;
+  room.reason = null;
+  room.assassinTarget = null;
   room.acks = new Set();
   return {};
+}
+
+// 같은 멤버로 역할을 새로 섞어 바로 처음부터 다시 시작한다.
+function restart(room, byId) {
+  if (byId !== room.hostId) return { error: '방장만 할 수 있어요.' };
+  if (room.phase === 'lobby') return { error: '대기실에서는 "게임 시작"을 누르세요.' };
+  if (room.players.length !== PLAYER_COUNT || room.players.some((p) => !p.connected)) {
+    return { error: '접속이 끊긴 사람이 있어요. 대기실로 돌아가서 정리하세요.' };
+  }
+  const prev = room.phase;
+  room.phase = 'lobby'; // start()가 대기실 상태를 요구한다. 실패하면 되돌린다.
+  const r = start(room, byId);
+  if (r.error) room.phase = prev;
+  return r;
 }
 
 function kick(room, byId, targetId) {
@@ -382,6 +412,7 @@ function viewFor(room, viewerId) {
     me: viewerId,
     hostId: room.hostId,
     phase,
+    gameNo: room.gameNo,
     round: room.round,
     teamSizes: TEAM_SIZES,
     teamSize: inGame && !over ? teamSize(room) : null,
@@ -441,6 +472,7 @@ module.exports = {
   removePlayer,
   start,
   backToLobby,
+  restart,
   kick,
   ack,
   force,

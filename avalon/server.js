@@ -164,8 +164,11 @@ function createAppServer() {
       case 'assassinate':
         r = game.assassinate(room, id, msg.target);
         break;
-      case 'again':
+      case 'again': // 게임 초기화: 대기실로 돌아가기
         r = game.backToLobby(room, id);
+        break;
+      case 'restart': // 같은 멤버로 역할을 새로 섞어 바로 다시 시작
+        r = game.restart(room, id);
         break;
       case 'kick': {
         r = game.kick(room, id, msg.target);

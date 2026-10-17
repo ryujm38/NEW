@@ -15,6 +15,7 @@ const ui = {
   code: (new URLSearchParams(location.search).get('room') || '').toUpperCase().slice(0, 4),
   roleOpen: false,
   historyOpen: false,
+  hostOpen: false,
   toast: '',
 };
 let session = loadJson(SESSION_KEY);
@@ -53,12 +54,18 @@ function connect() {
       session = { code: m.code, id: m.id, token: m.token };
       save(SESSION_KEY, JSON.stringify(session));
     } else if (m.t === 'state') {
+      const prev = S;
       S = m.state;
+      if (prev && prev.phase !== 'lobby') {
+        if (S.phase === 'lobby' && prev.phase !== 'over') showToast('방장이 게임을 초기화했어요. 대기실로 돌아왔어요.');
+        else if (S.gameNo !== prev.gameNo) showToast('방장이 게임을 처음부터 다시 시작했어요.');
+      }
+      if (S.phase === 'lobby' || (prev && S.gameNo !== prev.gameNo)) ui.roleOpen = ui.historyOpen = ui.hostOpen = false;
       render();
     } else if (m.t === 'gone') {
       clearSession();
       S = null;
-      ui.roleOpen = ui.historyOpen = false;
+      ui.roleOpen = ui.historyOpen = ui.hostOpen = false;
       if (m.kicked) showToast('방장이 내보냈어요.');
       render();
     } else if (m.t === 'error') {
@@ -329,7 +336,8 @@ function renderGame() {
       <p class="center">${REASONS[S.reason] || ''}</p>
       ${S.assassinTarget ? `<p class="center dim small">암살자의 선택: ${nm(S.assassinTarget)}</p>` : ''}
       ${isHost
-        ? '<button class="primary" data-act="again" style="margin-top:8px">대기실로 돌아가 다시 하기</button>'
+        ? `<button class="primary" data-act="restart" style="margin-top:8px">같은 멤버로 바로 다시 하기</button>
+           <button data-act="again" style="margin-top:8px">대기실로 돌아가기</button>`
         : '<p class="progress">방장이 다시 시작하길 기다리는 중…</p>'}
     </div>`;
   }
@@ -343,9 +351,21 @@ function renderGame() {
   <div class="foot">
     <button data-act="role">🎭 내 역할</button>
     <button data-act="history">📜 기록</button>
+    ${isHost ? '<button data-act="hostmenu">⚙ 방장</button>' : ''}
   </div>
   ${ui.roleOpen ? `<div class="overlay" data-act="closeall"><div class="sheet">${roleCardHtml(S.roleInfo)}<button data-act="closeall">닫기</button></div></div>` : ''}
+  ${ui.hostOpen && isHost ? hostMenuHtml() : ''}
   ${ui.historyOpen ? `<div class="overlay" data-act="closeall"><div class="sheet"><h2>지난 기록</h2>${historyHtml()}<button data-act="closeall">닫기</button></div></div>` : ''}`;
+}
+
+function hostMenuHtml() {
+  return `<div class="overlay" data-act="closeall"><div class="sheet">
+    <h2>방장 메뉴</h2>
+    <p class="dim small">누르면 모든 사람의 진행 상황이 사라지고, 모두에게 바로 반영돼요.</p>
+    <button class="primary" data-act="restart" data-confirm="같은 멤버로 역할을 새로 배정하고 처음부터 다시 시작할까요?">처음부터 다시 시작 (역할 새로 배정)</button>
+    <button data-act="again" data-confirm="게임을 초기화하고 모두 대기실로 돌아갈까요?">초기화하고 대기실로 돌아가기</button>
+    <button class="ghost" data-act="closeall">닫기</button>
+  </div></div>`;
 }
 
 function ackHtml(meP, ackCount, connectedCount, isHost) {
@@ -386,6 +406,7 @@ $app.addEventListener('click', (e) => {
   const act = el.dataset.act;
   // 오버레이 배경을 눌렀을 때만 닫고, 시트 안쪽 클릭은 무시
   if (act === 'closeall' && el.classList.contains('overlay') && e.target !== el) return;
+  if (el.dataset.confirm && !window.confirm(el.dataset.confirm)) return;
   switch (act) {
     case 'create': {
       const name = ui.name.trim();
@@ -411,13 +432,15 @@ $app.addEventListener('click', (e) => {
     case 'ack': send({ t: 'ack' }); break;
     case 'force': send({ t: 'force' }); break;
     case 'again': send({ t: 'again' }); break;
+    case 'restart': send({ t: 'restart' }); break;
+    case 'hostmenu': ui.hostOpen = true; render(); break;
     case 'pick': onPick(el.dataset.id); break;
     case 'propose': send({ t: 'propose', team: S.draft }); break;
     case 'vote': send({ t: 'vote', approve: el.dataset.v === '1' }); break;
     case 'card': send({ t: 'card', success: el.dataset.v === '1' }); break;
     case 'role': ui.roleOpen = true; render(); break;
     case 'history': ui.historyOpen = true; render(); break;
-    case 'closeall': ui.roleOpen = ui.historyOpen = false; render(); break;
+    case 'closeall': ui.roleOpen = ui.historyOpen = ui.hostOpen = false; render(); break;
     default: break;
   }
 });
