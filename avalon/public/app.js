@@ -6,7 +6,7 @@ const SESSION_KEY = 'avalon-session';
 const NAME_KEY = 'avalon-name';
 const GAME_KEY = 'avalon-game';
 const APP_NAME = '택미린솔록면';
-const GAME_NAME = { avalon: '아발론', uno: '우노', bang: '뱅!' };
+const GAME_NAME = { avalon: '아발론', uno: '우노', bang: '뱅!', mafia: '마피아' };
 const GAMES = Object.keys(GAME_NAME);
 
 let ws = null;
@@ -26,6 +26,9 @@ const ui = {
   bSid: null, // 뱅: 시드 능력으로 버릴 카드 고르는 중
   bStore: null, // 뱅: 잡화점에서 고른 카드
   bInfo: false,
+  mSel: null, // 마피아: 고른 대상
+  mInfo: false,
+  mText: '', // 마피아: 채팅 입력 중인 글
   unoSel: null,
   game: GAMES.includes(load(GAME_KEY)) ? load(GAME_KEY) : 'avalon', // 새 방을 만들 때 고른 게임
   toast: '',
@@ -76,6 +79,8 @@ function connect() {
       if (!S.hand || !S.hand.some((c) => c.id === ui.unoSel && c.playable)) ui.unoSel = null;
       if (S.phase === 'lobby' || (prev && S.gameNo !== prev.gameNo)) ui.bInfo = ui.bPick = false;
       if (typeof bangSync === 'function') bangSync();
+      if (S.phase === 'lobby' || (prev && S.gameNo !== prev.gameNo)) ui.mInfo = false;
+      if (typeof mafiaSync === 'function') mafiaSync();
       if (S.kind !== 'uno' || S.turnId !== S.me) ui.colorOpen = false;
       render();
     } else if (m.t === 'gone') {
@@ -83,7 +88,9 @@ function connect() {
       S = null;
       ui.roleOpen = ui.historyOpen = ui.hostOpen = ui.colorOpen = false;
       ui.unoSel = ui.bSel = ui.bPick = ui.bSid = ui.bStore = null;
-      ui.bInfo = false;
+      ui.bInfo = ui.mInfo = false;
+      ui.mSel = null;
+      ui.mText = '';
       if (m.kicked) showToast('방장이 내보냈어요.');
       render();
     } else if (m.t === 'error') {
@@ -147,7 +154,7 @@ const AVALON_RULES_HTML = `
 <li>선이 3번 성공해도 <b>암살자가 멀린을 맞히면 악의 역전승</b>입니다.</li>
 </ul></details>`;
 
-const rulesHtml = (kind) => ({ uno: UNO_RULES_HTML, bang: BANG_RULES_HTML }[kind] || AVALON_RULES_HTML);
+const rulesHtml = (kind) => ({ uno: UNO_RULES_HTML, bang: BANG_RULES_HTML, mafia: MAFIA_RULES_HTML }[kind] || AVALON_RULES_HTML);
 
 function sideLabel(team) {
   return team === 'good' ? '선의 세력' : '악의 세력';
@@ -155,19 +162,41 @@ function sideLabel(team) {
 
 // ---- 화면 ----
 
+// 손가락을 누르고 있는 동안 서버 상태가 와서 화면이 통째로 다시 그려지면 그 탭이 사라질 수 있다.
+// 누르는 동안은 갱신을 미뤘다가 손을 뗀 직후에 한 번에 그린다.
+let pressing = 0; // 누르기 시작한 시각(ms), 0이면 안 누름
+let renderQueued = false;
+function releasePress() {
+  pressing = 0;
+  if (renderQueued) {
+    renderQueued = false;
+    render();
+  }
+}
+document.addEventListener('pointerdown', () => { pressing = Date.now(); }, true);
+document.addEventListener('pointerup', () => setTimeout(releasePress, 60), true);
+document.addEventListener('pointercancel', releasePress, true);
+
 function render() {
+  // 손이 떨어졌는데 이벤트를 놓친 경우를 대비해 1초가 넘으면 무시한다
+  if (pressing && Date.now() - pressing < 1000) {
+    renderQueued = true;
+    return;
+  }
   const banner = online ? '' : '<div class="banner">연결이 끊겼어요. 다시 연결하는 중…</div>';
   let html;
   if (!S) html = renderHome();
   else if (S.phase === 'lobby') html = renderLobby();
   else if (S.kind === 'uno') html = renderUno();
   else if (S.kind === 'bang') html = renderBang();
+  else if (S.kind === 'mafia') html = renderMafia();
   else html = renderGame();
   document.title = S ? `${APP_NAME}:${GAME_NAME[S.kind]}` : APP_NAME;
   const toast = ui.toast ? `<div class="toast">${esc(ui.toast)}</div>` : '';
   const active = document.activeElement;
   const keep = active && active.id ? { id: active.id, s: active.selectionStart, e: active.selectionEnd } : null;
   $app.innerHTML = banner + html + toast;
+  if (typeof mafiaAfterRender === 'function') mafiaAfterRender();
   if (keep) {
     const el = document.getElementById(keep.id);
     if (el) {
@@ -186,8 +215,9 @@ function renderHome() {
       <input type="text" id="name" maxlength="8" autocomplete="off" value="${esc(ui.name)}" placeholder="예: 민수" />
     </label>
     <p class="field" style="margin-bottom:6px">무슨 게임을 할까요?</p>
-    <div class="row" style="margin-bottom:12px">
+    <div class="gamegrid">
       ${gameBtn('avalon', '🛡️ 아발론', '5~10명')}
+      ${gameBtn('mafia', '🕵️ 마피아', '5~12명')}
       ${gameBtn('uno', '🃏 우노', '2~10명')}
       ${gameBtn('bang', '🤠 뱅!', '4~7명')}
     </div>
@@ -199,7 +229,7 @@ function renderHome() {
     </label>
     <button data-act="join">들어가기</button>
   </div>
-  <div class="card">${AVALON_RULES_HTML}${UNO_RULES_HTML}${BANG_RULES_HTML}</div>`;
+  <div class="card">${AVALON_RULES_HTML}${MAFIA_RULES_HTML}${UNO_RULES_HTML}${BANG_RULES_HTML}</div>`;
 }
 
 function renderLobby() {
@@ -239,6 +269,7 @@ function renderLobby() {
     <div class="code">${esc(S.code)}</div>
     <button data-act="share">초대 링크 보내기</button>
     <div class="slots">${slots.join('')}</div>
+    ${S.kind === 'mafia' ? mafiaLobbyOptions(isHost) : ''}
     ${action}
   </div>
   <div class="card">${rulesHtml(S.kind)}</div>
@@ -454,6 +485,7 @@ $app.addEventListener('click', (e) => {
   if (el.dataset.confirm && !window.confirm(el.dataset.confirm)) return;
   if (typeof unoClick === 'function' && unoClick(act, el)) return;
   if (typeof bangClick === 'function' && bangClick(act, el)) return;
+  if (typeof mafiaClick === 'function' && mafiaClick(act, el)) return;
   switch (act) {
     case 'setgame':
       ui.game = GAMES.includes(el.dataset.game) ? el.dataset.game : 'avalon';
@@ -492,7 +524,7 @@ $app.addEventListener('click', (e) => {
     case 'card': send({ t: 'card', success: el.dataset.v === '1' }); break;
     case 'role': ui.roleOpen = true; render(); break;
     case 'history': ui.historyOpen = true; render(); break;
-    case 'closeall': ui.roleOpen = ui.historyOpen = ui.hostOpen = ui.colorOpen = ui.bInfo = false; ui.bPick = null; render(); break;
+    case 'closeall': ui.roleOpen = ui.historyOpen = ui.hostOpen = ui.colorOpen = ui.bInfo = ui.mInfo = false; ui.bPick = null; render(); break;
     default: break;
   }
 });

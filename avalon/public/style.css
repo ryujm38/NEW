@@ -266,3 +266,36 @@ button.pulse { animation: pulse 0.9s ease-in-out infinite; }
 .bdock .panel { padding: 12px; }
 .bdock .bhand { padding-top: 12px; }
 .bdock .foot { margin-top: 0; padding-top: 0; }
+
+/* 게임 선택 그리드 (4종) */
+.gamegrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+
+/* 마피아 */
+.mplayers { display: grid; gap: 8px; }
+.mp { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; text-align: left; background: var(--panel); border: 2px solid var(--line); border-radius: 12px; padding: 11px 12px; min-height: 52px; width: 100%; font-size: 16px; font-weight: 500; }
+.mp b { font-weight: 700; }
+.mp .dot { position: static; flex: none; }
+.mp .mstate { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.mp.me { border-color: #5b628a; }
+.mp.dead { opacity: 0.5; }
+.mp.dead b { text-decoration: line-through; }
+.mp.pick { border-color: var(--gold); box-shadow: 0 0 0 3px #e0b34a55; background: #2c2813; cursor: pointer; }
+.mp.sel { border-color: #fff; box-shadow: 0 0 0 3px #ffffff88; background: #3a3419; }
+.tag.role.mf-mafia { color: var(--evil); border-color: var(--evil); }
+.tag.role.mf-police { color: var(--good); border-color: var(--good); }
+.tag.role.mf-doctor { color: var(--ok); border-color: var(--ok); }
+.tag.role.mf-citizen { color: var(--dim); }
+.mbanner { text-align: center; font-size: 14px; padding: 8px 10px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); }
+.mbanner.mafia { background: var(--evil-bg); border-color: var(--evil); }
+.mbanner.police { background: var(--good-bg); border-color: var(--good); }
+.mbanner.doctor { background: #123a2a; border-color: var(--ok); }
+.mchatbox { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.mchat { height: 150px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; font-size: 14px; background: var(--panel2); border-radius: 10px; padding: 8px 10px; }
+.mchat .cl b { color: var(--gold); margin-right: 4px; }
+.mchat .cl.mafia b { color: var(--evil); }
+.mrow { display: flex; gap: 8px; }
+.mrow input { flex: 1; }
+.mrow button { width: auto; flex: none; }
+label.opt { display: flex; align-items: center; gap: 10px; padding: 10px 4px; font-size: 15px; }
+label.opt input { width: 22px; height: 22px; flex: none; accent-color: var(--gold); }
+label.opt.ro { opacity: 0.7; }

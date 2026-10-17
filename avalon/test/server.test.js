@@ -359,3 +359,93 @@ test('뱅 방: 4명이 접속해 시작하고, 자기 역할과 손패만 받고
     httpServer.close();
   }
 });
+
+test('마피아 방: 5명이 접속해 밤·낮·투표를 진행하고, 역할/마피아 채팅/조사 결과는 해당자에게만 보인다', async () => {
+  const { httpServer } = createAppServer();
+  await new Promise((r) => httpServer.listen(0, '127.0.0.1', r));
+  const port = httpServer.address().port;
+  const cs = [];
+  try {
+    for (let i = 0; i < 5; i++) {
+      const c = client(port);
+      await c.open;
+      cs.push(c);
+    }
+    cs[0].send({ t: 'create', name: '방장', game: 'mafia' });
+    await cs[0].until((c) => c.code);
+    assert.strictEqual(cs[0].state.kind, 'mafia');
+    for (let i = 1; i < 5; i++) {
+      cs[i].send({ t: 'join', code: cs[0].code, name: `친구${i}` });
+      await cs[i].until((c) => c.state);
+    }
+    // 방장만 설정을 바꾼다
+    cs[1].send({ t: 'setting', key: 'revealRoles', value: false });
+    await cs[1].until((c) => c.errors.length === 1);
+    cs[0].send({ t: 'setting', key: 'revealRoles', value: false });
+    await Promise.all(cs.map((c) => c.until((x) => x.state.settings.revealRoles === false)));
+    cs[0].send({ t: 'start' });
+    await Promise.all(cs.map((c) => c.until((x) => x.state.phase === 'roles')));
+    const myRole = (c) => c.state.players.find((p) => p.id === c.id).role;
+    assert.ok(cs.every((c) => myRole(c)));
+    for (const c of cs) {
+      for (const p of c.state.players) {
+        if (p.id !== c.id && !(myRole(c) === 'mafia' && p.role === 'mafia')) assert.strictEqual(p.role, null);
+      }
+    }
+    cs.forEach((c) => c.send({ t: 'ack' }));
+    await Promise.all(cs.map((c) => c.until((x) => x.state.phase === 'night')));
+
+    const by = (role) => cs.find((c) => myRole(c) === role);
+    const mafia = by('mafia');
+    const police = by('police');
+    const doctor = by('doctor');
+    const citizens = cs.filter((c) => myRole(c) === 'citizen');
+
+    // 밤 채팅은 마피아에게만, 시민은 못 쓴다
+    mafia.send({ t: 'chat', text: '비밀 작전' });
+    citizens[0].send({ t: 'chat', text: '나도 낄래' });
+    await citizens[0].until((c) => c.errors.length >= 1);
+    await mafia.until((c) => c.state.chat.length === 1);
+    assert.ok(cs.filter((c) => c !== mafia).every((c) => c.state.chat.length === 0));
+
+    // 밤 행동: 마피아는 시민 한 명, 의사는 자기 자신, 경찰은 마피아를 조사
+    mafia.send({ t: 'night', target: citizens[0].id });
+    doctor.send({ t: 'night', target: doctor.id });
+    police.send({ t: 'night', target: mafia.id });
+    await Promise.all(cs.map((c) => c.until((x) => x.state.phase === 'day')));
+    assert.strictEqual(cs[0].state.players.find((p) => p.id === citizens[0].id).alive, false);
+    assert.deepStrictEqual(police.state.policeLog, [{ day: 1, target: mafia.id, mafia: true }]);
+    assert.ok(cs.filter((c) => c !== police).every((c) => c.state.policeLog === null));
+
+    // 낮 채팅은 산 사람 모두에게, 죽은 사람은 못 쓴다
+    mafia.send({ t: 'chat', text: '안녕' });
+    await Promise.all(cs.map((c) => c.until((x) => x.state.chat.some((l) => l.text === '안녕'))));
+    assert.ok(cs.filter((c) => c !== mafia).every((c) => !c.state.chat.some((l) => l.text === '비밀 작전') || myRole(c) === 'mafia'));
+    const before = citizens[0].errors.length;
+    citizens[0].send({ t: 'chat', text: '억울해' });
+    await citizens[0].until((c) => c.errors.length > before);
+
+    // 토론 끝 → 투표 (전원이 마피아에게)
+    const live = cs.filter((c) => c !== citizens[0]);
+    live.forEach((c) => c.send({ t: 'ready' }));
+    await Promise.all(cs.map((c) => c.until((x) => x.state.phase === 'vote')));
+    live.forEach((c) => c.send({ t: 'vote', target: c === mafia ? police.id : mafia.id }));
+    await Promise.all(cs.map((c) => c.until((x) => x.state.phase === 'voteResult' || x.state.phase === 'over')));
+    assert.strictEqual(cs[0].state.lastVote.executed, mafia.id);
+    live.forEach((c) => c.send({ t: 'ack' }));
+    await Promise.all(cs.map((c) => c.until((x) => x.state.phase === 'over')));
+    assert.strictEqual(cs[0].state.winner, 'citizen');
+    assert.ok(cs[0].state.players.every((p) => p.role)); // 끝나면 모두 공개
+
+    // 아발론/우노/뱅 전용 요청은 거부
+    cs[0].send({ t: 'draw' });
+    cs[0].send({ t: 'propose', team: [] });
+    await cs[0].until((c) => c.errors.length >= 2);
+    cs[0].send({ t: 'again' });
+    await Promise.all(cs.map((c) => c.until((x) => x.state.phase === 'lobby')));
+  } finally {
+    cs.forEach((c) => c.ws.terminate());
+    httpServer.closeAllConnections?.();
+    httpServer.close();
+  }
+});
