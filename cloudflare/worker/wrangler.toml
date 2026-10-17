@@ -1,0 +1,16 @@
+# 게임 방을 들고 있는 Worker (Durable Object). Pages(clue-note)의 /board/ws 가 여기로 연결한다.
+name = "board-rooms"
+main = "src/index.js"
+# 이 Worker는 따로 주소가 필요 없다(Pages가 연결해서 쓴다)
+workers_dev = false
+compatibility_date = "2026-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "GameHub"
+
+# 무료 플랜은 SQLite 저장소를 쓰는 Durable Object만 만들 수 있다
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["GameHub"]

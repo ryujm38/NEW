@@ -2,6 +2,10 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
+  <script>
+    // /board 처럼 끝에 /가 없으면 상대 경로(style.css, app.js)가 깨지므로 /board/ 로 옮긴다
+    if (!/\/$|\.html$/.test(location.pathname)) location.replace(location.pathname + '/' + location.search);
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#14161f" />
   <meta name="apple-mobile-web-app-capable" content="yes" />

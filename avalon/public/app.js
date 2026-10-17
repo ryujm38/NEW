@@ -59,13 +59,20 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 
 // ---- 연결 ----
 
+// 이 페이지가 있는 폴더. 주소가 /board/ 아래여도(Cloudflare) 맨 위여도(Node 서버) 같은 코드로 동작한다.
+const BASE_PATH = location.pathname.replace(/\/index\.html$/, '/').replace(/([^/])$/, '$1/');
+let pingTimer = null;
+
 function connect() {
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
-  ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
+  ws = new WebSocket(`${location.protocol === 'https:' ? 'wss://' : 'ws://'}${location.host}${BASE_PATH}ws`);
   ws.onopen = () => {
     online = true;
     backoff = 500;
     if (session) send({ t: 'resume', code: session.code, token: session.token });
+    // 연결이 살아 있다는 신호(서버가 조용히 끊긴 연결을 정리할 수 있게)
+    clearInterval(pingTimer);
+    pingTimer = setInterval(() => { if (ws && ws.readyState === WebSocket.OPEN) ws.send('{"t":"ping"}'); }, 25000);
     render();
   };
   ws.onmessage = (e) => {
@@ -105,6 +112,7 @@ function connect() {
     }
   };
   ws.onclose = () => {
+    clearInterval(pingTimer);
     online = false;
     render();
     setTimeout(connect, backoff);
@@ -574,7 +582,7 @@ function onPick(id) {
 }
 
 async function shareLink() {
-  const url = `${location.origin}/?room=${S.code}`;
+  const url = `${location.origin}${BASE_PATH}?room=${S.code}`;
   const text = `${APP_NAME}:${gameName(S.kind)} 하자! 방 코드: ${S.code}`;
   try {
     if (navigator.share) {

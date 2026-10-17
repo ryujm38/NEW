@@ -117,7 +117,10 @@ npm test           # 규칙 테스트 + 실제 서버 통합 테스트
 ### 방법 1: 같은 와이파이에 모여 있을 때
 서버를 켠 컴퓨터의 내부 IP로 접속합니다. 예: `http://192.168.0.12:3000`
 
-### 방법 2: 각자 다른 곳에 있을 때 (인터넷 공개)
+### 방법 2: Cloudflare (clue-note.pages.dev/board/)
+폰 서버 없이 Cloudflare 무료 플랜(Pages + Durable Object)에서 돌리는 방법은 저장소의 `cloudflare/README.md` 를 보세요.
+
+### 방법 3: 각자 다른 곳에 있을 때 (인터넷 공개)
 이 서버는 **계속 켜져 있는 Node 서버**가 필요합니다. Cloudflare Pages나 GitHub Pages 같은 정적 호스팅에는 올릴 수 없습니다.
 
 **Render (무료 플랜 있음)**
@@ -144,6 +147,7 @@ npm test           # 규칙 테스트 + 실제 서버 통합 테스트
 | `duel.js` | 세븐 원더스 듀얼 규칙 엔진. 피라미드 배치/가림, 비용·자원 구입 자동 계산, 연계, 불가사의·진보 토큰 효과, 군사·과학 즉시 승리, 점수 계산. 카드 정보는 `public/duel-data.js` |
 | `bang.js` | 뱅! 규칙 엔진. 효과를 작업 목록(queue)으로 쌓고 사람의 선택이 필요한 곳에서만 멈춤(pending). 카드·캐릭터 정보는 `public/bang-data.js`(서버와 화면 공용) |
 | `common.js` | 두 게임이 같이 쓰는 도우미 |
+| `hub.js` | 방 만들기/입장/재접속/요청 전달(전송 방식과 무관). Node 서버와 Cloudflare Durable Object가 같이 씀. 방 저장/복원(Set 포함) |
 | `server.js` | 정적 파일 + WebSocket. 방 생성/입장/재접속, 연결 유지(ping). 방 종류에 맞는 엔진의 `actions` 표로 요청을 전달 |
 | `public/` | 폰 화면(빌드 없는 HTML/CSS/JS). `app.js` 공통·아발론, `uno.js` 우노, `bang.js` 뱅!, `mafia.js` 마피아, `splendor.js` 스플렌더, `marble.js` 부루마블, `bohnanza.js` 보난자, `vegas.js` 라스베가스, `duel.js` 세븐 원더스 듀얼(새 게임은 `GAME_UI`에 등록하는 방식) |
 | `test/` | `game.test.js` 아발론 규칙, `uno.test.js` 우노 규칙, `bang.test.js` 뱅! 규칙, `mafia.test.js` 마피아 규칙, `splendor.test.js` 스플렌더 규칙, `marble.test.js` 부루마블 규칙, `bohnanza.test.js` 보난자 규칙, `vegas.test.js` 라스베가스 규칙, `duel.test.js` 듀얼 규칙, `server.test.js` 실제 서버에 접속해 한 판 |
