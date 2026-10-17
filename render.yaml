@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: avalon-6
+    runtime: node
+    rootDir: avalon
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /healthz
