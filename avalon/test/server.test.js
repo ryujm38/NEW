@@ -315,7 +315,7 @@ test('뱅 방: 4명이 접속해 시작하고, 자기 역할과 손패만 받고
     cs[0].send({ t: 'start' });
     await Promise.all(cs.map((c) => c.until((x) => x.state.phase === 'play')));
     const meOf = (c) => c.state.players.find((p) => p.id === c.id);
-    assert.ok(cs.every((c) => meOf(c).role && c.state.hand.length >= 4));
+    assert.ok(cs.every((c) => meOf(c).role && c.state.hand.length >= 3)); // 시작 손패 = 체력 (3~5장)
     // 다른 사람의 정체(보안관 제외)와 손패는 보이지 않는다
     for (const c of cs) {
       for (const p of c.state.players) {
@@ -336,6 +336,11 @@ test('뱅 방: 4명이 접속해 시작하고, 자기 역할과 손패만 받고
     const other = cs.find((c) => c.id !== turnId);
     other.send({ t: 'play', card: other.state.hand[0].id });
     await other.until((c) => c.errors.length >= 1);
+    // 시작 캐릭터에 따라 뽑을 때 선택이 먼저 대기 중일 수 있다 (키트 칼슨, 제시 존스)
+    await mover.until((c) => c.state.mode !== 'wait');
+    if (mover.state.mode === 'kit') mover.send({ t: 'choose', card: mover.state.hand.find((c) => c.ok).id });
+    else if (mover.state.mode === 'drawChoice') mover.send({ t: 'choose', opt: 'deck' });
+    await mover.until((c) => c.state.mode === 'main');
     mover.send({ t: 'end' });
     await mover.until((c) => c.state.turnId !== turnId || c.state.mode === 'discard');
 
@@ -533,6 +538,71 @@ test('부루마블 방: 설정은 방장만, 시작 후 차례인 사람만 굴�
     others[1].send({ t: 'draw' });
     others[1].send({ t: 'take', colors: ['w'] });
     await others[1].until((c) => c.errors.length >= 3);
+    cs[0].send({ t: 'again' });
+    await Promise.all(cs.map((c) => c.until((x) => x.state.phase === 'lobby')));
+  } finally {
+    cs.forEach((c) => c.ws.terminate());
+    httpServer.closeAllConnections?.();
+    httpServer.close();
+  }
+});
+
+test('보난자 방: 3명이 접속해 시작하고, 손패는 본인에게만 보이고, 거래 제안/수락이 서버를 통해 동작한다', async () => {
+  const { httpServer } = createAppServer();
+  await new Promise((r) => httpServer.listen(0, '127.0.0.1', r));
+  const port = httpServer.address().port;
+  const cs = [];
+  try {
+    for (let i = 0; i < 3; i++) {
+      const c = client(port);
+      await c.open;
+      cs.push(c);
+    }
+    cs[0].send({ t: 'create', name: '방장', game: 'bohnanza' });
+    await cs[0].until((c) => c.code);
+    assert.strictEqual(cs[0].state.kind, 'bohnanza');
+    for (let i = 1; i < 3; i++) {
+      cs[i].send({ t: 'join', code: cs[0].code, name: `친구${i}` });
+      await cs[i].until((c) => c.state);
+    }
+    cs[0].send({ t: 'start' });
+    await Promise.all(cs.map((c) => c.until((x) => x.state.phase === 'play')));
+    assert.ok(cs.every((c) => c.state.hand.length === 5));
+    const mover = cs.find((c) => c.state.mode === 'plant1');
+    const others = cs.filter((c) => c !== mover);
+    // 다른 사람의 손패는 보이지 않는다
+    const mine = new Set(mover.state.hand.map((x) => x.id));
+    assert.ok(others.every((c) => c.state.hand.every((x) => !mine.has(x.id))));
+    assert.ok(others.every((c) => c.state.players.every((p) => !('hand' in p))));
+
+    // 차례가 아닌 사람은 심을 수 없고, 차례인 사람은 맨 앞 카드를 심는다
+    others[0].send({ t: 'plant', card: others[0].state.hand[0].id, field: 0 });
+    await others[0].until((c) => c.errors.length >= 1);
+    mover.send({ t: 'plant', card: mover.state.hand[0].id, field: 0 });
+    await mover.until((c) => c.state.plantCount === 1);
+    mover.send({ t: 'skipPlant' });
+    await Promise.all(cs.map((c) => c.until((x) => x.state.step === 'trade')));
+    assert.strictEqual(mover.state.faceUp.length, 2);
+    assert.ok(others.every((c) => c.state.faceUp.length === 2)); // 펼친 카드는 모두에게 보인다
+
+    // 거래: 친구가 손패 한 장을 주고 펼친 카드 한 장을 받겠다고 제안 → 수락
+    const want = mover.state.faceUp[0];
+    const give = others[0].state.hand[0];
+    others[0].send({ t: 'propose', give: [give.id], want: [want.id] });
+    await mover.until((c) => c.state.proposals.length === 1);
+    others[1].send({ t: 'accept', from: others[0].id }); // 차례가 아닌 사람은 수락 불가
+    await others[1].until((c) => c.errors.length >= 1);
+    mover.send({ t: 'accept', from: others[0].id });
+    await Promise.all(cs.map((c) => c.until((x) => x.state.proposals.length === 0 && x.state.faceUp.length === 1)));
+    assert.deepStrictEqual(others[0].state.table.map((x) => x.id), [want.id]);
+    assert.deepStrictEqual(mover.state.table.map((x) => x.id), [give.id]);
+    assert.strictEqual(others[0].state.hand.length, 4);
+
+    // 아발론/우노/뱅/마피아/스플렌더/부루마블 전용 요청은 거부
+    others[1].send({ t: 'vote', approve: true });
+    others[1].send({ t: 'draw' });
+    others[1].send({ t: 'roll' });
+    await others[1].until((c) => c.errors.length >= 4);
     cs[0].send({ t: 'again' });
     await Promise.all(cs.map((c) => c.until((x) => x.state.phase === 'lobby')));
   } finally {
