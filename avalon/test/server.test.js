@@ -678,3 +678,65 @@ test('라스베가스 방: 3명이 접속해 시작하고, 차례인 사람만 �
     httpServer.close();
   }
 });
+
+test('세븐 원더스 듀얼 방: 2명이 접속해 불가사의를 고르고, 차례인 사람만 카드를 가져오고, 뒷면 카드는 정체가 안 보인다', async () => {
+  const { httpServer } = createAppServer();
+  await new Promise((r) => httpServer.listen(0, '127.0.0.1', r));
+  const port = httpServer.address().port;
+  const cs = [];
+  try {
+    for (let i = 0; i < 3; i++) {
+      const c = client(port);
+      await c.open;
+      cs.push(c);
+    }
+    cs[0].send({ t: 'create', name: '방장', game: 'duel' });
+    await cs[0].until((c) => c.code);
+    assert.strictEqual(cs[0].state.kind, 'duel');
+    cs[1].send({ t: 'join', code: cs[0].code, name: '친구' });
+    await cs[1].until((c) => c.state);
+    // 3번째 사람은 들어올 수 없다 (2명 정원)
+    cs[2].send({ t: 'join', code: cs[0].code, name: '셋째' });
+    await cs[2].until((c) => c.errors.length >= 1);
+    const two = cs.slice(0, 2);
+    cs[0].send({ t: 'start' });
+    await Promise.all(two.map((c) => c.until((x) => x.state.phase === 'draft')));
+    // 불가사의 고르기: 고를 차례가 아닌 사람은 거부
+    let picker = two.find((c) => c.state.mode === 'draft');
+    let waiter = two.find((c) => c !== picker);
+    waiter.send({ t: 'draftWonder', wonder: waiter.state.draft.pool[0] });
+    await waiter.until((c) => c.errors.length >= 1);
+    for (let n = 0; n < 6; n++) {
+      picker = two.find((c) => c.state.mode === 'draft');
+      const before = picker.state.draft.pool.length;
+      picker.send({ t: 'draftWonder', wonder: picker.state.draft.pool[0] });
+      await Promise.all(two.map((c) => c.until((x) => x.state.phase !== 'draft' || !x.state.draft || x.state.draft.pool.length !== before || x.state.draft.set !== picker.state.draft.set)));
+    }
+    await Promise.all(two.map((c) => c.until((x) => x.state.phase === 'play')));
+    assert.ok(two.every((c) => c.state.players.every((p) => p.wonders.length === 4)));
+    const mover = two.find((c) => c.state.mode === 'pick');
+    const other = two.find((c) => c !== mover);
+    // 뒷면 카드는 정체가 없고, 집을 수 있는 카드는 모두 앞면
+    assert.ok(other.state.slots.filter((s) => !s.up).every((s) => s.card === null));
+    assert.ok(other.state.slots.filter((s) => s.open).every((s) => s.card !== null));
+    assert.deepStrictEqual(other.state.costs, {});
+    const slot = mover.state.slots.find((s) => s.open).i;
+    other.send({ t: 'discard', slot });
+    await other.until((c) => c.errors.length >= 2);
+    mover.send({ t: 'discard', slot });
+    await Promise.all(two.map((c) => c.until((x) => x.state.slots[slot].taken)));
+    assert.strictEqual(mover.state.players.find((p) => p.id === mover.state.me).coins, 9);
+    await other.until((c) => c.state.mode === 'pick');
+    // 다른 게임 전용 요청은 거부
+    mover.send({ t: 'vote', approve: true });
+    mover.send({ t: 'roll' });
+    mover.send({ t: 'plant', card: 1, field: 0 });
+    await mover.until((c) => c.errors.length >= 3);
+    cs[0].send({ t: 'again' });
+    await Promise.all(two.map((c) => c.until((x) => x.state.phase === 'lobby')));
+  } finally {
+    cs.forEach((c) => c.ws.terminate());
+    httpServer.closeAllConnections?.();
+    httpServer.close();
+  }
+});
