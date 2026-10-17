@@ -54,6 +54,31 @@ test('카드·불가사의·진보 토큰 구성이 맞다', () => {
   assert.strictEqual(new Set(gives).size, gives.length);
 });
 
+test('원작 대조 데이터: 연계 17쌍, 색·시대별 장수, 길드·불가사의 비용', () => {
+  const pairs = CARDS.filter((c) => c.from).map((c) => `${CARDS.find((g) => g.key === c.from).name}→${c.name}`).sort();
+  assert.deepStrictEqual(pairs, [
+    '극장→조각상', '마구간→마필 사육장', '목욕탕→수도교', '목책→요새', '수비대→병영', '약제사→조제실', '필사실→도서관', '제단→신전',
+    '조각상→정원', '신전→판테온', '연단→원로원', '학교→대학', '연구소→천문대', '궁술 연습장→공성 공방', '열병장→서커스',
+    '선술집→등대 신호소', '양조장→경기장',
+  ].sort());
+  const tally = {};
+  CARDS.forEach((c) => { const k = `${c.age}${c.color}`; tally[k] = (tally[k] || 0) + 1; });
+  assert.deepStrictEqual(tally, {
+    '1brown': 6, '1grey': 2, '1red': 4, '1green': 4, '1yellow': 4, '1blue': 3,
+    '2brown': 3, '2grey': 2, '2red': 5, '2green': 4, '2yellow': 4, '2blue': 5,
+    '3blue': 6, '3red': 5, '3green': 4, '3yellow': 5, '3purple': 7,
+  });
+  const cost = (name) => JSON.stringify(Object.entries(CARD[byName(name)].cost).sort());
+  assert.strictEqual(cost('건축가 길드'), JSON.stringify(Object.entries({ S: 2, C: 1, W: 1, G: 1 }).sort()));
+  assert.strictEqual(cost('전술가 길드'), JSON.stringify(Object.entries({ S: 2, C: 1, P: 1 }).sort()));
+  assert.strictEqual(cost('프레토리움'), JSON.stringify([['$', 8]]));
+  assert.strictEqual(CARD[byName('프레토리움')].shields, 3);
+  assert.deepStrictEqual(WONDERS.find((w) => w.name === '제우스 상').cost, { P: 2, C: 1, W: 1, S: 1 });
+  // 3시대 노랑 카드는 승점 3 + 장수당 동전, 시민 카드 승점
+  assert.deepStrictEqual(CARDS.filter((c) => c.age === 3 && c.color === 'blue').map((c) => c.vp).sort(), [5, 5, 6, 6, 7, 7]);
+  assert.ok(CARDS.filter((c) => c.age === 3 && c.color === 'yellow').every((c) => c.vp === 3 && c.per));
+});
+
 test('판 배치: 시대마다 20칸, 처음 집을 수 있는 카드 수, 덱 구성', () => {
   [1, 2, 3].forEach((age) => {
     const s = duel.layout(age);
@@ -327,10 +352,10 @@ test('과학: 같은 기호 2장이면 진보 토큰을 고르고, 법률 토큰
 
 test('과학 승리: 서로 다른 기호 6종 (법률 토큰 포함)', () => {
   const { room, p0 } = ready();
-  give(p0, '약국', '공방', '필사실', '약제사', '연구소'); // wheel astro quill mortar globe
+  give(p0, '약국', '공방', '필사실', '약제사', '학술원'); // wheel square quill mortar sundial
   assert.strictEqual(room.phase, 'play');
   const s = duel.openSlots(room)[0];
-  setSlot(room, s, '조제실'); // sundial → 6종
+  setSlot(room, s, '천문대'); // astrolabe → 6종
   p0.coins = 30;
   assert.deepStrictEqual(duel.build(room, p0.id, s), {});
   assert.strictEqual(room.phase, 'over');
@@ -339,11 +364,11 @@ test('과학 승리: 서로 다른 기호 6종 (법률 토큰 포함)', () => {
 
   // 법률 토큰도 과학 기호 1개로 친다: 5종 + 같은 기호 한 쌍 → 토큰으로 법률을 고르면 6종
   const r2 = ready();
-  give(r2.p0, '약제사', '공방', '필사실', '연구소', '조제실'); // mortar astro quill globe sundial
+  give(r2.p0, '약제사', '공방', '필사실', '학술원', '천문대'); // mortar square quill sundial astrolabe
   r2.room.boardTokens = ['law', 'agriculture', 'masonry', 'strategy', 'theology'];
   r2.room.boxTokens = ['architecture', 'economy', 'mathematics', 'philosophy', 'urbanism'];
   const s2 = duel.openSlots(r2.room)[0];
-  setSlot(r2.room, s2, '대학'); // mortar 두 번째 (6종은 아님)
+  setSlot(r2.room, s2, '연구소'); // square 두 번째 (6종은 아님)
   r2.p0.coins = 30;
   duel.build(r2.room, r2.p0.id, s2);
   assert.strictEqual(r2.room.phase, 'play');
