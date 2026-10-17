@@ -620,3 +620,61 @@ test('보난자 방: 3명이 접속해 시작하고, 손패는 본인에게만 �
     httpServer.close();
   }
 });
+
+test('라스베가스 방: 3명이 접속해 시작하고, 차례인 사람만 굴리고 놓을 수 있고, 굴린 주사위는 모두에게 보인다', async () => {
+  const { httpServer } = createAppServer();
+  await new Promise((r) => httpServer.listen(0, '127.0.0.1', r));
+  const port = httpServer.address().port;
+  const cs = [];
+  try {
+    for (let i = 0; i < 3; i++) {
+      const c = client(port);
+      await c.open;
+      cs.push(c);
+    }
+    cs[0].send({ t: 'create', name: '방장', game: 'vegas' });
+    await cs[0].until((c) => c.code);
+    assert.strictEqual(cs[0].state.kind, 'vegas');
+    for (let i = 1; i < 3; i++) {
+      cs[i].send({ t: 'join', code: cs[0].code, name: `친구${i}` });
+      await cs[i].until((c) => c.state);
+    }
+    cs[0].send({ t: 'start' });
+    await Promise.all(cs.map((c) => c.until((x) => x.state.phase === 'play')));
+    assert.ok(cs.every((c) => c.state.casinos.length === 6 && c.state.round === 1));
+    assert.ok(cs.every((c) => c.state.casinos.every((k) => k.bills.reduce((a, b) => a + b, 0) >= 50)));
+    const mover = cs.find((c) => c.state.mode === 'roll');
+    const others = cs.filter((c) => c !== mover);
+
+    // 차례가 아닌 사람은 굴릴 수 없다
+    others[0].send({ t: 'roll' });
+    await others[0].until((c) => c.errors.length >= 1);
+
+    // 차례인 사람이 굴리면 모두에게 보이고, 나온 숫자 하나를 골라 놓는다
+    mover.send({ t: 'roll' });
+    await Promise.all(cs.map((c) => c.until((x) => x.state.rolled && x.state.rolled.length === 8)));
+    assert.strictEqual(mover.state.mode, 'place');
+    const pick = mover.state.rolled[0];
+    const count = mover.state.rolled.filter((v) => v === pick).length;
+    others[1].send({ t: 'place', number: pick });
+    await others[1].until((c) => c.errors.length >= 1);
+    mover.send({ t: 'place', number: pick });
+    await Promise.all(cs.map((c) => c.until((x) => x.state.rolled === null)));
+    const moverId = mover.state.me;
+    assert.ok(cs.every((c) => c.state.casinos[pick - 1].dice[moverId] === count));
+    assert.ok(cs.every((c) => c.state.players.find((p) => p.id === moverId).dice === 8 - count));
+    assert.ok(cs.every((c) => c.state.turnId !== moverId || count === 8)); // 차례가 넘어감
+
+    // 다른 게임 전용 요청은 거부
+    others[1].send({ t: 'vote', approve: true });
+    others[1].send({ t: 'draw' });
+    others[1].send({ t: 'plant', card: 1, field: 0 });
+    await others[1].until((c) => c.errors.length >= 4);
+    cs[0].send({ t: 'again' });
+    await Promise.all(cs.map((c) => c.until((x) => x.state.phase === 'lobby')));
+  } finally {
+    cs.forEach((c) => c.ws.terminate());
+    httpServer.closeAllConnections?.();
+    httpServer.close();
+  }
+});
