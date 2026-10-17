@@ -5,7 +5,7 @@
 // (빗나감! 낼지, 죽기 직전 맥주, 잡화점 고르기 …)에서는 room.pending에 "누가 무엇을 해야 하는지"를 적고 멈춘다.
 // 작업도 pending도 없으면 지금 턴인 사람의 자유 행동 시간이다.
 //
-// 단순화한 점: 배럴은 맞을 때 자동으로 사용한다. 럭키 듀크는 더 좋은 쪽을 자동으로 고른다.
+// 단순화한 점: 럭키 듀크는 뽑기!에서 더 좋은 쪽을 자동으로 고른다. (배럴은 맞을 때 쓸지 말지 직접 고른다)
 // 카드 80장의 종류·장수·무늬·숫자는 실제 덱 목록을 따른다(public/bang-data.js).
 
 const crypto = require('crypto');
@@ -355,17 +355,9 @@ function step(room, task) {
       const t = getPlayer(room, task.target);
       if (!t.alive) break;
       const src = getPlayer(room, task.source);
-      let need = task.kind === 'bang' && src.char === 'slab' ? 2 : 1;
-      let barrels = t.table.filter((c) => c.key === 'barrel').length + (t.char === 'jourdonnais' ? 1 : 0);
-      while (need > 0 && barrels > 0) {
-        barrels -= 1;
-        if (check(room, t, isHeart, '배럴').ok) need -= 1;
-      }
-      if (need <= 0) {
-        say(room, `${t.name}님이 막았어요!`);
-        break;
-      }
-      askRespond(room, task.kind, t, task.source, need);
+      const need = task.kind === 'bang' && src.char === 'slab' ? 2 : 1;
+      const barrels = t.table.filter((c) => c.key === 'barrel').length + (t.char === 'jourdonnais' ? 1 : 0);
+      continueAttack(room, task.kind, t, task.source, need, barrels);
       break;
     }
 
@@ -408,6 +400,38 @@ function step(room, task) {
     default:
       throw new Error(`bang: 알 수 없는 작업 ${task.t}`);
   }
+}
+
+// 뱅!/개틀링을 맞는 사람: 배럴이 있으면 쓸지 먼저 묻고, 막지 못한 몫은 빗나감!으로 막을 기회를 준다
+function continueAttack(room, kind, t, sourceId, need, barrels) {
+  if (need <= 0) {
+    say(room, `${t.name}님이 막았어요!`);
+    return;
+  }
+  if (barrels > 0) {
+    room.pending = { t: 'barrel', who: t.id, kind, source: sourceId, need, barrels };
+    return;
+  }
+  askRespond(room, kind, t, sourceId, need);
+}
+
+// 배럴을 쓸지 고른다. 쓰면 뽑기!(♥면 빗나감! 1장 몫), 안 쓰면 남은 배럴은 포기하고 빗나감!으로 넘어간다.
+function useBarrel(room, id, use) {
+  const pd = room.pending;
+  if (!pd || pd.t !== 'barrel' || pd.who !== id) return { error: '지금은 배럴을 쓸 때가 아니에요.' };
+  const t = getPlayer(room, id);
+  room.pending = null;
+  let { need, barrels } = pd;
+  if (use) {
+    barrels -= 1;
+    if (check(room, t, isHeart, '배럴').ok) need -= 1;
+  } else {
+    barrels = 0;
+    say(room, `${t.name}님은 배럴을 쓰지 않았어요.`);
+  }
+  continueAttack(room, pd.kind, t, pd.source, need, barrels);
+  run(room);
+  return {};
 }
 
 function canSave(room, p) {
@@ -779,7 +803,8 @@ function force(room, byId) {
   const pd = room.pending;
   if (pd) {
     const who = pd.who;
-    if (pd.t === 'respond' || pd.t === 'dying') respond(room, who, null);
+    if (pd.t === 'barrel') useBarrel(room, who, true); // 자리를 비운 사람은 배럴을 쓴 것으로 (손해 볼 일이 없다)
+    else if (pd.t === 'respond' || pd.t === 'dying') respond(room, who, null);
     else if (pd.t === 'store') store(room, who, pd.cards[0].id);
     else if (pd.t === 'drawChoice') choose(room, who, { opt: 'deck' });
     else if (pd.t === 'kit') choose(room, who, { card: pd.cards[pd.cards.length - 1] });
@@ -904,7 +929,7 @@ function viewFor(room, viewerId) {
 
   let pending = null;
   if (pd && started && !over) {
-    pending = { t: pd.t, who: pd.who, kind: pd.kind || null, source: pd.source || null, other: pd.other || null, need: pd.need || null };
+    pending = { t: pd.t, who: pd.who, kind: pd.kind || null, source: pd.source || null, other: pd.other || null, need: pd.need || null, barrels: pd.barrels || null };
     if (pd.t === 'store') pending.cards = pd.cards.map(pub);
     if (pd.t === 'drawChoice' && iAmWho) {
       pending.options = pd.options;
@@ -961,6 +986,7 @@ const actions = {
   end: (room, id) => endTurn(room, id),
   discard: (room, id, msg) => discardCard(room, id, msg.card),
   respond: (room, id, msg) => respond(room, id, msg.card ?? null),
+  barrel: (room, id, msg) => useBarrel(room, id, msg.use !== false),
   store: (room, id, msg) => store(room, id, msg.card),
   choose: (room, id, msg) => choose(room, id, msg),
   sid: (room, id, msg) => sid(room, id, msg.cards),
@@ -985,6 +1011,7 @@ module.exports = {
   endTurn,
   discardCard,
   respond,
+  useBarrel,
   store,
   choose,
   sid,

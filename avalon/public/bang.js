@@ -45,6 +45,7 @@ function bangPendingText() {
       if (pd.kind === 'gatling') return `🌀 개틀링! <b>${who}</b>님이 막는 중`;
       if (pd.kind === 'indians') return `🏹 인디언! <b>${who}</b>님이 뱅!을 버려야 해요`;
       return `⚔️ 결투! <b>${who}</b>님이 뱅!을 버려야 해요 (상대: ${bangName(pd.other)})`;
+    case 'barrel': return `🛢️ <b>${who}</b>님이 배럴을 쓸지 고르는 중`;
     case 'store': return `🏪 잡화점: <b>${who}</b>님이 고르는 중`;
     case 'dying': return `💀 <b>${who}</b>님이 죽기 직전! 맥주로 버틸 수 있어요`;
     case 'drawChoice': return `<b>${who}</b>님이 카드 뽑는 방법을 고르는 중`;
@@ -162,6 +163,13 @@ function bangPanel(selCard, targeting) {
       <p class="small dim center">${need} 카드를 내서 막거나, 포기하고 맞을 수 있어요.</p>
       ${selCard && selCard.ok ? `${desc}<button class="primary" data-act="bangRespond">이 카드로 막기</button>` : ''}
       <button class="no" data-act="bangGiveUp">포기 (체력 -1)</button></div>`;
+  }
+  if (mode === 'barrel') {
+    const what = pd.kind === 'gatling' ? '개틀링' : '뱅!';
+    return `<div class="card panel"><p class="center"><b>${bangName(pd.source)}님의 ${what}! 배럴을 쓸까요?</b></p>
+      <p class="small dim center">카드 1장을 뒤집어 ♥이면 막아요. 아니면 빗나감!으로 막을 수 있어요.${pd.barrels > 1 ? ' (배럴을 한 번 더 쓸 수 있어요)' : ''}</p>
+      <button class="primary" data-act="bangBarrel" data-use="1">🛢️ 배럴 쓰기 (카드 뒤집기)</button>
+      <button data-act="bangBarrel" data-use="0">쓰지 않기</button></div>`;
   }
   if (mode === 'dying') {
     return `<div class="card panel"><p class="big bad">죽기 직전이에요!</p>
@@ -319,6 +327,7 @@ function bangClick(act, el) {
     case 'bangEnd': send({ t: 'end' }); ui.bSel = null; return true;
     case 'bangDiscard': send({ t: 'discard', card: ui.bSel }); ui.bSel = null; return true;
     case 'bangRespond': send({ t: 'respond', card: ui.bSel }); ui.bSel = null; return true;
+    case 'bangBarrel': send({ t: 'barrel', use: el.dataset.use === '1' }); return true;
     case 'bangGiveUp':
       if (window.confirm(S.mode === 'dying' ? '정말 포기하고 탈락할까요?' : '막지 않고 맞을까요?')) send({ t: 'respond' });
       ui.bSel = null;

@@ -207,24 +207,112 @@ test('슬랩 더 킬러의 뱅!은 빗나감!이 2장 필요하다', () => {
   assert.strictEqual(P(one, 1).life, 3);
 });
 
-test('배럴: ♥면 막고 아니면 맞는다. 조던네는 배럴을 기본으로 가진다 (장비와 겹치면 두 번 시도)', () => {
+const barrelOf = (room, i, use) => b.useBarrel(room, P(room, i).id, use);
+
+test('배럴: 쓸지 직접 고른다. ♥면 막고 아니면 맞는다. 조던네는 배럴을 기본으로 가진다 (장비와 겹치면 두 번 시도)', () => {
   const hit = setup(5, { hands: [['bang']], tables: [[], [C('barrel')]], deck: [clubs(), heart()] });
   play(hit, 0, 'bang', 1);
+  assert.strictEqual(hit.pending.t, 'barrel'); // 맞기 전에 배럴을 쓸지 묻는다
+  assert.strictEqual(hit.pending.who, P(hit, 1).id);
+  assert.strictEqual(P(hit, 1).life, 4);
+  assert.deepStrictEqual(barrelOf(hit, 1, true), {});
   assert.strictEqual(P(hit, 1).life, 4); // ♥ 성공
+  assert.strictEqual(hit.pending, null);
   const miss = setup(5, { hands: [['bang']], tables: [[], [C('barrel')]], deck: [heart(), clubs()] });
   play(miss, 0, 'bang', 1);
-  assert.strictEqual(P(miss, 1).life, 3);
+  barrelOf(miss, 1, true);
+  assert.strictEqual(P(miss, 1).life, 3); // ♣ 실패, 빗나감!도 없어서 맞음
   const jour = setup(5, { chars: { 1: 'jourdonnais' }, hands: [['bang']], deck: [clubs(), heart()] });
   play(jour, 0, 'bang', 1);
+  assert.strictEqual(jour.pending.t, 'barrel');
+  barrelOf(jour, 1, true);
   assert.strictEqual(P(jour, 1).life, 4);
+  // 장비 배럴 + 조던네: 첫 시도 실패 → 다시 쓸지 묻고, 두 번째 성공
   const both = setup(5, { chars: { 1: 'jourdonnais' }, hands: [['bang']], tables: [[], [C('barrel')]], deck: [heart(), clubs()] });
   play(both, 0, 'bang', 1);
+  assert.strictEqual(both.pending.barrels, 2);
+  barrelOf(both, 1, true);
+  assert.strictEqual(both.pending.t, 'barrel');
+  assert.strictEqual(both.pending.barrels, 1);
+  barrelOf(both, 1, true);
   assert.strictEqual(P(both, 1).life, 4); // 첫 시도 실패, 두 번째 성공
+  assert.strictEqual(both.pending, null);
+});
+
+test('배럴을 쓰지 않기로 하면 카드를 뒤집지 않고 빗나감!으로 넘어간다', () => {
+  const room = setup(5, { hands: [['bang'], ['missed']], tables: [[], [C('barrel')]], deck: [heart()] });
+  const deckBefore = room.deck.length;
+  play(room, 0, 'bang', 1);
+  assert.strictEqual(room.pending.t, 'barrel');
+  assert.deepStrictEqual(barrelOf(room, 1, false), {});
+  assert.strictEqual(room.deck.length, deckBefore); // 뽑기!를 하지 않았다
+  assert.strictEqual(room.pending.t, 'respond');
+  assert.strictEqual(room.pending.who, P(room, 1).id);
+  assert.deepStrictEqual(respondWith(room, 1, 'missed'), {});
+  assert.strictEqual(P(room, 1).life, 4);
+  // 빗나감!도 없으면 바로 맞는다
+  const none = setup(5, { hands: [['bang']], tables: [[], [C('barrel')]], deck: [heart()] });
+  play(none, 0, 'bang', 1);
+  barrelOf(none, 1, false);
+  assert.strictEqual(none.pending, null);
+  assert.strictEqual(P(none, 1).life, 3);
+  // 조던네+장비 배럴이라도 '쓰지 않기'를 누르면 남은 시도는 모두 포기
+  const both = setup(5, { chars: { 1: 'jourdonnais' }, hands: [['bang']], tables: [[], [C('barrel')]], deck: [heart(), heart()] });
+  play(both, 0, 'bang', 1);
+  barrelOf(both, 1, false);
+  assert.strictEqual(both.pending, null);
+  assert.strictEqual(P(both, 1).life, 3);
+});
+
+test('배럴 실패 뒤에도 빗나감!으로 막을 수 있다. 슬랩의 뱅!은 배럴 성공이 빗나감! 1장 몫', () => {
+  const room = setup(5, { hands: [['bang'], ['missed']], tables: [[], [C('barrel')]], deck: [clubs()] });
+  play(room, 0, 'bang', 1);
+  barrelOf(room, 1, true); // ♣ 실패
+  assert.strictEqual(room.pending.t, 'respond');
+  respondWith(room, 1, 'missed');
+  assert.strictEqual(P(room, 1).life, 4);
+  const slab = setup(5, { chars: { 0: 'slab' }, hands: [['bang'], ['missed']], tables: [[], [C('barrel')]], deck: [heart()] });
+  play(slab, 0, 'bang', 1);
+  barrelOf(slab, 1, true); // ♥ 성공 → 빗나감! 1장 몫
+  assert.strictEqual(slab.pending.t, 'respond');
+  assert.strictEqual(slab.pending.need, 1);
+  respondWith(slab, 1, 'missed');
+  assert.strictEqual(P(slab, 1).life, 4);
+});
+
+test('배럴 선택: 다른 사람/대기 중이 아닐 때는 거부, 보는 사람에게만 선택창, 개틀링에도 묻는다', () => {
+  const room = setup(5, { hands: [['bang']], tables: [[], [C('barrel')]], deck: [heart()] });
+  assert.ok(barrelOf(room, 1, true).error); // 아직 맞는 중이 아님
+  play(room, 0, 'bang', 1);
+  assert.ok(barrelOf(room, 2, true).error); // 다른 사람
+  assert.ok(barrelOf(room, 0, true).error);
+  assert.strictEqual(b.viewFor(room, P(room, 1).id).mode, 'barrel');
+  assert.strictEqual(b.viewFor(room, P(room, 0).id).mode, 'wait');
+  assert.strictEqual(b.viewFor(room, P(room, 1).id).pending.barrels, 1);
+  assert.ok(b.respond(room, P(room, 1).id, null).error); // 배럴 선택 중에는 포기도 안 됨(먼저 고른다)
+  barrelOf(room, 1, true);
+  assert.ok(barrelOf(room, 1, true).error); // 이미 끝남
+  const gat = setup(5, { hands: [['gatling']], tables: [[], [C('barrel')]], deck: [heart()] });
+  play(gat, 0, 'gatling');
+  assert.strictEqual(gat.pending.t, 'barrel');
+  assert.strictEqual(gat.pending.kind, 'gatling');
+  barrelOf(gat, 1, true);
+  assert.strictEqual(P(gat, 1).life, 4);
+});
+
+test('방장 force: 배럴 선택 중인 사람이 없으면 배럴을 쓴 것으로 처리한다', () => {
+  const room = setup(5, { hands: [['bang']], tables: [[], [C('barrel')]], deck: [heart()] });
+  play(room, 0, 'bang', 1);
+  assert.strictEqual(room.pending.t, 'barrel');
+  assert.deepStrictEqual(b.force(room, room.hostId), {});
+  assert.strictEqual(room.pending, null);
+  assert.strictEqual(P(room, 1).life, 4);
 });
 
 test('럭키 듀크는 2장을 넘겨 좋은 쪽을 고른다', () => {
   const room = setup(5, { chars: { 1: 'luckyduke' }, hands: [['bang']], tables: [[], [C('barrel')]], deck: [heart(), clubs()] });
   play(room, 0, 'bang', 1);
+  barrelOf(room, 1, true);
   assert.strictEqual(P(room, 1).life, 4);
   assert.strictEqual(room.discard.length, 3); // 뱅! + 판정 2장
 });
@@ -420,12 +508,14 @@ test('무법자를 쓰러뜨리면 3장 뽑고, 보안관이 부보안관을 쓰
 test('벌처 샘은 탈락자의 카드를 모두 가져온다', () => {
   const room = setup(5, { life: [4, 1], chars: { 3: 'vulture' }, hands: [['bang'], ['beer', 'missed']], tables: [[], [C('barrel')]] });
   play(room, 0, 'bang', 1);
+  barrelOf(room, 1, false); // 배럴은 쓰지 않는다
   respondWith(room, 1, 'missed'); // 막아 봤자 맥주는 쓰지 않음 → 이번엔 직접 포기 흐름으로
   assert.strictEqual(P(room, 1).alive, true);
   P(room, 1).life = 1;
   P(room, 0).table = [C('volcanic')];
   P(room, 0).hand.push(C('bang'));
   play(room, 0, 'bang', 1);
+  barrelOf(room, 1, false);
   assert.strictEqual(room.pending.t, 'dying');
   respondWith(room, 1, null);
   assert.strictEqual(P(room, 1).alive, false);
@@ -670,6 +760,9 @@ function botStep(room, rnd) {
     }
     case 'discard':
       must(b.discardCard(room, actorId, me.hand[0].id));
+      return;
+    case 'barrel':
+      must(b.useBarrel(room, actorId, rnd() < 0.7));
       return;
     case 'respond':
       if (ok.length && rnd() < 0.7) must(b.respond(room, actorId, ok[0].id));
