@@ -398,6 +398,15 @@ test('마피아 방: 5명이 접속해 밤·낮·투표를 진행하고, 역할/
       }
     }
     cs.forEach((c) => c.send({ t: 'ack' }));
+    // 게임은 1일차 낮부터: 밤사이 일어난 일이 없고, 밤 행동은 아직 불가
+    await Promise.all(cs.map((c) => c.until((x) => x.state.phase === 'day')));
+    assert.ok(cs.every((c) => c.state.day === 1 && c.state.lastNight === null));
+    // 1일차 낮 → 전원 토론 끝 → 전원 기권 → 결과 확인 → 1번째 밤
+    cs.forEach((c) => c.send({ t: 'ready' }));
+    await Promise.all(cs.map((c) => c.until((x) => x.state.phase === 'vote')));
+    cs.forEach((c) => c.send({ t: 'vote', target: null }));
+    await Promise.all(cs.map((c) => c.until((x) => x.state.phase === 'voteResult')));
+    cs.forEach((c) => c.send({ t: 'ack' }));
     await Promise.all(cs.map((c) => c.until((x) => x.state.phase === 'night')));
 
     const by = (role) => cs.find((c) => myRole(c) === role);

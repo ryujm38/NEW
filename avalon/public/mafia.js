@@ -6,6 +6,7 @@ const MAFIA_RULES_HTML = `
 <details><summary>마피아 규칙 간단 설명</summary>
 <p><b>5~12명</b> · 마피아팀(마피아) vs 시민팀(경찰, 의사, 시민). 마피아는 서로를 알고 있어요.</p>
 <ul>
+<li>게임은 <b>낮부터</b> 시작해요: 1일차 낮(토론·투표) → 1번째 밤 → 2일차 낮 → …</li>
 <li><b>밤</b>: 마피아는 함께 한 명을 골라 죽여요. <b>의사</b>는 한 명을 지켜요(자기 자신도 가능). <b>경찰</b>은 한 명을 조사해 마피아인지 알아내요(본인만 확인).</li>
 <li>마피아의 표적을 의사가 지켰다면 아무도 죽지 않아요. 마피아의 표가 갈리면 최다득표 중 무작위예요.</li>
 <li><b>낮</b>: 밤에 일어난 일이 공개되고 토론해요(채팅 또는 음성). 산 사람의 과반이 "토론 끝"을 누르면 투표로 넘어가요.</li>
@@ -65,7 +66,9 @@ function mfPoliceLog() {
 }
 
 function mfChatHtml() {
-  const lines = S.chat.map((c) => `<div class="cl ${c.ch}"><b>${esc(c.name)}</b> ${esc(c.text)}</div>`).join('');
+  // 밤에는 마피아 채팅만, 낮/투표에는 전체 채팅만 보여준다 (끝나면 모두)
+  const show = S.phase === 'night' ? (c) => c.ch === 'mafia' : S.phase === 'over' ? () => true : (c) => c.ch === 'all';
+  const lines = S.chat.filter(show).map((c) => `<div class="cl ${c.ch}"><b>${esc(c.name)}</b> ${esc(c.text)}</div>`).join('');
   const label = S.canChat === 'mafia' ? '마피아끼리만 보이는 채팅' : S.canChat === 'all' ? '토론 채팅' : '채팅 (읽기 전용)';
   return `<div class="card mchatbox"><div class="small dim">💬 ${label}</div>
     <div class="mchat" id="mchat">${lines || '<div class="dim small">아직 대화가 없어요.</div>'}</div>
@@ -193,7 +196,9 @@ function mfPanel(me, isHost) {
 
   if (phase === 'day') {
     const ln = S.lastNight;
-    let news = '조용한 밤이었어요.';
+    let news = S.day === 1 && !ln
+      ? '첫 번째 낮이에요. 아직 밤을 겪지 않아서 아무 일도 없었어요. 서로 이야기해 보고, 의심되는 사람이 없으면 기권해도 돼요.'
+      : '조용한 밤이었어요.';
     if (ln && ln.victim) news = `☠️ <b>${mfName(ln.victim)}</b>님이 밤사이 마피아에게 살해당했어요.`;
     else if (ln && ln.saved) news = `마피아가 <b>${mfName(ln.attacked)}</b>님을 공격했지만 의사가 살렸어요!`;
     const readyN = S.readyCount;

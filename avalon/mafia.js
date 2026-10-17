@@ -2,7 +2,8 @@
 // 마피아 규칙 엔진, 5~12명. 서버가 사회자 역할을 한다.
 //
 // 구성: 마피아 floor(n/3)명(최소 1), 경찰 1, 의사 1, 나머지는 시민.
-// 진행: 역할 확인 → [밤 → 낮(토론) → 투표(처형) → 결과] 반복
+// 진행: 역할 확인 → [낮(토론) → 투표(처형) → 결과 → 밤] 반복. 게임은 낮부터 시작한다.
+//   (1일차 낮에는 아직 밤사이 일어난 일이 없다. 1일차 낮 → 1번째 밤 → 2일차 낮 …)
 //   밤: 마피아가 함께 한 명을 지목(표가 갈리면 최다득표 중 무작위), 의사가 한 명을 보호(자기 자신 가능),
 //       경찰이 한 명을 조사(마피아 여부를 본인만 확인). 마피아의 표적을 의사가 지켰으면 아무도 죽지 않는다.
 //   낮: 살아 있는 사람의 과반이 "토론 끝"을 누르면 투표로 넘어간다.
@@ -188,6 +189,13 @@ function restart(room, byId) {
 
 // ---- 진행 ----
 
+function startDay(room) {
+  room.phase = 'day';
+  room.readyIds = new Set();
+  room.votes = {};
+  say(room, `☀️ ${room.day}일차 낮이 밝았어요.`);
+}
+
 function startNight(room) {
   room.phase = 'night';
   room.night = { mafia: {}, doctor: undefined, police: undefined };
@@ -229,8 +237,8 @@ function resolveNight(room) {
     finish(room, w);
     return;
   }
-  room.phase = 'day';
-  room.readyIds = new Set();
+  room.day += 1;
+  startDay(room);
 }
 
 function night(room, id, targetId) {
@@ -337,14 +345,10 @@ function maybeAdvance(room) {
 function advance(room) {
   room.acks = new Set();
   if (room.phase === 'roles') {
-    startNight(room);
+    startDay(room); // 게임은 낮부터
   } else if (room.phase === 'voteResult') {
-    if (room.pendingWinner) {
-      finish(room, room.pendingWinner);
-    } else {
-      room.day += 1;
-      startNight(room);
-    }
+    if (room.pendingWinner) finish(room, room.pendingWinner);
+    else startNight(room); // 1일차 낮 뒤에는 1번째 밤
   }
 }
 

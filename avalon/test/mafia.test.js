@@ -3,15 +3,29 @@ const test = require('node:test');
 const assert = require('node:assert');
 const m = require('../mafia');
 
-// 역할을 직접 정해서 시작한다. roles[i]가 i번째 사람의 역할. 시작 후 모두 확인해서 첫 밤으로 넘어간다.
-function mk(roles, o = {}) {
+// 역할을 직접 정해서 시작한다. roles[i]가 i번째 사람의 역할.
+// 게임은 1일차 낮부터 시작한다. mk()는 1일차 낮(전원 기권)을 넘겨서 1번째 밤까지 진행해 준다.
+function mkDay(roles, o = {}) {
   const room = m.createRoom('MT');
   roles.forEach((_, i) => m.addPlayer(room, `p${i}`));
   if (o.revealRoles === false) m.setSetting(room, room.hostId, 'revealRoles', false);
   assert.deepStrictEqual(m.start(room, room.hostId), {});
   room.players.forEach((p, i) => { p.role = roles[i]; });
   room.players.forEach((p) => m.ack(room, p.id));
+  assert.strictEqual(room.phase, 'day');
+  assert.strictEqual(room.day, 1);
+  return room;
+}
+function mk(roles, o = {}) {
+  const room = mkDay(roles, o);
+  room.players.forEach((p) => m.ready(room, p.id)); // 토론 끝
+  assert.strictEqual(room.phase, 'vote');
+  room.players.forEach((p) => m.vote(room, p.id, null)); // 전원 기권 → 아무도 처형되지 않음
+  assert.strictEqual(room.phase, 'voteResult');
+  assert.strictEqual(room.lastVote.executed, null);
+  room.players.forEach((p) => m.ack(room, p.id));
   assert.strictEqual(room.phase, 'night');
+  assert.strictEqual(room.day, 1);
   return room;
 }
 const P = (room, i) => room.players[i];
@@ -379,4 +393,63 @@ test('5~12명이 무작위로 끝까지 두면 반드시 끝나고 승자가 맞
       else assert.ok(mafia >= alive(room).length - mafia);
     }
   }
+});
+
+
+// ---- 낮부터 시작 ----
+
+test('게임은 1일차 낮부터 시작한다: 밤사이 일어난 일이 없고, 채팅은 전체, 밤 행동은 불가', () => {
+  const room = mkDay(ROLES6);
+  assert.strictEqual(room.phase, 'day');
+  const v = m.viewFor(room, id(room, 0));
+  assert.strictEqual(v.day, 1);
+  assert.strictEqual(v.lastNight, null);
+  assert.strictEqual(v.canChat, 'all');
+  assert.ok(night(room, 0, 4).error); // 아직 밤이 아니다
+  assert.deepStrictEqual(m.chat(room, id(room, 4), '안녕'), {});
+  assert.strictEqual(m.viewFor(room, id(room, 3)).chat.length, 1); // 마피아가 아니어도 낮 채팅은 보인다
+  assert.ok(room.log.some((l) => l.text.includes('1일차 낮')));
+  assert.ok(room.players.every((p) => p.alive));
+});
+
+test('낮 → 투표 → 밤 → 낮 순서로 진행되고 날짜는 밤이 지나야 올라간다', () => {
+  const room = mkDay(ROLES6);
+  room.players.forEach((p) => m.ready(room, p.id));
+  assert.strictEqual(room.phase, 'vote');
+  room.players.forEach((p) => m.vote(room, p.id, null));
+  room.players.forEach((p) => m.ack(room, p.id));
+  assert.strictEqual(room.phase, 'night');
+  assert.strictEqual(room.day, 1); // 1일차 낮 다음은 1번째 밤
+  night(room, 0, 4); night(room, 1, 4); night(room, 2, 0); night(room, 3, 3);
+  assert.strictEqual(room.phase, 'day');
+  assert.strictEqual(room.day, 2); // 밤이 끝나야 2일차
+  assert.strictEqual(m.viewFor(room, id(room, 0)).lastNight.victim, id(room, 4));
+});
+
+test('1일차 낮의 투표로도 처형되고, 마지막 마피아를 처형하면 그 자리에서 시민팀이 이긴다', () => {
+  const room = mkDay(ROLES5); // 마피아 1명
+  room.players.forEach((p) => m.ready(room, p.id));
+  const mafia = id(room, 0);
+  room.players.forEach((p) => { if (p.id !== mafia) m.vote(room, p.id, mafia); });
+  m.vote(room, mafia, null);
+  assert.strictEqual(room.lastVote.executed, mafia);
+  assert.strictEqual(room.pendingWinner, 'citizen');
+  room.players.filter((p) => p.alive).forEach((p) => m.ack(room, p.id));
+  assert.strictEqual(room.phase, 'over');
+  assert.strictEqual(room.winner, 'citizen');
+  assert.strictEqual(room.day, 1); // 밤은 한 번도 오지 않았다
+});
+
+test('1일차 낮에 시민이 처형되면 그 뒤에 첫 밤이 온다', () => {
+  const room = mkDay(ROLES6);
+  room.players.forEach((p) => m.ready(room, p.id));
+  const target = id(room, 5);
+  room.players.forEach((p) => { if (p.id !== target) m.vote(room, p.id, target); });
+  m.vote(room, target, null);
+  assert.strictEqual(room.lastVote.executed, target);
+  assert.strictEqual(room.pendingWinner, null);
+  room.players.filter((p) => p.alive).forEach((p) => m.ack(room, p.id));
+  assert.strictEqual(room.phase, 'night');
+  assert.strictEqual(P(room, 5).alive, false);
+  assert.strictEqual(room.day, 1);
 });
