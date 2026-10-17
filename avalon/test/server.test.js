@@ -449,3 +449,49 @@ test('마피아 방: 5명이 접속해 밤·낮·투표를 진행하고, 역할/
     httpServer.close();
   }
 });
+
+test('스플렌더 방: 3명이 접속해 시작하고, 예약 카드는 본인에게만 보이고, 차례가 아니면 거부된다', async () => {
+  const { httpServer } = createAppServer();
+  await new Promise((r) => httpServer.listen(0, '127.0.0.1', r));
+  const port = httpServer.address().port;
+  const cs = [];
+  try {
+    for (let i = 0; i < 3; i++) {
+      const c = client(port);
+      await c.open;
+      cs.push(c);
+    }
+    cs[0].send({ t: 'create', name: '방장', game: 'splendor' });
+    await cs[0].until((c) => c.code);
+    assert.strictEqual(cs[0].state.kind, 'splendor');
+    for (let i = 1; i < 3; i++) {
+      cs[i].send({ t: 'join', code: cs[0].code, name: `친구${i}` });
+      await cs[i].until((c) => c.state);
+    }
+    cs[0].send({ t: 'start' });
+    await Promise.all(cs.map((c) => c.until((x) => x.state.phase === 'play')));
+    const mover = cs.find((c) => c.state.mode === 'main');
+    const others = cs.filter((c) => c !== mover);
+    assert.strictEqual(others.length, 2);
+    assert.ok(others.every((c) => c.state.mode === 'wait'));
+    others[0].send({ t: 'take', colors: ['w', 'u', 'g'] });
+    await others[0].until((c) => c.errors.length >= 1);
+
+    mover.send({ t: 'reserve', level: 1, index: 0 });
+    await Promise.all(cs.map((c) => c.until((x) => x.state.players.find((p) => p.id === mover.id).reservedCount === 1)));
+    const mine = mover.state.players.find((p) => p.id === mover.id);
+    assert.strictEqual(mine.reserved.length, 1);
+    assert.ok(others.every((c) => c.state.players.find((p) => p.id === mover.id).reserved === null));
+
+    // 아발론/우노/뱅/마피아 전용 요청은 거부
+    others[1].send({ t: 'vote', approve: true });
+    others[1].send({ t: 'draw' });
+    await others[1].until((c) => c.errors.length >= 2);
+    cs[0].send({ t: 'again' });
+    await Promise.all(cs.map((c) => c.until((x) => x.state.phase === 'lobby')));
+  } finally {
+    cs.forEach((c) => c.ws.terminate());
+    httpServer.closeAllConnections?.();
+    httpServer.close();
+  }
+});

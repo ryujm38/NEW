@@ -7,7 +7,13 @@ const NAME_KEY = 'avalon-name';
 const GAME_KEY = 'avalon-game';
 const APP_NAME = '택미린솔록면';
 const GAME_NAME = { avalon: '아발론', uno: '우노', bang: '뱅!', mafia: '마피아' };
-const GAMES = Object.keys(GAME_NAME);
+// 새 게임은 파일 안에서 GAME_UI[종류] = {...}로 등록한다.
+//   name(제목용 이름), label(첫 화면 버튼), range(인원), rules(규칙 html), render(), sync(), click(act, el),
+//   afterRender(), lobbyOptions(isHost), closeAll()
+window.GAME_UI = window.GAME_UI || {};
+const gameName = (kind) => (GAME_UI[kind] && GAME_UI[kind].name) || GAME_NAME[kind];
+const allGames = () => [...Object.keys(GAME_NAME), ...Object.keys(GAME_UI)];
+const uiGames = () => Object.values(GAME_UI);
 
 let ws = null;
 let online = false;
@@ -30,7 +36,7 @@ const ui = {
   mInfo: false,
   mText: '', // 마피아: 채팅 입력 중인 글
   unoSel: null,
-  game: GAMES.includes(load(GAME_KEY)) ? load(GAME_KEY) : 'avalon', // 새 방을 만들 때 고른 게임
+  game: allGames().includes(load(GAME_KEY)) ? load(GAME_KEY) : 'avalon', // 새 방을 만들 때 고른 게임
   toast: '',
 };
 let session = loadJson(SESSION_KEY);
@@ -81,6 +87,7 @@ function connect() {
       if (typeof bangSync === 'function') bangSync();
       if (S.phase === 'lobby' || (prev && S.gameNo !== prev.gameNo)) ui.mInfo = false;
       if (typeof mafiaSync === 'function') mafiaSync();
+      uiGames().forEach((g) => g.sync && g.sync());
       if (S.kind !== 'uno' || S.turnId !== S.me) ui.colorOpen = false;
       render();
     } else if (m.t === 'gone') {
@@ -154,7 +161,7 @@ const AVALON_RULES_HTML = `
 <li>선이 3번 성공해도 <b>암살자가 멀린을 맞히면 악의 역전승</b>입니다.</li>
 </ul></details>`;
 
-const rulesHtml = (kind) => ({ uno: UNO_RULES_HTML, bang: BANG_RULES_HTML, mafia: MAFIA_RULES_HTML }[kind] || AVALON_RULES_HTML);
+const rulesHtml = (kind) => (GAME_UI[kind] ? GAME_UI[kind].rules : { uno: UNO_RULES_HTML, bang: BANG_RULES_HTML, mafia: MAFIA_RULES_HTML }[kind] || AVALON_RULES_HTML);
 
 function sideLabel(team) {
   return team === 'good' ? '선의 세력' : '악의 세력';
@@ -190,13 +197,15 @@ function render() {
   else if (S.kind === 'uno') html = renderUno();
   else if (S.kind === 'bang') html = renderBang();
   else if (S.kind === 'mafia') html = renderMafia();
+  else if (GAME_UI[S.kind]) html = GAME_UI[S.kind].render();
   else html = renderGame();
-  document.title = S ? `${APP_NAME}:${GAME_NAME[S.kind]}` : APP_NAME;
+  document.title = S ? `${APP_NAME}:${gameName(S.kind)}` : APP_NAME;
   const toast = ui.toast ? `<div class="toast">${esc(ui.toast)}</div>` : '';
   const active = document.activeElement;
   const keep = active && active.id ? { id: active.id, s: active.selectionStart, e: active.selectionEnd } : null;
   $app.innerHTML = banner + html + toast;
   if (typeof mafiaAfterRender === 'function') mafiaAfterRender();
+  uiGames().forEach((g) => g.afterRender && g.afterRender());
   if (keep) {
     const el = document.getElementById(keep.id);
     if (el) {
@@ -207,6 +216,10 @@ function render() {
 }
 
 function renderHome() {
+  const gameList = [
+    ['avalon', '🛡️ 아발론', '5~10명'], ['mafia', '🕵️ 마피아', '5~12명'], ['uno', '🃏 우노', '2~10명'], ['bang', '🤠 뱅!', '4~7명'],
+    ...Object.entries(GAME_UI).map(([k, g]) => [k, g.label, g.range]),
+  ];
   const gameBtn = (g, label, sub) => `<button class="gamebtn ${ui.game === g ? 'on' : ''}" data-act="setgame" data-game="${g}"><b>${label}</b><small>${sub}</small></button>`;
   return `
   <h1>🎲 ${APP_NAME}<small>친구들과 폰으로 같이 하는 보드게임</small></h1>
@@ -216,12 +229,9 @@ function renderHome() {
     </label>
     <p class="field" style="margin-bottom:6px">무슨 게임을 할까요?</p>
     <div class="gamegrid">
-      ${gameBtn('avalon', '🛡️ 아발론', '5~10명')}
-      ${gameBtn('mafia', '🕵️ 마피아', '5~12명')}
-      ${gameBtn('uno', '🃏 우노', '2~10명')}
-      ${gameBtn('bang', '🤠 뱅!', '4~7명')}
+      ${gameList.map(([k, label, range]) => gameBtn(k, label, range)).join('')}
     </div>
-    <button class="primary" data-act="create">${GAME_NAME[ui.game]} 방 만들기</button>
+    <button class="primary" data-act="create">${gameName(ui.game)} 방 만들기</button>
   </div>
   <div class="card">
     <label class="field">친구가 만든 방에 들어가기 — 방 코드 4글자
@@ -229,7 +239,7 @@ function renderHome() {
     </label>
     <button data-act="join">들어가기</button>
   </div>
-  <div class="card">${AVALON_RULES_HTML}${MAFIA_RULES_HTML}${UNO_RULES_HTML}${BANG_RULES_HTML}</div>`;
+  <div class="card">${AVALON_RULES_HTML}${MAFIA_RULES_HTML}${UNO_RULES_HTML}${BANG_RULES_HTML}${uiGames().map((g) => g.rules).join('')}</div>`;
 }
 
 function renderLobby() {
@@ -263,13 +273,14 @@ function renderLobby() {
   }
   const count = min === max ? `${max}명` : `${min}~${max}명`;
   return `
-  <h1>대기실<small>${APP_NAME}:${GAME_NAME[S.kind]} · ${count}</small></h1>
+  <h1>대기실<small>${APP_NAME}:${gameName(S.kind)} · ${count}</small></h1>
   <div class="card">
     <p class="dim center small">친구들에게 이 코드를 알려주세요</p>
     <div class="code">${esc(S.code)}</div>
     <button data-act="share">초대 링크 보내기</button>
     <div class="slots">${slots.join('')}</div>
     ${S.kind === 'mafia' ? mafiaLobbyOptions(isHost) : ''}
+    ${GAME_UI[S.kind] && GAME_UI[S.kind].lobbyOptions ? GAME_UI[S.kind].lobbyOptions(isHost) : ''}
     ${action}
   </div>
   <div class="card">${rulesHtml(S.kind)}</div>
@@ -444,6 +455,25 @@ function hostMenuHtml() {
   </div></div>`;
 }
 
+// 새 게임들이 같이 쓰는 방장 메뉴 / 종료 화면 버튼
+function genericHostMenu(forceLabel, forceConfirm) {
+  return `<div class="overlay" data-act="closeall"><div class="sheet">
+    <h2>방장 메뉴</h2>
+    <p class="dim small">누르면 모든 사람의 진행 상황이 바로 바뀌어요.</p>
+    ${forceLabel ? `<button data-act="force" data-confirm="${esc(forceConfirm || '정말 넘길까요?')}">${esc(forceLabel)}</button>` : ''}
+    <button class="primary" data-act="restart" data-confirm="같은 멤버로 처음부터 다시 시작할까요?">처음부터 다시 시작</button>
+    <button data-act="again" data-confirm="게임을 초기화하고 모두 대기실로 돌아갈까요?">초기화하고 대기실로</button>
+    <button class="ghost" data-act="closeall">닫기</button>
+  </div></div>`;
+}
+
+function genericOverButtons(isHost) {
+  return isHost
+    ? `<button class="primary" data-act="restart" style="margin-top:10px">같은 멤버로 바로 다시 하기</button>
+       <button data-act="again" style="margin-top:8px">대기실로 돌아가기</button>`
+    : '<p class="progress">방장이 다시 시작하길 기다리는 중…</p>';
+}
+
 function ackHtml(meP, ackCount, connectedCount, isHost) {
   if (meP.acked) {
     return `<p class="progress">다른 사람을 기다리는 중 (${ackCount}/${connectedCount})</p>${isHost ? '<button class="ghost" data-act="force">기다리지 않고 넘어가기</button>' : ''}`;
@@ -486,9 +516,10 @@ $app.addEventListener('click', (e) => {
   if (typeof unoClick === 'function' && unoClick(act, el)) return;
   if (typeof bangClick === 'function' && bangClick(act, el)) return;
   if (typeof mafiaClick === 'function' && mafiaClick(act, el)) return;
+  if (uiGames().some((g) => g.click && g.click(act, el))) return;
   switch (act) {
     case 'setgame':
-      ui.game = GAMES.includes(el.dataset.game) ? el.dataset.game : 'avalon';
+      ui.game = allGames().includes(el.dataset.game) ? el.dataset.game : 'avalon';
       save(GAME_KEY, ui.game);
       render();
       break;
@@ -524,7 +555,7 @@ $app.addEventListener('click', (e) => {
     case 'card': send({ t: 'card', success: el.dataset.v === '1' }); break;
     case 'role': ui.roleOpen = true; render(); break;
     case 'history': ui.historyOpen = true; render(); break;
-    case 'closeall': ui.roleOpen = ui.historyOpen = ui.hostOpen = ui.colorOpen = ui.bInfo = ui.mInfo = false; ui.bPick = null; render(); break;
+    case 'closeall': ui.roleOpen = ui.historyOpen = ui.hostOpen = ui.colorOpen = ui.bInfo = ui.mInfo = false; ui.bPick = null; uiGames().forEach((g) => g.closeAll && g.closeAll()); render(); break;
     default: break;
   }
 });
@@ -544,10 +575,10 @@ function onPick(id) {
 
 async function shareLink() {
   const url = `${location.origin}/?room=${S.code}`;
-  const text = `${APP_NAME}:${GAME_NAME[S.kind]} 하자! 방 코드: ${S.code}`;
+  const text = `${APP_NAME}:${gameName(S.kind)} 하자! 방 코드: ${S.code}`;
   try {
     if (navigator.share) {
-      await navigator.share({ title: `${APP_NAME}:${GAME_NAME[S.kind]}`, text, url });
+      await navigator.share({ title: `${APP_NAME}:${gameName(S.kind)}`, text, url });
       return;
     }
   } catch (err) {
