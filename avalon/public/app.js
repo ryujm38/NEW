@@ -4,6 +4,9 @@
 const $app = document.getElementById('app');
 const SESSION_KEY = 'avalon-session';
 const NAME_KEY = 'avalon-name';
+const GAME_KEY = 'avalon-game';
+const APP_NAME = '택미린솔록면';
+const GAME_NAME = { avalon: '아발론', uno: '우노' };
 
 let ws = null;
 let online = false;
@@ -16,6 +19,9 @@ const ui = {
   roleOpen: false,
   historyOpen: false,
   hostOpen: false,
+  colorOpen: false,
+  unoSel: null,
+  game: load(GAME_KEY) === 'uno' ? 'uno' : 'avalon', // 새 방을 만들 때 고른 게임
   toast: '',
 };
 let session = loadJson(SESSION_KEY);
@@ -60,12 +66,15 @@ function connect() {
         if (S.phase === 'lobby' && prev.phase !== 'over') showToast('방장이 게임을 초기화했어요. 대기실로 돌아왔어요.');
         else if (S.gameNo !== prev.gameNo) showToast('방장이 게임을 처음부터 다시 시작했어요.');
       }
-      if (S.phase === 'lobby' || (prev && S.gameNo !== prev.gameNo)) ui.roleOpen = ui.historyOpen = ui.hostOpen = false;
+      if (S.phase === 'lobby' || (prev && S.gameNo !== prev.gameNo)) ui.roleOpen = ui.historyOpen = ui.hostOpen = ui.colorOpen = false;
+      if (!S.hand || !S.hand.some((c) => c.id === ui.unoSel && c.playable)) ui.unoSel = null;
+      if (S.kind !== 'uno' || S.turnId !== S.me) ui.colorOpen = false;
       render();
     } else if (m.t === 'gone') {
       clearSession();
       S = null;
-      ui.roleOpen = ui.historyOpen = ui.hostOpen = false;
+      ui.roleOpen = ui.historyOpen = ui.hostOpen = ui.colorOpen = false;
+      ui.unoSel = null;
       if (m.kicked) showToast('방장이 내보냈어요.');
       render();
     } else if (m.t === 'error') {
@@ -117,7 +126,7 @@ const REASONS = {
   missed: '암살자가 멀린을 찾지 못했습니다.',
 };
 
-const RULES_HTML = `
+const AVALON_RULES_HTML = `
 <details><summary>규칙 간단 설명</summary>
 <p><b>6명</b> · 선 4(멀린, 퍼시벌, 충성스러운 신하 2) vs 악 2(모르가나, 암살자)</p>
 <ul>
@@ -127,6 +136,8 @@ const RULES_HTML = `
 <li>원정대원은 몰래 성공/실패 카드를 냅니다. 선은 성공만 낼 수 있고, 악은 둘 중 고릅니다. 결과는 실패 카드 수만 공개됩니다.</li>
 <li>선이 3번 성공해도 <b>암살자가 멀린을 맞히면 악의 역전승</b>입니다.</li>
 </ul></details>`;
+
+const rulesHtml = (kind) => (kind === 'uno' ? UNO_RULES_HTML : AVALON_RULES_HTML);
 
 function sideLabel(team) {
   return team === 'good' ? '선의 세력' : '악의 세력';
@@ -139,7 +150,9 @@ function render() {
   let html;
   if (!S) html = renderHome();
   else if (S.phase === 'lobby') html = renderLobby();
+  else if (S.kind === 'uno') html = renderUno();
   else html = renderGame();
+  document.title = S ? `${APP_NAME}:${GAME_NAME[S.kind]}` : APP_NAME;
   const toast = ui.toast ? `<div class="toast">${esc(ui.toast)}</div>` : '';
   const active = document.activeElement;
   const keep = active && active.id ? { id: active.id, s: active.selectionStart, e: active.selectionEnd } : null;
@@ -154,13 +167,19 @@ function render() {
 }
 
 function renderHome() {
+  const gameBtn = (g, label, sub) => `<button class="gamebtn ${ui.game === g ? 'on' : ''}" data-act="setgame" data-game="${g}"><b>${label}</b><small>${sub}</small></button>`;
   return `
-  <h1>🛡️ 택미린솔록면:아발론<small>6명이 폰으로 같이 하는 아발론</small></h1>
+  <h1>🎲 ${APP_NAME}<small>친구들과 폰으로 같이 하는 보드게임</small></h1>
   <div class="card">
     <label class="field">내 이름 (8자까지)
       <input type="text" id="name" maxlength="8" autocomplete="off" value="${esc(ui.name)}" placeholder="예: 민수" />
     </label>
-    <button class="primary" data-act="create">새 방 만들기</button>
+    <p class="field" style="margin-bottom:6px">무슨 게임을 할까요?</p>
+    <div class="row" style="margin-bottom:12px">
+      ${gameBtn('avalon', '🛡️ 아발론', '6명')}
+      ${gameBtn('uno', '🃏 우노', '2~8명')}
+    </div>
+    <button class="primary" data-act="create">${GAME_NAME[ui.game]} 방 만들기</button>
   </div>
   <div class="card">
     <label class="field">친구가 만든 방에 들어가기 — 방 코드 4글자
@@ -168,13 +187,16 @@ function renderHome() {
     </label>
     <button data-act="join">들어가기</button>
   </div>
-  <div class="card">${RULES_HTML}</div>`;
+  <div class="card">${AVALON_RULES_HTML}${UNO_RULES_HTML}</div>`;
 }
 
 function renderLobby() {
   const isHost = S.hostId === S.me;
+  const n = S.players.length;
+  const { minPlayers: min, maxPlayers: max } = S;
+  const shown = Math.max(n + (n < max ? 1 : 0), min); // 우노는 빈 자리를 한 칸만 보여준다
   const slots = [];
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < shown; i++) {
     const p = S.players[i];
     if (!p) {
       slots.push('<div class="slot empty">빈 자리</div>');
@@ -184,19 +206,22 @@ function renderLobby() {
       <span class="dot ${p.connected ? '' : 'off'}"></span>
       <span class="nm">${esc(p.name)}${p.id === S.me ? ' (나)' : ''}</span>
       ${p.id === S.hostId ? '<span class="tag host">방장</span>' : ''}
+      ${p.wins ? `<span class="tag">🏆 ${p.wins}</span>` : ''}
       ${isHost && p.id !== S.me ? `<button class="sm ghost" data-act="kick" data-id="${p.id}">내보내기</button>` : ''}
     </div>`);
   }
-  const n = S.players.length;
   const allOn = S.players.every((p) => p.connected);
+  const ready = n >= min && n <= max && allOn;
+  const startLabel = n < min ? `${min - n}명 더 필요해요` : allOn ? '게임 시작' : '접속이 끊긴 사람이 있어요';
   let action;
   if (isHost) {
-    action = `<button class="primary" data-act="start" ${n === 6 && allOn ? '' : 'disabled'}>${n === 6 ? (allOn ? '게임 시작' : '접속이 끊긴 사람이 있어요') : `${6 - n}명 더 필요해요`}</button>`;
+    action = `<button class="primary" data-act="start" ${ready ? '' : 'disabled'}>${startLabel}</button>`;
   } else {
     action = '<p class="dim center">방장이 시작하길 기다리는 중…</p>';
   }
+  const count = min === max ? `${max}명` : `${min}~${max}명`;
   return `
-  <h1>대기실</h1>
+  <h1>대기실<small>${APP_NAME}:${GAME_NAME[S.kind]} · ${count}</small></h1>
   <div class="card">
     <p class="dim center small">친구들에게 이 코드를 알려주세요</p>
     <div class="code">${esc(S.code)}</div>
@@ -204,7 +229,7 @@ function renderLobby() {
     <div class="slots">${slots.join('')}</div>
     ${action}
   </div>
-  <div class="card">${RULES_HTML}</div>
+  <div class="card">${rulesHtml(S.kind)}</div>
   <div class="foot"><button class="ghost" data-act="leave">방 나가기</button></div>`;
 }
 
@@ -407,12 +432,18 @@ $app.addEventListener('click', (e) => {
   // 오버레이 배경을 눌렀을 때만 닫고, 시트 안쪽 클릭은 무시
   if (act === 'closeall' && el.classList.contains('overlay') && e.target !== el) return;
   if (el.dataset.confirm && !window.confirm(el.dataset.confirm)) return;
+  if (typeof unoClick === 'function' && unoClick(act, el)) return;
   switch (act) {
+    case 'setgame':
+      ui.game = el.dataset.game === 'uno' ? 'uno' : 'avalon';
+      save(GAME_KEY, ui.game);
+      render();
+      break;
     case 'create': {
       const name = ui.name.trim();
       if (!name) return showToast('이름을 먼저 입력하세요.');
       save(NAME_KEY, name);
-      send({ t: 'create', name });
+      send({ t: 'create', name, game: ui.game });
       break;
     }
     case 'join': {
@@ -440,7 +471,7 @@ $app.addEventListener('click', (e) => {
     case 'card': send({ t: 'card', success: el.dataset.v === '1' }); break;
     case 'role': ui.roleOpen = true; render(); break;
     case 'history': ui.historyOpen = true; render(); break;
-    case 'closeall': ui.roleOpen = ui.historyOpen = ui.hostOpen = false; render(); break;
+    case 'closeall': ui.roleOpen = ui.historyOpen = ui.hostOpen = ui.colorOpen = false; render(); break;
     default: break;
   }
 });
@@ -460,10 +491,10 @@ function onPick(id) {
 
 async function shareLink() {
   const url = `${location.origin}/?room=${S.code}`;
-  const text = `택미린솔록면:아발론 하자! 방 코드: ${S.code}`;
+  const text = `${APP_NAME}:${GAME_NAME[S.kind]} 하자! 방 코드: ${S.code}`;
   try {
     if (navigator.share) {
-      await navigator.share({ title: '택미린솔록면:아발론', text, url });
+      await navigator.share({ title: `${APP_NAME}:${GAME_NAME[S.kind]}`, text, url });
       return;
     }
   } catch (err) {

@@ -6,12 +6,12 @@
 // 3번 성공하면 암살자가 멀린을 맞힐 기회를 얻고, 3번 실패하거나 원정대가 5번 연속 부결되면 악의 승리
 
 const crypto = require('crypto');
+const { shuffle, newId, newToken, cleanName } = require('./common');
 
 const PLAYER_COUNT = 6;
 const TEAM_SIZES = [2, 3, 4, 3, 4];
 const MAX_REJECTS = 5;
 const WINS_NEEDED = 3;
-const NAME_MAX = 8;
 
 const ROLES = {
   merlin: {
@@ -44,25 +44,9 @@ const ROLE_POOL = ['merlin', 'percival', 'servant', 'servant', 'morgana', 'assas
 
 const ACK_PHASES = new Set(['roles', 'voteResult', 'questResult']);
 
-function shuffle(arr) {
-  const a = arr.slice();
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = crypto.randomInt(i + 1);
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-
-function newId() {
-  return crypto.randomBytes(6).toString('hex');
-}
-
-function newToken() {
-  return crypto.randomBytes(16).toString('hex');
-}
-
 function createRoom(code) {
   return {
+    kind: 'avalon',
     code,
     hostId: null,
     players: [], // 좌석 순서 = 배열 순서
@@ -84,10 +68,6 @@ function createRoom(code) {
     assassinTarget: null,
     lastActive: Date.now(),
   };
-}
-
-function cleanName(raw) {
-  return String(raw ?? '').replace(/\s+/g, ' ').trim().slice(0, NAME_MAX);
 }
 
 function addPlayer(room, rawName) {
@@ -408,6 +388,9 @@ function viewFor(room, viewerId) {
   const showTeam = ['vote', 'voteResult', 'quest', 'questResult'].includes(phase);
 
   const view = {
+    kind: 'avalon',
+    minPlayers: PLAYER_COUNT,
+    maxPlayers: PLAYER_COUNT,
     code: room.code,
     me: viewerId,
     hostId: room.hostId,
@@ -461,7 +444,23 @@ const ROLES_PUBLIC = Object.fromEntries(
   Object.entries(ROLES).map(([k, v]) => [k, { name: v.name, team: v.team }]),
 );
 
+// 서버가 메시지 종류(t)로 찾아 부르는 동작 표. 반환값은 { error } 또는 {}.
+const actions = {
+  start: (room, id) => start(room, id),
+  ack: (room, id) => ack(room, id),
+  force: (room, id) => force(room, id),
+  draft: (room, id, msg) => setDraft(room, id, msg.team),
+  propose: (room, id, msg) => propose(room, id, msg.team),
+  vote: (room, id, msg) => vote(room, id, msg.approve),
+  card: (room, id, msg) => submitCard(room, id, msg.success),
+  assassinate: (room, id, msg) => assassinate(room, id, msg.target),
+  again: (room, id) => backToLobby(room, id), // 게임 초기화: 대기실로 돌아가기
+  restart: (room, id) => restart(room, id), // 같은 멤버로 역할을 새로 섞어 바로 다시 시작
+};
+
 module.exports = {
+  actions,
+  afterDisconnect: maybeAdvance,
   PLAYER_COUNT,
   TEAM_SIZES,
   MAX_REJECTS,

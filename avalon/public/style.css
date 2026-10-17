@@ -150,3 +150,64 @@ details ul { margin: 4px 0 8px; padding-left: 20px; }
 
 .foot { display: flex; gap: 10px; margin-top: auto; padding-top: 6px; }
 .foot button { font-size: 15px; min-height: 46px; }
+
+/* 게임 선택 */
+.gamebtn { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 8px; }
+.gamebtn small { font-size: 12px; font-weight: 500; color: var(--dim); }
+.gamebtn.on { border-color: var(--gold); background: #2c2813; box-shadow: 0 0 0 2px #e0b34a44; }
+
+/* 우노 */
+:root { --ur: #e0453a; --uy: #f0c331; --ug: #35a862; --ub: #3b82e0; }
+.uplayers { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.up { position: relative; background: var(--panel); border: 2px solid var(--line); border-radius: 12px; padding: 8px 10px; display: flex; flex-direction: column; gap: 1px; min-height: 56px; }
+.up .un { font-weight: 700; padding-right: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.up .ucount { font-size: 13px; color: var(--dim); }
+.up .dot { position: absolute; top: 9px; right: 10px; }
+.up.me { border-color: #5b628a; }
+.up.turn { border-color: var(--gold); background: #2c2813; box-shadow: 0 0 0 3px #e0b34a33; }
+.up.last .ucount { color: var(--evil); font-weight: 700; }
+
+.ucenter { display: flex; align-items: center; justify-content: space-around; gap: 8px; padding: 6px 0; }
+.pile { width: auto; min-height: 0; padding: 6px; background: transparent; border: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.pile small { font-size: 12px; font-weight: 600; color: var(--dim); }
+.pile:disabled { opacity: 0.5; }
+.topcard { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.colorchip { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 99px; color: #101010; }
+.colorchip.c-r { background: var(--ur); color: #fff; }
+.colorchip.c-y { background: var(--uy); }
+.colorchip.c-g { background: var(--ug); color: #fff; }
+.colorchip.c-b { background: var(--ub); color: #fff; }
+.dirinfo { display: flex; flex-direction: column; align-items: center; font-size: 26px; color: var(--dim); }
+.dirinfo small { font-size: 11px; }
+
+.uc { width: 54px; height: 80px; border-radius: 10px; border: 3px solid #fff; display: grid; place-items: center; font-weight: 900; font-size: 26px; color: #fff; padding: 0; min-height: 0; text-shadow: 0 1px 2px #0006; position: relative; flex: none; }
+.uc.big { width: 82px; height: 120px; font-size: 42px; border-radius: 14px; }
+.uc.c-r { background: var(--ur); }
+.uc.c-y { background: var(--uy); color: #3a2f00; text-shadow: none; }
+.uc.c-g { background: var(--ug); }
+.uc.c-b { background: var(--ub); }
+.uc.c-w { background: conic-gradient(var(--ur) 0 25%, var(--uy) 0 50%, var(--ug) 0 75%, var(--ub) 0); }
+.uc.c-w span { background: #000b; border-radius: 50%; min-width: 60%; aspect-ratio: 1; display: grid; place-items: center; font-size: 0.8em; }
+.uc.k-d2 span, .uc.k-d4 span { font-size: 0.85em; }
+.uc.back { background: #111; border-color: #fff; color: var(--ur); font-size: 14px; letter-spacing: 1px; }
+
+.uhand { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; padding-top: 12px; }
+.uhand .uc { cursor: pointer; transition: transform 0.12s; }
+.uhand .uc.ok { box-shadow: 0 0 0 2px var(--gold), 0 0 10px #e0b34a99; }
+.uhand .uc.no { opacity: 0.35; }
+.uhand .uc.wait { opacity: 0.85; }
+.uhand .uc.sel { transform: translateY(-14px) scale(1.06); box-shadow: 0 0 0 3px #fff, 0 6px 14px #000a; }
+.uhand.dimmed { opacity: 0.5; pointer-events: none; }
+.ulog { font-size: 13px; color: var(--dim); background: var(--panel); border-radius: 12px; padding: 8px 12px; display: grid; gap: 2px; }
+.ulog .new { color: var(--text); font-weight: 600; }
+.uactions button { font-size: 15px; }
+
+.colorpick { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.cp { height: 72px; color: #fff; border: 0; font-size: 20px; }
+.cp.c-r { background: var(--ur); }
+.cp.c-y { background: var(--uy); color: #3a2f00; }
+.cp.c-g { background: var(--ug); }
+.cp.c-b { background: var(--ub); }
+
+@keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04); } }
+button.pulse { animation: pulse 0.9s ease-in-out infinite; }

@@ -203,3 +203,77 @@ test('게임 도중 방장의 초기화/다시 시작이 모두의 화면에 반
   await all((x) => x.state.phase === 'roles');
   close(s);
 });
+
+test('우노 방: 만들기·입장·시작, 내 손패만 받고, 차례가 아니면 거부, 다른 게임 요청은 거부', async () => {
+  const { httpServer } = createAppServer();
+  await new Promise((r) => httpServer.listen(0, '127.0.0.1', r));
+  const port = httpServer.address().port;
+  const cs = [];
+  try {
+    for (let i = 0; i < 3; i++) {
+      const c = client(port);
+      await c.open;
+      cs.push(c);
+    }
+    cs[0].send({ t: 'create', name: '방장', game: 'uno' });
+    await cs[0].until((c) => c.code);
+    assert.strictEqual(cs[0].state.kind, 'uno');
+    for (let i = 1; i < 3; i++) {
+      cs[i].send({ t: 'join', code: cs[0].code, name: `친구${i}` });
+      await cs[i].until((c) => c.state);
+    }
+    // 2명 미만이면 시작 불가, 방장만 시작
+    cs[1].send({ t: 'start' });
+    await cs[1].until((c) => c.errors.length === 1);
+    cs[0].send({ t: 'start' });
+    await Promise.all(cs.map((c) => c.until((x) => x.state.phase === 'play')));
+    assert.ok(cs.every((c) => c.state.hand.length === 7));
+    assert.ok(cs.every((c) => c.state.players.every((p) => p.count === 7 && !('hand' in p))));
+    const mine = new Set(cs[0].state.hand.map((x) => x.id));
+    assert.ok(cs[1].state.hand.every((x) => !mine.has(x.id)));
+
+    // 아발론 전용 요청과 이상한 요청은 거부
+    cs[0].send({ t: 'vote', approve: true });
+    cs[0].send({ t: 'constructor' });
+    cs[0].send({ t: '__proto__' });
+    await cs[0].until((c) => c.errors.length === 3);
+
+    // 차례가 아닌 사람은 뽑을 수 없고, 차례인 사람은 뽑을 수 있다
+    const turnId = cs[0].state.turnId;
+    const me = cs.find((c) => c.id === turnId);
+    const other = cs.find((c) => c.id !== turnId);
+    other.send({ t: 'draw' });
+    await other.until((c) => c.errors.length >= 1 && /차례/.test(c.errors[c.errors.length - 1]));
+    const before = me.state.hand.length;
+    me.send({ t: 'draw' });
+    await me.until((c) => c.state.hand.length === before + 1);
+
+    // 끊겼다 토큰으로 돌아와도 같은 손패
+    const victim = cs[2];
+    const handBefore = victim.state.hand.map((x) => x.id).join();
+    victim.ws.terminate();
+    await cs[0].until((c) => c.state.players.some((p) => !p.connected));
+    const back = client(port);
+    await back.open;
+    back.send({ t: 'resume', code: victim.code, token: victim.token });
+    await back.until((c) => c.state);
+    assert.strictEqual(back.state.hand.map((x) => x.id).join(), handBefore);
+    cs.push(back);
+
+    // 방장 초기화
+    cs[0].send({ t: 'again' });
+    await cs[0].until((c) => c.state.phase === 'lobby');
+  } finally {
+    cs.forEach((c) => c.ws.terminate());
+    httpServer.closeAllConnections?.();
+    httpServer.close();
+  }
+});
+
+test('아발론 방에 우노 요청을 보내면 거부된다', async () => {
+  const s = await setup();
+  s.cs[0].send({ t: 'draw' });
+  s.cs[0].send({ t: 'play', card: 1 });
+  await s.cs[0].until((c) => c.errors.length === 2);
+  close(s);
+});

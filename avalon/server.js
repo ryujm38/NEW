@@ -6,7 +6,8 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
-const game = require('./game');
+const common = require('./common');
+const engines = { avalon: require('./game'), uno: require('./uno') };
 
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MIME = {
@@ -24,6 +25,7 @@ const ROOM_TTL_MS = 6 * 60 * 60 * 1000;
 function createAppServer() {
   const rooms = new Map(); // code -> room
   const sockets = new Map(); // room code -> Map(playerId -> ws)
+  const engineOf = (room) => engines[room.kind];
 
   const httpServer = http.createServer((req, res) => {
     const urlPath = decodeURIComponent((req.url || '/').split('?')[0]);
@@ -75,7 +77,7 @@ function createAppServer() {
   function broadcast(room) {
     room.lastActive = Date.now();
     for (const [pid, ws] of socketsOf(room)) {
-      send(ws, { t: 'state', state: game.viewFor(room, pid) });
+      send(ws, { t: 'state', state: engineOf(room).viewFor(room, pid) });
     }
   }
 
@@ -100,8 +102,9 @@ function createAppServer() {
     const ctx = ws.ctx;
 
     if (msg.t === 'create') {
-      const room = game.createRoom(newCode());
-      const r = game.addPlayer(room, msg.name);
+      const engine = engines[msg.game] || engines.avalon;
+      const room = engine.createRoom(newCode());
+      const r = engine.addPlayer(room, msg.name);
       if (r.error) return fail(ws, r.error);
       rooms.set(room.code, room);
       attach(ws, room, r.player);
@@ -111,7 +114,7 @@ function createAppServer() {
     if (msg.t === 'join') {
       const room = rooms.get(String(msg.code || '').toUpperCase().trim());
       if (!room) return fail(ws, '그 코드의 방이 없어요.');
-      const name = game.cleanName(msg.name);
+      const name = common.cleanName(msg.name);
       if (room.phase !== 'lobby') {
         // 게임 도중 토큰을 잃어버린 사람이 같은 이름으로 다시 들어오는 경우
         const p = room.players.find((x) => x.name === name && !x.connected);
@@ -119,7 +122,7 @@ function createAppServer() {
         attach(ws, room, p);
         return broadcast(room);
       }
-      const r = game.addPlayer(room, msg.name);
+      const r = engineOf(room).addPlayer(room, msg.name);
       if (r.error) return fail(ws, r.error);
       attach(ws, room, r.player);
       return broadcast(room);
@@ -137,64 +140,34 @@ function createAppServer() {
     const room = rooms.get(ctx.code);
     if (!room) return send(ws, { t: 'gone' });
     const id = ctx.id;
+    const engine = engineOf(room);
     let r = {};
 
-    switch (msg.t) {
-      case 'start':
-        r = game.start(room, id);
-        break;
-      case 'ack':
-        r = game.ack(room, id);
-        break;
-      case 'force':
-        r = game.force(room, id);
-        break;
-      case 'draft':
-        r = game.setDraft(room, id, msg.team);
-        break;
-      case 'propose':
-        r = game.propose(room, id, msg.team);
-        break;
-      case 'vote':
-        r = game.vote(room, id, msg.approve);
-        break;
-      case 'card':
-        r = game.submitCard(room, id, msg.success);
-        break;
-      case 'assassinate':
-        r = game.assassinate(room, id, msg.target);
-        break;
-      case 'again': // 게임 초기화: 대기실로 돌아가기
-        r = game.backToLobby(room, id);
-        break;
-      case 'restart': // 같은 멤버로 역할을 새로 섞어 바로 다시 시작
-        r = game.restart(room, id);
-        break;
-      case 'kick': {
-        r = game.kick(room, id, msg.target);
-        if (r.kicked) {
-          const target = socketsOf(room).get(r.kicked);
-          if (target) {
-            target.ctx = null;
-            send(target, { t: 'gone', kicked: true });
-            socketsOf(room).delete(r.kicked);
-          }
+    // 방 종류와 상관없는 동작은 여기서, 게임 규칙에 속한 동작은 엔진의 actions 표에서 처리한다
+    if (msg.t === 'kick') {
+      r = engine.kick(room, id, msg.target);
+      if (r.kicked) {
+        const target = socketsOf(room).get(r.kicked);
+        if (target) {
+          target.ctx = null;
+          send(target, { t: 'gone', kicked: true });
+          socketsOf(room).delete(r.kicked);
         }
-        break;
       }
-      case 'leave': {
-        if (room.phase === 'lobby') {
-          game.removePlayer(room, id);
-          socketsOf(room).delete(id);
-          ws.ctx = null;
-          send(ws, { t: 'gone' });
-          if (room.players.length === 0) rooms.delete(room.code);
-          else broadcast(room);
-        }
-        return;
+    } else if (msg.t === 'leave') {
+      if (room.phase === 'lobby') {
+        engine.removePlayer(room, id);
+        socketsOf(room).delete(id);
+        ws.ctx = null;
+        send(ws, { t: 'gone' });
+        if (room.players.length === 0) rooms.delete(room.code);
+        else broadcast(room);
       }
-      default:
-        return fail(ws, '알 수 없는 요청이에요.');
+      return;
+    } else if (Object.hasOwn(engine.actions, msg.t)) {
+      r = engine.actions[msg.t](room, id, msg);
+    } else {
+      return fail(ws, '알 수 없는 요청이에요.');
     }
     if (r.error) return fail(ws, r.error);
     broadcast(room);
@@ -226,11 +199,12 @@ function createAppServer() {
       if (!ctx) return;
       const room = rooms.get(ctx.code);
       if (!room) return;
-      const p = game.getPlayer(room, ctx.id);
+      const engine = engineOf(room);
+      const p = engine.getPlayer(room, ctx.id);
       if (!p) return;
       if (socketsOf(room).get(ctx.id) === ws) socketsOf(room).delete(ctx.id);
       p.connected = false;
-      game.maybeAdvance(room);
+      engine.afterDisconnect(room);
       broadcast(room);
     });
   });
