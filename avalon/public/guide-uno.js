@@ -27,6 +27,7 @@ window.GUIDES = window.GUIDES || {};
   window.GUIDES.uno = {
     intro: [
       { icon: '🃏', title: '손패를 먼저 다 털면 이겨요', text: '모두 7장씩 받고 시작해요. 한 장씩 내서 <b>내 손의 카드를 가장 먼저 0장</b>으로 만드는 사람이 이겨요.', html: true },
+      { icon: '👀', title: '화면 읽는 법', text: '맨 위 칸에 <b>사람마다 남은 카드 수</b>가 크게 보여요. <b>노란 테두리</b>가 지금 차례, <b>점선</b>이 다음 차례, 칸 사이 <b>화살표</b>가 도는 방향이에요. 가운데 오른쪽 동그라미가 <b>지금 이어야 하는 색</b>이고, 1장 남은 사람에겐 빨간 <b>우노!</b> 표시가 붙어요.', html: true },
       { icon: '🎨', title: '같은 색 또는 같은 숫자', text: '가운데 맨 위 카드와 <b>색이 같거나</b>, <b>숫자/기호가 같은</b> 카드를 낼 수 있어요. 예: 빨강 7 위에는 빨강 아무 카드나, 파랑 7·초록 7 같은 7을 낼 수 있어요. 낼 수 있는 카드는 반짝여요.', html: true },
       { icon: '👆', title: '내 차례: 탭, 그리고 한 번 더 탭', text: '반짝이는 카드를 <b>한 번 탭</b>하면 위로 올라오고, <b>한 번 더 탭</b>(또는 아래 "내기" 버튼)하면 내요. 낼 카드가 없으면 왼쪽 <b>뽑는 더미</b>를 눌러 1장 뽑아요.', html: true },
       { icon: '⚡', title: '특별한 카드', text: '<b>⊘ 스킵</b> 다음 사람 쉬기 · <b>⇄ 리버스</b> 방향 바꾸기 · <b>+2</b> 다음 사람 2장 뽑기 · <b>와일드</b> 색 바꾸기 · <b>와일드 +4</b> 색 바꾸고 다음 사람 4장. +2와 +4는 겹쳐 낼 수 없어요.', html: true },
@@ -55,7 +56,7 @@ window.GUIDES = window.GUIDES || {};
         if (one) return { title: `${nameOf(S, S.turnId)}님 차례예요`, text: `${one.name}님이 1장 남았어요! 그 사람 앞 차례라면 스킵·+2로 막아 보세요.` };
         return {
           title: `${nameOf(S, S.turnId)}님 차례예요`,
-          text: nextMe ? '다음이 내 차례예요! 맨 위 카드와 색이나 숫자가 같은 카드가 있는지 미리 봐 두세요.' : '기다리는 동안 내 손패를 살펴보세요. 위쪽 사람 칸의 "차례"·"다음" 표시로 순서를 알 수 있어요.',
+          text: nextMe ? '다음이 내 차례예요! 맨 위 카드와 색이나 숫자가 같은 카드가 있는지 미리 봐 두세요.' : '기다리는 동안 내 손패를 살펴보세요. 위쪽 칸의 노란 테두리가 지금 차례, 점선이 다음 차례예요.',
         };
       }
       if (ui.colorOpen) {
@@ -68,7 +69,7 @@ window.GUIDES = window.GUIDES || {};
       }
       const sel = S.hand.find((c) => c.id === ui.unoSel);
       if (sel) {
-        return { title: `${cardName(sel)}을(를) 낼까요?`, text: `${SPECIAL[sel.kind] ? `${SPECIAL[sel.kind]} ` : ''}같은 카드를 한 번 더 탭하거나 아래 버튼을 누르면 내요.`, target: '[data-act="unoPlay"]' };
+        return { title: `${cardName(sel)} 낼까요?`, text: `${SPECIAL[sel.kind] ? `${SPECIAL[sel.kind]} ` : ''}같은 카드를 한 번 더 탭하거나 아래 버튼을 누르면 내요.`, target: '[data-act="unoPlay"]' };
       }
       if (!playable.length) {
         return { title: '낼 카드가 없어요 → 1장 뽑기', text: `${matchText(S)} 맞는 카드가 없으니 왼쪽 뽑는 더미를 누르세요. 뽑은 카드가 맞으면 바로 낼 수 있어요.`, html: true, target: '[data-act="unoDraw"]' };

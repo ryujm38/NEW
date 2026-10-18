@@ -611,6 +611,11 @@ function sid(room, id, cardIds) {
   me.life += 1;
   say(room, `${me.name}님(시드)이 카드 2장을 버리고 체력을 회복했어요. (체력 ${me.life})`);
   if (dying) afterSaveAttempt(room, me, room.pending);
+  // 턴 끝 버리기 중에 능력을 써서 손패가 체력 이하가 되면 버리기도 끝난다
+  else if (room.discarding && me.hand.length <= me.life) {
+    room.discarding = false;
+    room.queue.push({ t: 'nextTurn' });
+  }
   run(room);
   return {};
 }

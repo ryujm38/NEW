@@ -67,18 +67,42 @@
   let lastDice = null; // 지난 상태의 카지노별 주사위 (새로 놓인 곳 찾기)
   let drop = null; // { n, id, at }
 
-  function stacksHtml(c) {
-    const entries = Object.entries(c.dice).sort((a, b) => b[1] - a[1]);
-    if (!entries.length) return '<span class="vg-empty">아직 아무도 없어요</span>';
-    const counts = entries.map((e) => e[1]);
-    const lead = entries.find(([, n]) => counts.filter((x) => x === n).length === 1);
-    return entries.map(([id, n]) => {
-      const tied = counts.filter((x) => x === n).length > 1;
-      const cubes = Array.from({ length: Math.min(n, 8) }, () => '<i></i>').join('');
-      const isLead = lead && lead[0] === id;
-      return `<span class="vg-stack ${tied ? 'tie' : ''} ${isLead ? 'lead' : ''} ${id === S.me ? 'me' : ''}" style="${dieVars(colorOf(id))}" title="${pname(id)}">
-        <span class="vg-cubes">${cubes}</span><b>${n}</b>${tied ? '<em>동점</em>' : isLead ? '<em>👑</em>' : ''}</span>`;
+  // 카지노 한 곳의 지금 순위: 같은 개수끼리는 상쇄되고, 남은 사람이 많은 순서대로 지폐를 받는다 (엔진 settleCasino와 같은 계산)
+  function standing(dice, bills) {
+    const entries = Object.entries(dice).map(([id, n]) => ({ id, n })).sort((a, b) => b.n - a.n);
+    const tied = (n) => entries.filter((e) => e.n === n).length > 1;
+    const surv = entries.filter((e) => !tied(e.n));
+    entries.forEach((e) => {
+      e.tied = tied(e.n);
+      const r = surv.indexOf(e);
+      e.rank = r;
+      e.bill = r >= 0 && r < bills.length ? bills[r] : 0;
+    });
+    return { entries, leader: surv[0] || null };
+  }
+  const initial = (id) => (player(id) ? esc([...player(id).name][0] || '?') : '?');
+
+  function stacksHtml(c, st) {
+    if (!st.entries.length) return '<span class="vg-empty">아직 아무도 없어요</span>';
+    return st.entries.map((e) => {
+      const cubes = Array.from({ length: Math.min(e.n, 8) }, () => '<i></i>').join('');
+      const tag = e.tied ? '<em class="x">동점</em>' : e.bill ? `<em>${e.rank + 1}등</em>` : '<em class="no">–</em>';
+      return `<span class="vg-stack ${e.tied ? 'tie' : ''} ${e.rank === 0 ? 'lead' : ''} ${e.id === S.me ? 'me' : ''}" style="${dieVars(colorOf(e.id))}" title="${pname(e.id)}">
+        <span class="vg-ini">${initial(e.id)}</span><span class="vg-cubes">${cubes}</span><b>${e.n}</b>${tag}</span>`;
     }).join('');
+  }
+
+  // 카지노마다 한 줄 판정: 지금 1등은 누구, 동점이면 경고
+  function verdictHtml(c, st) {
+    if (!st.entries.length) return '';
+    const ties = st.entries.filter((e) => e.tied);
+    const mine = st.entries.find((e) => e.id === S.me);
+    const lead = st.leader
+      ? `<span class="vg-lead" style="${dieVars(colorOf(st.leader.id))}">👑 ${st.leader.id === S.me ? '나' : pname(st.leader.id)}${st.leader.bill ? ` <b>${money(st.leader.bill)}</b>` : ''}</span>`
+      : '<span class="vg-lead none">💥 모두 동점</span>';
+    const tie = ties.length ? `<span class="vg-tiewarn">⚠ ${ties.length}명 상쇄</span>` : '';
+    const me = mine && st.leader && st.leader.id !== S.me ? `<span class="vg-mine ${mine.tied ? 'bad' : ''}">나 ${mine.tied ? '동점' : mine.bill ? `${mine.rank + 1}등` : '–'}</span>` : '';
+    return `<span class="vg-verdict">${lead}${tie}${me}</span>`;
   }
 
   function billsHtml(bills) {
@@ -97,9 +121,11 @@
       const el = Date.now() - drop.at;
       if (el < DROP_MS) { cls.push('drop'); dropAttr = `;--dd:-${el}ms`; }
     }
+    const sd = standing(c.dice, c.bills);
     const inner = `<span class="vg-sign"><span class="vg-face">${face(c.n)}</span><span class="vg-name"><b>${c.n}번</b>${info.name}</span></span>
       <span class="vg-bills">${billsHtml(c.bills)}</span>
-      <span class="vg-stacks">${stacksHtml(c)}</span>
+      ${verdictHtml(c, sd)}
+      <span class="vg-stacks">${stacksHtml(c, sd)}</span>
       ${count ? `<span class="vg-add">+${count}개 놓기</span>` : ''}`;
     const style = `style="--nc:${info.c}${dropAttr}"`;
     return pickable && count
@@ -107,14 +133,27 @@
       : `<div class="${cls.join(' ')}" ${style}>${inner}</div>`;
   }
 
+  // 플레이어 줄: 남은 주사위 수와 돈을 크게
   function playersHtml() {
     return `<div class="vg-players">${S.players.map((p) => {
       const turn = p.id === S.turnId;
       const left = Array.from({ length: p.dice }, () => '<i></i>').join('');
-      return `<div class="vg-pl ${turn ? 'turn' : ''} ${p.id === S.me ? 'me' : ''}" style="${dieVars(p.color || '#888888')}">
-        <div class="vg-pl-h"><span class="vg-pl-chip"></span><span class="dot ${p.connected ? '' : 'off'}"></span><b class="vg-pl-nm">${esc(p.name)}${p.id === S.me ? ' (나)' : ''}</b>${S.winnerIds.includes(p.id) ? '🏆' : ''}${turn ? '<span class="vg-turnb">차례</span>' : ''}</div>
-        <div class="vg-pl-r"><span class="vg-left" title="남은 주사위 ${p.dice}개">${left || '<small>다 놓음</small>'}</span><b class="vg-pl-t">${money(p.total)}</b></div></div>`;
+      return `<div class="vg-pl ${turn ? 'turn' : ''} ${p.id === S.me ? 'me' : ''} ${S.phase === 'play' && !p.dice ? 'out' : ''}" style="${dieVars(p.color || '#888888')}">
+        <div class="vg-pl-h"><span class="vg-pl-chip">${initial(p.id)}</span><b class="vg-pl-nm">${esc(p.name)}</b>${S.winnerIds.includes(p.id) ? '🏆' : ''}<span class="dot ${p.connected ? '' : 'off'}"></span></div>
+        <div class="vg-pl-r"><span class="vg-dleft" title="남은 주사위 ${p.dice}개">🎲<b>${p.dice}</b></span><b class="vg-pl-t">${money(p.total)}</b></div>
+        <span class="vg-left">${left}</span>
+        ${turn ? '<span class="vg-turnb">차례</span>' : ''}${S.phase === 'roundEnd' && p.acked ? '<span class="vg-turnb ok">확인</span>' : ''}</div>`;
     }).join('')}</div>`;
+  }
+
+  // 지금 상황 한 줄
+  function statusText() {
+    if (S.phase === 'over') return '🏆 게임 끝!';
+    if (S.phase === 'roundEnd') return `💰 ${S.round}라운드 정산 · 확인 ${S.players.filter((p) => p.acked).length}/${S.players.filter((p) => p.connected).length}명`;
+    const mine = S.turnId === S.me;
+    const who = mine ? '<b>내 차례!</b>' : `<b>${pname(S.turnId)}</b>님 차례`;
+    const what = S.rolled ? (mine ? '놓을 숫자를 골라요' : '놓을 숫자를 고르는 중') : (mine ? '주사위를 굴려요' : '주사위를 굴리는 중');
+    return `🎲 ${who} · ${what}`;
   }
 
   function trayHtml() {
@@ -148,8 +187,10 @@
     return `<div class="vg-choices">${groups.map((v) => {
       const n = S.rolled.filter((x) => x === v).length;
       const c = S.casinos[v - 1];
+      const after = standing({ ...c.dice, [S.me]: (c.dice[S.me] || 0) + n }, c.bills).entries.find((e) => e.id === S.me);
+      const res = after.tied ? '<em class="x">→ 동점 상쇄</em>' : after.bill ? `<em>→ ${after.rank + 1}등 ${money(after.bill)}</em>` : '<em class="no">→ 지폐 없음</em>';
       return `<button class="vg-choice" style="--nc:${CASINO[v].c}" data-act="vgPlace" data-n="${v}">
-        ${die(v, color, 'sm')}<b>×${n}</b><small>${v}번 · ${c.bills.length ? money(c.bills[0]) : '지폐 없음'}</small></button>`;
+        ${die(v, color, 'sm')}<b>×${n}</b><small>${v}번 카지노</small>${res}</button>`;
     }).join('')}</div>`;
   }
 
@@ -158,7 +199,7 @@
     const meP = player(S.me);
     if (m === 'roll') return `<button class="primary vg-rollbtn" data-act="vgRoll">🎲 주사위 ${meP ? meP.dice : ''}개 굴리기</button>`;
     if (m === 'place') {
-      return `<p class="vg-dock-msg"><b>어떤 숫자를 놓을까요?</b><br><small>고른 숫자의 주사위는 <b>모두</b> 같은 번호 카지노로 가요</small></p>${choicesHtml()}`;
+      return `<p class="vg-dock-msg"><b>어떤 숫자를 놓을까요?</b><br><small>그 숫자 주사위는 <b>모두</b> 같은 번호 카지노로 · →는 지금 기준 결과</small></p>${choicesHtml()}`;
     }
     if (m === 'roundEnd') {
       const acked = S.players.filter((p) => p.acked).length;
@@ -185,17 +226,18 @@
     const pips = Array.from({ length: S.rounds }, (_, i) => `<i class="${i + 1 < S.round ? 'done' : i + 1 === S.round ? 'now' : ''}"></i>`).join('');
     const log = S.log.length ? `<div class="ulog vg-log">${S.log.slice(-4).reverse().map((l, i) => `<div class="${i === 0 ? 'new' : ''}">${esc(l)}</div>`).join('')}</div>` : '';
     return `
-    <div class="top vg-top"><span>${roomTag()}</span><span>🎰 라스베가스</span></div>
-    <div class="vg-marquee"><span class="vg-neon">LAS VEGAS</span><span class="vg-round">${S.round}/${S.rounds} 라운드<span class="vg-pips">${pips}</span></span></div>
+    <div class="top"><span>${roomTag()}</span><span class="vg-top">🎰 라스베가스</span></div>
+    <div class="vg-marquee ${S.turnId === S.me && S.phase === 'play' ? 'mine' : ''}"><div class="vg-mq-r"><span class="vg-neon">LAS VEGAS</span><span class="vg-round">${S.round}/${S.rounds} 라운드<span class="vg-pips">${pips}</span></span></div>
+      <div class="vg-status">${statusText()}</div></div>
     ${overHtml(isHost)}
-    ${S.phase === 'roundEnd' || S.phase === 'over' ? resultsHtml() : ''}
-    <div class="vg-board ${pickable ? 'picking' : ''}">${S.casinos.map((c) => casinoHtml(c, pickable)).join('')}</div>
+    ${S.phase === 'over' ? '' : playersHtml()}
     ${trayHtml()}
-    ${playersHtml()}
+    ${S.phase === 'roundEnd' || S.phase === 'over' ? resultsHtml() : ''}
+    ${S.phase === 'play' ? `<div class="vg-board ${pickable ? 'picking' : ''}">${S.casinos.map((c) => casinoHtml(c, pickable)).join('')}</div>` : ''}
     ${log}
+    ${isHost ? '<div class="foot vg-foot"><button class="sm ghost" data-act="hostmenu">⚙ 방장 메뉴</button></div>' : ''}
     <div class="bdock vg-dock">
       ${dock()}
-      ${isHost ? '<div class="foot"><button data-act="hostmenu">⚙ 방장</button></div>' : ''}
     </div>
     ${ui.hostOpen && isHost ? genericHostMenu('멈춘 곳 대신 진행 (대신 굴리고 놓기 / 다음 라운드)', '자리를 비운 사람 대신 진행할까요? (굴려서 가장 많이 나온 숫자를 놓아요)') : ''}`;
   }

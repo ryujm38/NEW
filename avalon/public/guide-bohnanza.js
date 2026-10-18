@@ -7,7 +7,7 @@ window.GUIDES.bohnanza = {
     { icon: '🖐', title: '손패 순서는 못 바꿔요', text: '손패는 줄을 선 것과 같아요. 내 차례에는 <b>맨 앞(왼쪽, ①번) 카드를 꼭 심고</b>, 원하면 그다음 카드도 1장 더 심어요. 새로 받는 카드는 항상 <b>맨 뒤</b>에 붙어요.', html: true },
     { icon: '🌱', title: '한 밭에는 한 종류만', text: '밭은 처음에 2개예요(코인 3개로 3번째 밭을 살 수 있어요). 같은 콩은 한 밭에 쌓고, 다른 콩을 심으려면 그 밭을 <b>먼저 수확</b>해야 해요. 그래서 원치 않는 콩이 맨 앞에 오면 곤란해져요!', html: true },
     { icon: '🤝', title: '카드 2장 펼치고 거래', text: '심고 나면 덱에서 카드 2장이 펼쳐져요. 차례인 사람은 이 카드와 손패를 내놓고, 다른 사람은 <b>줄 카드 ⇄ 받을 카드</b>를 골라 제안해요. 수락은 차례인 사람만 할 수 있어요. 거래로 받은 카드와 남은 펼친 카드는 <b>바로 심어야</b> 해요.', html: true },
-    { icon: '🪙', title: '콩 계량표 보고 수확하기', text: '카드 맨 아래 줄이 <b>콩 계량표</b>예요. 동전 숫자는 받는 <b>코인</b>, 그 아래 숫자는 필요한 <b>콩 수</b>예요(예: 4 아래 🪙1 → 4개면 1코인). 내 밭을 누르면 언제든 수확해요. 카드 오른쪽 위 숫자는 그 콩이 덱에 몇 장 있는지예요.', html: true },
+    { icon: '🪙', title: '콩 계량표 보고 수확하기', text: '카드 맨 아래 줄이 <b>콩 계량표</b>예요. 동전 숫자는 받는 <b>코인</b>, 그 아래 숫자는 필요한 <b>콩 수</b>예요(예: 🪙1 아래에 4 → 콩 4개면 1코인). 내 밭을 누르면 언제든 수확해요(콩이 1개뿐인 밭은 다른 밭에 2개 이상 있으면 못 해요). 카드 오른쪽 위 숫자는 그 콩 카드가 모두 몇 장인지예요.', html: true },
     { icon: '🏆', title: '차례 끝과 승리', text: '모두 다 심으면 차례인 사람이 덱에서 <b>3장을 뽑아</b> 손패 뒤에 붙이고 다음 사람 차례가 돼요. 덱이 3번째로 바닥나면 모든 밭을 수확하고, 코인이 가장 많은 사람이 승리!', html: true },
   ],
   tip(S, ui) {
@@ -29,6 +29,9 @@ window.GUIDES.bohnanza = {
         if (!c) return null;
         const t = nm(c.type);
         const same = sameField(c.type);
+        if (!canPlant(c.type) && S.plantCount >= 1) {
+          return { title: `${j(t, '은', '는')} 심을 밭이 없어요`, text: '2번째 카드는 안 심어도 돼요. "그만 심고 카드 2장 펼치기"를 누르거나, 꼭 심고 싶으면 밭 하나를 먼저 수확해요.', target: '[data-act="bzSkip"]' };
+        }
         if (!canPlant(c.type)) {
           return { title: `${j(t, '을', '를')} 심을 밭이 없어요`, text: `맨 앞 카드 ${j(t, '은', '는')} 꼭 심어야 해서 밭 하나를 비워야 해요. 내 농장에서 수확할 밭을 눌러요(코인을 더 받는 밭이 좋아요).`, target: HARVEST };
         }
@@ -48,11 +51,12 @@ window.GUIDES.bohnanza = {
           return { title: `${name(p.from)}님이 거래를 제안했어요`, text: '주고받을 콩을 보고 마음에 들면 "수락", 아니면 "거절"을 눌러요. 받은 카드는 바로 심어야 하니 내 밭에 맞는 콩인지 확인해요!', target: '[data-act="bzAccept"]' };
         }
         const fu = S.faceUp.map((c) => nm(c.type)).join(', ');
+        if (!S.faceUp.length && !S.offered.length) return { title: '거래할 카드가 없어요', text: '펼친 카드를 모두 거래했어요. 손패를 눌러 더 내놓거나, 다 됐으면 "거래 끝내기"를 눌러요.', target: '[data-act="bzEndTrade"]' };
         return { title: '거래 시간이에요', text: `펼친 카드${fu ? `(${fu})` : ''}는 거래하지 않으면 내가 심어요. 필요 없는 손패를 눌러 내놓고 제안을 기다리거나, 다 됐으면 "거래 끝내기"를 눌러요.`, target: '.bz-faceup' };
       }
       case 'tradeB': {
         const mine = S.proposals.find((p) => p.from === S.me);
-        if (mine) return { title: '제안을 보냈어요', text: `${name(S.turnId)}님이 수락하면 카드가 바뀌고, 받은 카드는 바로 심어요. 바꾸고 싶으면 다시 고른 뒤 "제안 바꾸기"를 눌러요.` };
+        if (mine) return { title: '제안을 보냈어요', text: `${name(S.turnId)}님이 수락하면 카드가 바뀌고, 받은 카드는 바로 심어요. 바꾸고 싶으면 다시 고른 뒤 "제안 바꾸기"를 눌러요.`, target: '.bz-prop.mine' };
         const visible = [...S.faceUp, ...S.offered];
         if (!s.give.length && !s.want.length) {
           const good = visible.find((c) => sameField(c.type) >= 0);

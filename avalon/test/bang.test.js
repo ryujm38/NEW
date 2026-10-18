@@ -651,6 +651,17 @@ test('시드 케첨: 카드 2장을 버리고 체력 회복 (죽기 직전에도
   assert.strictEqual(P(dying, 1).alive, true);
 });
 
+test('시드 케첨: 턴 끝 버리기 중에 능력을 써서 손패가 체력 이하가 되면 바로 다음 사람', () => {
+  const room = setup(5, { chars: { 0: 'sid' }, life: [2], hands: [['bang', 'bang', 'missed', 'panic']] });
+  assert.deepStrictEqual(b.endTurn(room, P(room, 0).id), {});
+  assert.strictEqual(room.discarding, true); // 4장 > 체력 2
+  const [x, y] = P(room, 0).hand;
+  assert.deepStrictEqual(b.sid(room, P(room, 0).id, [x.id, y.id]), {}); // 2장 버리고 체력 3 → 손패 2장
+  assert.strictEqual(P(room, 0).hand.length, 2);
+  assert.strictEqual(room.discarding, false);
+  assert.strictEqual(room.turn, 1); // 1장을 더 버리지 않아도 넘어간다
+});
+
 test('턴 종료: 손패가 체력보다 많으면 줄여야 다음 사람으로 넘어간다', () => {
   const room = setup(5, { life: [2], chars: { 1: 'willy' }, hands: [['bang', 'beer', 'missed', 'panic']] });
   assert.deepStrictEqual(b.endTurn(room, P(room, 0).id), {});

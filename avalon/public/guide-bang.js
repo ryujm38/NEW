@@ -32,16 +32,17 @@ window.GUIDES = window.GUIDES || {};
       const S0 = typeof S !== 'undefined' ? S : null;
       const me = S0 && S0.players ? S0.players.find((p) => p.id === S0.me) : null;
       const role = me && me.role ? D().ROLES[me.role] : null;
+      // 역할 카드는 아이콘·제목을 모두 같은 모양으로 둔다(옆 사람이 멀리서 봐도 역할을 알 수 없게)
       const roleCard = role
-        ? { icon: role.icon, title: `내 역할: ${role.name}`, text: `${roleTip(S0, me.role)}<br><br><small>${ROLE_ALL}</small>`, html: true }
+        ? { icon: '🎭', title: '내 비밀 역할', text: `${roleTip(S0, me.role)}<br><small>언제든 아래 🎭 내 정보에서 다시 볼 수 있어요.</small><br><br><small>${ROLE_ALL}</small>`, html: true }
         : { icon: '🎭', title: '비밀 역할과 이기는 법', text: ROLE_ALL, html: true };
       return [
-        { icon: '🤠', title: '서부의 총잡이 게임', text: '4~7명이 각자 <b>비밀 역할</b>을 받고 서로 총을 쏘는 게임이에요. 내 체력은 <b>총알 모양</b>으로 보여요. 체력이 0이 되면 탈락하고 정체가 공개돼요.', html: true },
+        { icon: '🤠', title: '서부의 총잡이 게임', text: '4~7명이 각자 <b>비밀 역할</b>을 받고 서로 총을 쏘는 게임이에요. 체력은 <b>총알 모양</b>으로 보여요. 체력이 0이 되면 탈락하고 정체가 공개돼요.', html: true },
         roleCard,
+        { icon: '👀', title: '화면 읽는 법', text: '다른 사람들은 <b>앉은 순서대로</b> 가운데 탁자를 둘러앉아 있고, 나는 맨 아래 <b>내 칸</b>이에요. 칸마다 체력·🃏손패 수·<b>나와의 거리</b>가 보여요. 빨간 <b>🎯 거리</b>는 내 뱅!이 닿는 사람, ⭐는 보안관, 노란 테두리는 지금 차례예요.', html: true },
         { icon: '🔄', title: '내 차례에 하는 일', text: '① 카드 2장은 <b>자동으로</b> 뽑아요. ② 손패에서 <b>빛나는 카드</b>를 눌러 원하는 만큼 내요. ③ 다 했으면 <b>턴 끝내기</b>. 손패는 체력 수만큼만 들고 끝낼 수 있어서, 넘치면 버려야 해요.', html: true },
-        { icon: '🔫', title: '뱅!과 빗나감!', text: '<b>뱅!</b>은 한 턴에 한 번, <b>사거리</b> 안의 사람에게 쏴요. 쏠 수 있는 사람에겐 <b>🎯 사정권</b>이 붙어요. 맞은 사람은 <b>빗나감!</b>을 내서 막거나 체력 1을 잃어요. 무기를 놓으면 사거리가 늘어나요.', html: true },
-        { icon: '🟫', title: '갈색 카드와 파란 카드', text: '<b>갈색</b> 테두리는 한 번 쓰고 버리는 카드(뱅!, 맥주, 패닉! …)예요. <b>파란</b> 테두리는 내 앞에 놓아 계속 효과를 보는 장비(무기, 배럴, 머스탱, 스코프, 감옥, 다이너마이트)예요.', html: true },
-        { icon: '🍺', title: '체력, 맥주, 캐릭터', text: '<b>맥주</b>는 체력 +1, 죽기 직전에도 마실 수 있어요(둘만 남으면 안 돼요). 사람마다 특별한 <b>캐릭터 능력</b>이 있으니 아래 <b>🎭 내 정보</b>에서 꼭 확인하세요.', html: true },
+        { icon: '🔫', title: '뱅!과 빗나감!', text: '<b>뱅!</b>은 한 턴에 한 번, <b>사거리</b> 안의 사람(빨간 🎯)에게 쏴요. 맞은 사람은 <b>빗나감!</b>을 내서 막거나 체력 1을 잃어요. 무기를 앞에 놓으면 사거리가 늘어나요.', html: true },
+        { icon: '🍺', title: '카드 색, 맥주, 캐릭터', text: '<b>갈색</b> 카드는 한 번 쓰고 버리고, <b>파란</b> 카드는 앞에 놓아 계속 효과를 보는 장비예요. <b>맥주</b>는 체력 +1, 죽기 직전에도 마실 수 있어요(둘만 남으면 안 돼요). 사람마다 다른 <b>캐릭터 능력</b>은 <b>🎭 내 정보</b>에서 확인하세요.', html: true },
       ];
     },
     tip(S, ui) {
@@ -68,8 +69,8 @@ window.GUIDES = window.GUIDES || {};
           const attacker = nameOf(S, pd.kind === 'duel' ? pd.other : pd.source);
           const need = pd.kind === 'bang' || pd.kind === 'gatling' ? '빗나감!' : '뱅!';
           const what = { bang: `${attacker}님이 나에게 뱅!을 쐈어요`, gatling: `${attacker}님의 개틀링!`, indians: `${attacker}님의 인디언 습격!`, duel: `${attacker}님과 결투 중!` }[pd.kind];
-          if (selCard && selCard.ok) return { title: what, text: `"이 카드로 막기"를 누르면 ${cardName(selCard)}(으)로 막아요.`, target: '[data-act="bangRespond"]' };
-          return { title: what, text: `빛나는 ${need} 카드를 눌러 막으세요${pd.need > 1 ? ` (${pd.need}장 필요)` : ''}. 아끼고 싶으면 "포기"를 눌러 체력 1을 잃어도 돼요.${pd.kind === 'duel' ? ' 결투는 뱅!을 더 오래 버티는 쪽이 이겨요.' : ''}`, target: '.bng-hand.mine .bng-card.okc' };
+          if (selCard && selCard.ok) return { title: what, text: `아래 "${cardName(selCard)}으로 막기" 버튼을 누르면 막아요.`, target: '[data-act="bangRespond"]' };
+          return { title: what, text: `빛나는 ${need} 카드를 고르고 아래 막기 버튼을 누르세요${pd.need > 1 ? ` (${pd.need}장 필요)` : ''}. 아끼고 싶으면 "포기"를 눌러 체력 1을 잃어도 돼요.${pd.kind === 'duel' ? ' 결투는 뱅!을 더 오래 버티는 쪽이 이겨요.' : ''}`, target: '.bng-hand.mine .bng-card.okc' };
         }
         case 'barrel':
           return { title: '배럴을 써 보세요', text: '배럴은 카드를 1장 뒤집어 ♥가 나오면 공격을 막아 줘요. 실패해도 손해가 없으니 쓰는 게 좋아요.', target: '[data-act="bangBarrel"][data-use="1"]' };
@@ -85,9 +86,13 @@ window.GUIDES = window.GUIDES || {};
           if (selCard && selCard.ok) return { title: '이 카드를 덱 위로 돌려놓을까요?', text: '가장 필요 없는 카드를 돌려놓으세요. 버튼을 누르면 확정돼요.', target: '[data-act="bangKit"]' };
           return { title: '키트 칼슨: 3장 중 1장 돌려놓기', text: '빛나는 3장 중 가장 덜 필요한 카드를 눌러 고르세요.', target: '.bng-hand.mine .bng-card.okc' };
         case 'discard':
-          if (selCard) return { title: `${cardName(selCard)}을(를) 버릴까요?`, text: '"이 카드 버리기"를 누르면 버려요.', target: '[data-act="bangDiscard"]' };
+          if (selCard) return { title: `${cardName(selCard)} 카드를 버릴까요?`, text: '"이 카드 버리기"를 누르면 버려요.', target: '[data-act="bangDiscard"]' };
           return { title: `손패 ${S.needDiscard}장을 버려야 해요`, text: `손패는 체력(${me.life})만큼만 들고 턴을 끝낼 수 있어요. 빗나감!과 맥주는 남겨 두고 덜 쓸모 있는 카드부터 버리세요.`, target: '.bng-hand.mine .bng-card' };
         case 'main': {
+          if (ui.bPick) {
+            const t = S.players.find((p) => p.id === ui.bPick.target);
+            return { title: selCard && selCard.key === 'panic' ? '어떤 카드를 가져올까요?' : '어떤 카드를 버리게 할까요?', text: `${t ? t.name : ''}님의 손패(무작위 1장)나 앞에 놓인 장비 중 하나를 고르세요.`, target: '[data-act="bangPick"]' };
+          }
           if (ui.bSid) return { title: '버릴 카드 2장 고르기', text: '손패에서 버릴 카드 2장을 누르면 체력 1을 회복해요.', target: '.bng-hand.mine .bng-card' };
           if (selCard) {
             if (!selCard.ok) {
@@ -96,7 +101,7 @@ window.GUIDES = window.GUIDES || {};
                   : selCard.key === 'beer' ? '체력이 가득 찼거나 둘만 남아서 지금은 못 마셔요.' : '지금은 이 카드를 낼 수 없어요.';
               return { title: '이 카드는 지금 못 내요', text: why };
             }
-            if (selCard.targets) return { title: '누구에게 쓸까요?', text: `${C[selCard.key].name}: 과녁이 표시된 사람을 누르세요. ${roleTip(S, role, true)}`, target: '.bng-seat.target' };
+            if (selCard.targets) return { title: '누구에게 쓸까요?', text: `${C[selCard.key].name}: 위에서 과녁이 표시된 사람의 칸을 누르세요. 그만두려면 같은 카드를 한 번 더 눌러요.`, target: '.bng-seat.target' };
             return { title: `${C[selCard.key].name} 내기`, text: `${C[selCard.key].desc} "카드 내기"를 누르면 써요.`, target: '[data-act="bangPlay"]' };
           }
           if (!okCards.length) return { title: '낼 카드가 없어요', text: '"턴 끝내기"를 누르면 다음 사람 차례가 돼요. 빗나감!은 남겨 두면 공격을 막을 수 있어요.', target: '[data-act="bangEnd"]' };
@@ -104,18 +109,17 @@ window.GUIDES = window.GUIDES || {};
           const pick = (k) => okCards.find((c) => key(c) === k);
           const draw = pick('wellsfargo') || pick('stagecoach');
           if (draw) return { title: '먼저 카드를 더 뽑아요', text: `${cardName(draw)}을(를) 먼저 쓰면 손패가 늘어서 더 많은 걸 할 수 있어요.`, target: sel(draw.id) };
-          const equip = okCards.find((c) => C[c.key].type !== 'brown' && c.key !== 'jail' && c.key !== 'dynamite');
+          // 무기는 지금보다 사거리가 길 때만 권한다(약한 총으로 바꾸면 손해)
+          const equip = okCards.find((c) => C[c.key].type === 'blue' ? c.key !== 'jail' && c.key !== 'dynamite' : C[c.key].type === 'gun' && C[c.key].range > (S.range || 1));
           if (equip) return { title: '장비를 앞에 놓아요', text: `파란 카드 ${cardName(equip)}: ${C[equip.key].desc} 한 번 놓으면 계속 효과가 있어요.`, target: sel(equip.id) };
           const beer = pick('beer');
           if (beer && me.life < me.max - 1) return { title: '맥주로 체력 회복', text: `체력이 ${me.life}/${me.max}이에요. 맥주를 마셔 1 회복해요.`, target: sel(beer.id) };
           const bang = pick('bang');
           if (bang) {
-            const sh = sheriffOf(S);
-            const shotSheriff = role === 'outlaw' && sh && bang.targets && bang.targets.includes(sh.id);
+            // 가이드 띠는 멀리서도 보이니 내 역할에 따라 다른 말을 하지 않는다(작전은 🎭 내 정보에)
             return {
-              title: shotSheriff ? `보안관 ${sh.name}님이 사정권이에요!` : '뱅!을 쏠 수 있어요',
-              text: shotSheriff ? '뱅!을 누르고 보안관을 골라 쏘세요. 무법자의 목표예요!' : `뱅! 카드를 누르고 🎯 사정권인 사람을 골라요. ${roleTip(S, role)}`,
-              html: true,
+              title: '뱅!을 쏠 수 있어요',
+              text: `뱅! 카드를 누르고 빨간 🎯 거리 표시가 있는 사람을 골라요. 누구를 쏠지는 내 역할 작전(🎭 내 정보)을 떠올려 보세요.${bang.asBang ? ' (빗나감!을 뱅!으로 쓸 수 있어요)' : ''}`,
               target: sel(bang.id),
             };
           }
@@ -125,10 +129,10 @@ window.GUIDES = window.GUIDES || {};
           // 다른 사람을 기다리는 중
           if (pd) {
             const who = nameOf(S, pd.who);
-            const t = { respond: `${who}님이 공격을 막을지 고르는 중이에요.`, barrel: `${who}님이 배럴을 쓸지 고르는 중이에요.`, dying: `${who}님이 죽기 직전이에요! 맥주로 버틸지 고르는 중.`, store: `잡화점: ${who}님이 카드를 고르는 중이에요. 곧 내 차례가 와요.`, drawChoice: `${who}님이 카드 뽑는 방법을 고르는 중이에요.`, kit: `${who}님이 카드를 덱 위로 돌려놓는 중이에요.` }[pd.t];
+            const t = { respond: `${who}님이 공격을 막을지 고르는 중이에요.`, barrel: `${who}님이 배럴을 쓸지 고르는 중이에요.`, dying: `${who}님이 죽기 직전이에요! 맥주로 버틸지 고르는 중.`, store: `잡화점: ${who}님이 카드를 고르는 중이에요. 낸 사람부터 차례로 한 장씩 골라요.`, drawChoice: `${who}님이 카드 뽑는 방법을 고르는 중이에요.`, kit: `${who}님이 카드를 덱 위로 돌려놓는 중이에요.` }[pd.t];
             return { title: '잠시 기다려요', text: t || '다른 사람이 고르는 중이에요.' };
           }
-          return { title: `${nameOf(S, S.turnId)}님 차례예요`, text: `${roleTip(S, role)} 누가 누구를 쏘는지 잘 보면 정체를 추리할 수 있어요.`, html: true };
+          return { title: `${nameOf(S, S.turnId)}님 차례예요`, text: '누가 누구를 쏘는지 잘 보면 정체를 추리할 수 있어요. 빨간 🎯 거리는 내 뱅!이 닿는 사람이에요. 내 역할 작전은 🎭 내 정보에 있어요.' };
         }
       }
     },

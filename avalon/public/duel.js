@@ -98,10 +98,12 @@
     const left = S.slots.filter((x) => !x.taken);
     const top = Math.min(...left.map((x) => x.row));
     const rows = Math.max(...left.map((x) => x.row)) - top + 1;
-    const STEP = 44;
-    const CH = 78;
+    const STEP = 38;
+    const CH = 72;
     const H = (rows - 1) * STEP + CH + 8;
     const pick = S.mode === 'pick';
+    const m = me();
+    const o = opp();
     const tiles = left.map((x) => {
       const lx = `calc(50% + ${(((x.x - 1) * 100) / 12).toFixed(3)}%)`;
       const style = `left:${lx};top:${(x.row - top) * STEP}px;z-index:${x.row + 1}`;
@@ -115,56 +117,129 @@
         ok = k.ok ? 'can' : 'cant';
         price = `<span class="dlc-price ${k.ok ? 'ok' : 'no'}">${k.chain ? '🔗무료' : k.coins ? `🪙${k.coins}` : '무료'}</span>`;
       }
-      return `<button class="dlc k-${c.color} ${x.open ? 'open' : 'covered'} ${ok} ${sel ? 'sel' : ''}" data-act="dlSlot" data-i="${x.i}" style="${style}" aria-label="${esc(c.name)}${x.open ? '' : ' (가려짐)'}">
+      const oWin = x.open && S.phase === 'play' ? winsWith(o, c) : '';
+      const mWin = x.open && S.phase === 'play' ? winsWith(m, c) : '';
+      const flag = oWin ? `<i class="dlc-flag bad" aria-hidden="true">⚠️</i>` : mWin ? '<i class="dlc-flag good" aria-hidden="true">🏆</i>' : '';
+      const warn = oWin ? ` (상대가 가져가면 ${oWin === 'science' ? '과학' : '군사'} 승리!)` : mWin ? ` (내가 지으면 ${mWin === 'science' ? '과학' : '군사'} 승리!)` : '';
+      return `<button class="dlc k-${c.color} ${x.open ? 'open' : 'covered'} ${ok} ${sel ? 'sel' : ''} ${oWin ? 'threat' : ''}" data-act="dlSlot" data-i="${x.i}" style="${style}" aria-label="${esc(c.name)}${x.open ? '' : ' (가려짐)'}${warn}">${flag}
         <span class="dlc-band"><span class="dlc-ico">${cardIcon(c)}</span>${c.gives ? `<i class="dlc-chain">${CHAINS[c.gives]}</i>` : ''}</span>
         <span class="dlc-nm">${esc(c.name)}</span>${price}</button>`;
     }).join('');
     return `<div class="dlpyr" style="height:${H}px">${tiles}</div>`;
   }
 
+  // ---- 지금 점수(게임이 지금 끝난다면) — 모두 공개된 정보로 서버의 점수 계산과 같은 방식 ----
+  const colorCount = (p, list) => p.cards.filter((id) => list.includes(CARD[id].color)).length;
+  const builtCount = (p) => p.wonders.filter((w) => w.built).length;
+  function liveScore(p) {
+    const o = S.players.find((x) => x.id !== p.id);
+    let cards = 0;
+    p.cards.forEach((id) => {
+      const c = CARD[id];
+      if (c.guild) {
+        const g = c.guild;
+        if (g.moneylend) cards += Math.floor(Math.max(p.coins, o.coins) / 3);
+        else if (g.wonders) cards += g.vp * Math.max(builtCount(p), builtCount(o));
+        else cards += Math.max(colorCount(p, g.colors), colorCount(o, g.colors));
+      } else if (c.vp && ['blue', 'green', 'yellow'].includes(c.color)) cards += c.vp;
+    });
+    const wonders = p.wonders.filter((w) => w.built).reduce((a, w) => a + (WONDER[w.id].vp || 0), 0);
+    let tokens = 0;
+    if (p.tokens.includes('agriculture')) tokens += 4;
+    if (p.tokens.includes('philosophy')) tokens += 7;
+    if (p.tokens.includes('mathematics')) tokens += 3 * p.tokens.length;
+    const lead = S.military * p.shieldSide;
+    const military = lead >= 6 ? 10 : lead >= 3 ? 5 : lead >= 1 ? 2 : 0;
+    return cards + wonders + tokens + military + Math.floor(p.coins / 3);
+  }
+
+  // ---- 즉시 승리 위협: 펼쳐진 카드 중 누군가 가져가면 바로 이기는 카드 ----
+  const SCI_ALL = Object.keys(SYMS);
+  const leadOf = (p) => S.military * p.shieldSide; // +면 p가 상대 수도 쪽으로 밀고 있음
+  function winsWith(p, c) {
+    if (!p || !c) return '';
+    if (c.sym && !p.sci.includes(c.sym) && p.sci.length >= 5) return 'science';
+    if (c.shields) {
+      const n = c.shields + (c.color === 'red' && p.tokens.includes('strategy') ? 1 : 0);
+      if (leadOf(p) + n >= 9) return 'military';
+    }
+    return '';
+  }
+  function threatList() {
+    const m = me();
+    const o = opp();
+    if (!m || !o || S.phase !== 'play') return [];
+    const out = [];
+    const oLead = leadOf(o);
+    const mLead = leadOf(m);
+    const visible = S.slots.filter((x) => x.open && x.card !== null);
+    const oWin = visible.filter((x) => winsWith(o, CARD[x.card]));
+    const mWin = visible.filter((x) => winsWith(m, CARD[x.card]));
+    if (o.sci.length >= 5) {
+      const needList = SCI_ALL.filter((k) => !o.sci.includes(k) && k !== 'law');
+      const need = needList.map((k) => SYMS[k].icon).join('') + (needList.length > 1 ? ' 중 하나' : ' 하나');
+      out.push({ bad: true, text: `<b>${esc(o.name)}님 과학 ${o.sci.length}종!</b> ${need}면 과학 승리${oWin.length ? ' · ⚠️ 카드를 먼저 가져가요' : ''}` });
+    }
+    if (oLead >= 5) out.push({ bad: true, text: `<b>내 수도까지 ${9 - oLead}칸!</b> 방패 ${9 - oLead}개면 군사 패배${oWin.some((x) => CARD[x.card].shields) ? ' · ⚠️ 빨강 카드를 먼저 가져가요' : ' · 빨강 카드로 밀어내요'}` });
+    else if (oWin.length && o.sci.length < 5) out.push({ bad: true, text: `<b>⚠️ 표시 카드</b>를 상대가 가져가면 바로 져요` });
+    if (m.sci.length >= 5) out.push({ bad: false, text: `<b>내 과학 ${m.sci.length}종!</b> 새 기호 하나면 과학 승리${mWin.some((x) => CARD[x.card].sym) ? ' · 🏆 카드를 노려요' : ''}` });
+    if (mLead >= 5) out.push({ bad: false, text: `<b>상대 수도까지 ${9 - mLead}칸!</b> 방패 ${9 - mLead}개면 군사 승리${mWin.some((x) => CARD[x.card].shields) ? ' · 🏆 카드를 노려요' : ''}` });
+    return out;
+  }
+
   // ---- 군사 트랙 ----
   function trackHtml() {
     const [a, b] = S.players;
+    const loot = { '-6': 5, '-3': 2, 3: 2, 6: 5 };
     const cells = [];
     for (let p = -9; p <= 9; p++) {
       const ab = Math.abs(p);
       const zone = ab === 9 ? 'cap' : ab >= 6 ? 'z3' : ab >= 3 ? 'z2' : ab >= 1 ? 'z1' : 'z0';
       const side = p < 0 ? 'l' : p > 0 ? 'r' : '';
-      const pawn = p === S.military ? '<i class="dl-pawn" aria-label="군사 말"><svg viewBox="0 0 16 22"><path d="M8 1 L14 9 L8 21 L2 9 Z" fill="#ff5a3c" stroke="#3a0a00" stroke-width="1.3" stroke-linejoin="round"/><path d="M8 1 L8 21 M2 9 L14 9" stroke="#ffd2a8" stroke-opacity=".7" stroke-width=".8"/></svg></i>' : '';
-      const inner = ab === 9 ? `<span class="dl-castle" style="--pc:${p < 0 ? a.color : b.color}">🏰</span>` : p === 0 ? '<span class="dl-mid">◆</span>' : '';
-      cells.push(`<div class="dl-tc ${zone} ${side}">${inner}${pawn}</div>`);
+      const here = p === S.military;
+      const pawn = here ? '<i class="dl-pawn" aria-hidden="true"><svg viewBox="0 0 16 22"><path d="M8 1 L14 9 L8 21 L2 9 Z" fill="#ff5a3c" stroke="#3a0a00" stroke-width="1.3" stroke-linejoin="round"/><path d="M8 1 L8 21 M2 9 L14 9" stroke="#ffd2a8" stroke-opacity=".7" stroke-width=".8"/></svg></i>' : '';
+      const key = p > 0 ? `+${p}` : String(p);
+      const coin = loot[p] && !S.milTokens[key] && !here ? `<span class="dl-loot" title="여기 닿으면 상대 동전 −${loot[p]}">${loot[p]}</span>` : '';
+      const inner = ab === 9 ? `<span class="dl-castle" style="--pc:${p < 0 ? a.color : b.color}">🏰</span>` : p === 0 && !here ? '<span class="dl-mid">◆</span>' : '';
+      cells.push(`<div class="dl-tc ${zone} ${side}">${inner}${coin}${pawn}</div>`);
     }
-    const loot = (key, n, col) => {
-      const gone = S.milTokens[key];
-      return `<span class="dl-loot ${gone ? 'gone' : ''}" style="grid-column:${col}">🪙−${n}</span>`;
-    };
-    // 존 점수 표시: 1~2칸 2점, 3~5칸 5점, 6~8칸 10점
     const zl = (from, to, txt) => `<span class="dl-zl" style="grid-column:${from} / ${to}">${txt}</span>`;
     const zones = [zl(2, 5, '10점'), zl(5, 8, '5점'), zl(8, 10, '2점'), zl(11, 13, '2점'), zl(13, 16, '5점'), zl(16, 19, '10점')].join('');
-    const loots = [loot('-6', 5, '2 / 5'), loot('-3', 2, '5 / 8'), loot('+3', 2, '13 / 16'), loot('+6', 5, '16 / 19')].join('');
-    const lead = S.military === 0 ? '군사력이 팽팽해요' : `${esc((S.military > 0 ? a : b).name)}님이 ${Math.abs(S.military)}칸 앞서요`;
-    return `<section class="dl-mil">
-      <div class="dl-mil-h"><span style="--pc:${a.color}">◀ ${esc(a.name)} 수도</span><b>⚔️ ${lead}</b><span style="--pc:${b.color}">${esc(b.name)} 수도 ▶</span></div>
+    const lead = S.military === 0 ? '팽팽해요' : `<b style="--pc:${(S.military > 0 ? a : b).color}">${esc((S.military > 0 ? a : b).name)}</b> ${Math.abs(S.military)}칸 우세`;
+    return `<section class="dl-mil" aria-label="군사 트랙, ${S.military === 0 ? '균형' : `${esc((S.military > 0 ? a : b).name)} ${Math.abs(S.military)}칸 우세`}">
+      <div class="dl-mil-h"><span style="--pc:${a.color}">🏰 ${esc(a.name)}</span><em>⚔️ ${lead}</em><span style="--pc:${b.color}">${esc(b.name)} 🏰</span></div>
       <div class="dl-track">${cells.join('')}</div>
-      <div class="dl-zones">${zones}</div>
-      <div class="dl-zones loot">${loots}</div>
-      <p class="dl-mil-f">방패를 지으면 말이 상대 수도 쪽으로 가요. 끝에 닿으면 즉시 승리, 아니면 게임 끝에 말이 있는 쪽 반대편 사람이 그 칸의 점수를 받아요.</p></section>`;
+      <div class="dl-zones">${zones}</div></section>`;
+  }
+
+  function sciCounts(p) {
+    const n = {};
+    p.cards.forEach((id) => { const s = CARD[id].sym; if (s) n[s] = (n[s] || 0) + 1; });
+    return n;
   }
 
   function playerBar(p) {
     const you = p.id === S.me;
     const turn = p.id === S.turnId || (S.pend && S.pend.playerId === p.id) || (S.draft && S.draft.pickerId === p.id) || S.chooserId === p.id;
-    const sci = p.sci.map((k) => `<i title="${SYMS[k].name}">${SYMS[k].icon}</i>`).join('');
+    const acting = S.phase !== 'over' && turn;
+    const n = sciCounts(p);
+    const sci = p.sci.map((k) => `<i class="${n[k] >= 2 ? 'pair' : ''}" title="${SYMS[k].name}${n[k] >= 2 ? ' 2장' : ''}">${SYMS[k].icon}</i>`).join('');
     const toks = p.tokens.map((t) => `<button class="dl-tk sm" data-act="dlInfo" data-kind="token" data-id="${t}" aria-label="${esc(TOKENS[t].name)}">${TOKENS[t].icon}</button>`).join('');
     const counts = COLOR_ORDER.map((k) => {
-      const n = p.cards.filter((id) => CARD[id].color === k).length;
-      return n ? `<span class="dl-cnt k-${k}">${n}</span>` : '';
+      const c = p.cards.filter((id) => CARD[id].color === k).length;
+      return c ? `<span class="dl-cnt k-${k}" title="${COLORS[k].name} ${c}장">${c}</span>` : '';
     }).join('');
     const sciWarn = p.sci.length >= 5 ? 'warn' : '';
-    return `<div class="dlp ${turn ? 'turn' : ''} ${you ? 'me' : ''} ${S.winnerIds.includes(p.id) ? 'win' : ''}" style="--pc:${p.color}">
-      <div class="dlp-h"><span class="dot ${p.connected ? '' : 'off'}"></span><b class="dlp-nm">${esc(p.name)}${you ? ' (나)' : ''}</b>${S.winnerIds.includes(p.id) ? '<span>🏆</span>' : ''}</div>
-      <div class="dlp-r">${coins(p.coins)}<span class="dl-sci ${sciWarn}" aria-label="과학 기호 ${p.sci.length}종">${sci || '<em>과학 0</em>'}<small>${p.sci.length}/6</small></span></div>
-      <div class="dlp-r">${counts ? `<span class="dl-cnts">${counts}</span>` : '<span class="dim small">건물 없음</span>'}${toks ? `<span class="dl-tks">${toks}</span>` : ''}</div></div>`;
+    const vp = S.phase === 'over' && S.result ? S.result.scores[p.id].total : liveScore(p);
+    const doing = !acting ? '' : S.phase === 'draft' ? '고르는 중' : S.phase === 'chooseStart' ? '선택 중' : S.pend ? '선택 중' : '차례';
+    return `<div class="dlp ${acting ? 'turn' : ''} ${you ? 'me' : ''} ${S.winnerIds.includes(p.id) ? 'win' : ''}" style="--pc:${p.color}">
+      <div class="dlp-h"><span class="dot ${p.connected ? '' : 'off'}"></span><b class="dlp-nm">${esc(p.name)}</b>${you ? '<small class="dlp-me">나</small>' : ''}${doing ? `<span class="dlp-turn">${doing}</span>` : ''}${S.winnerIds.includes(p.id) ? '<span class="dlp-win">🏆</span>' : ''}</div>
+      <div class="dlp-st">
+        <span class="dls" title="동전">${coinSvg}<b>${p.coins}</b></span>
+        <span class="dls vp" title="${S.phase === 'over' ? '최종 점수' : '지금 끝나면 받을 점수'}"><i>🏆</i><b>${vp}</b></span>
+        <span class="dls sci ${sciWarn}" title="서로 다른 과학 기호"><i>🔬</i><b>${p.sci.length}</b><small>/6</small></span></div>
+      <div class="dlp-r">${counts ? `<span class="dl-cnts">${counts}</span>` : '<span class="dlp-none">건물 없음</span>'}<span class="dlp-w" title="지은 불가사의">🏛️${builtCount(p)}/${p.wonders.length}</span></div>
+      ${sci || toks ? `<div class="dlp-sci ${sciWarn}">${sci}${toks ? `<span class="dl-tks">${toks}</span>` : ''}</div>` : ''}</div>`;
   }
 
   function wonderHtml(p, w, you) {
@@ -301,30 +376,41 @@
     const [a, b] = S.players;
     const mine = me();
     const other = opp();
-    const log = S.log.length ? `<div class="ulog dl-log">${S.log.slice(-4).reverse().map((l, i) => `<div class="${i === 0 ? 'new' : ''}">${esc(l)}</div>`).join('')}</div>` : '';
-    const tokens = S.boardTokens.length
-      ? `<section class="dl-toks"><div class="dl-cap">🧪 진보 토큰 <small>같은 과학 기호 2장을 모으면 하나 가져와요</small></div>
-        <div class="dl-tkrow">${S.boardTokens.map((t) => `<button class="dl-tkb" data-act="dlInfo" data-kind="token" data-id="${t}"><span class="dl-tk">${TOKENS[t].icon}</span><small>${esc(TOKENS[t].name)}</small></button>`).join('')}</div></section>` : '';
+    const log = S.log.length ? `<section class="dl-logs"><div class="dl-cap">📜 최근 기록</div><div class="ulog dl-log">${S.log.slice(-5).reverse().map((l, i) => `<div class="${i === 0 ? 'new' : ''}">${esc(l)}</div>`).join('')}</div></section>` : '';
+    const news = S.log.length && S.phase !== 'over' ? `<div class="dl-news" aria-live="polite"><span>📣</span><span>${esc(S.log[S.log.length - 1])}</span></div>` : '';
+    const tokens = S.boardTokens.length && S.phase !== 'draft'
+      ? `<section class="dl-toks" aria-label="진보 토큰"><span class="dl-toks-l">🧪 진보 토큰<small>같은 과학 기호 2장이면 1개</small></span>
+        <div class="dl-tkrow">${S.boardTokens.map((t) => `<button class="dl-tkb" data-act="dlInfo" data-kind="token" data-id="${t}" aria-label="진보 토큰 ${esc(TOKENS[t].name)}"><span class="dl-tk">${TOKENS[t].icon}</span></button>`).join('')}</div></section>` : '';
     let board = '';
     if (S.phase === 'play' || S.phase === 'chooseStart' || S.phase === 'over') {
-      const live = S.slots.some((x) => !x.taken);
-      board = `${tokens}${live ? `<section class="dl-age"><div class="dl-cap">🃏 ${ROMAN[S.age]}시대 카드 <small>남은 ${S.slots.filter((x) => !x.taken).length}장 · 버린 카드 ${S.discard.length}장</small></div>${pyramidHtml()}</section>` : ''}`;
+      const left = S.slots.filter((x) => !x.taken).length;
+      const canN = S.mode === 'pick' ? Object.values(S.costs).filter((k) => k.ok).length : 0;
+      const cap = S.mode === 'pick' ? ` · <b class="${canN ? 'dl-okn' : 'dl-non'}">지을 수 있는 카드 ${canN}장</b>` : '';
+      board = left ? `<section class="dl-age"><div class="dl-cap">🃏 ${ROMAN[S.age]}시대 <small>남은 ${left}장 · 버린 카드 ${S.discard.length}장${cap}</small></div>${pyramidHtml()}</section>` : '';
       if (S.phase === 'chooseStart') board += `<div class="dl-agebanner"><b>${ROMAN[S.age]}시대 끝!</b><span>곧 ${ROMAN[S.age + 1]}시대가 시작돼요${S.age + 1 === 3 ? ' · 보라색 길드 카드가 섞여 있어요' : ''}</span></div>`;
     }
+    const tl = threatList();
+    const threats = tl.length ? `<div class="dl-threats" role="status">${tl.map((t) => `<div class="dl-threat ${t.bad ? 'bad' : 'good'}"><span>${t.bad ? '🚨' : '🎯'}</span><span>${t.text}</span></div>`).join('')}</div>` : '';
+    const status = S.phase === 'over' ? '게임 끝'
+      : S.phase === 'draft' ? `불가사의 고르기 ${S.draft.set + 1}/2`
+        : S.phase === 'chooseStart' ? `${ROMAN[S.age]}시대 끝`
+          : `${ROMAN[S.age]}시대 · ${S.mode === 'pick' || (S.pend && S.pend.playerId === S.me) ? '<b class="dl-mine">내 차례</b>' : `${pname(S.pend ? S.pend.playerId : S.turnId)}님 차례`}`;
     return `<div class="dlx">
-    <div class="top"><span>${roomTag()}</span><span>🏛️ 세븐 원더스 듀얼${S.age ? ` · ${ROMAN[S.age]}시대` : ''}</span></div>
+    <div class="top"><span>${roomTag()}</span><span class="dl-topst">🏛️ ${status}${isHost ? '<button class="dl-hostbtn" data-act="hostmenu" aria-label="방장 메뉴">⚙</button>' : ''}</span></div>
     ${S.phase === 'over' ? overHtml() : ''}
     <div class="dlps">${playerBar(a)}${playerBar(b)}</div>
     ${S.phase === 'draft' ? draftHtml() : ''}
+    ${threats}
     ${trackHtml()}
+    ${news}
     ${board}
-    ${other ? cityHtml(other) : ''}
+    ${tokens}
     ${mine ? cityHtml(mine) : ''}
+    ${other ? cityHtml(other) : ''}
     ${log}
     <div class="bdock dl-dock">
       ${S.mode === 'pick' || st().focus ? focusHtml() : ''}
       ${dock()}
-      ${isHost ? '<div class="foot"><button data-act="hostmenu">⚙ 방장</button></div>' : ''}
     </div>
     ${ui.hostOpen && isHost ? genericHostMenu('멈춘 곳 대신 진행 (자동으로 한 수 진행)', '자리를 비운 사람 대신 한 수 진행할까요? (카드를 버려 동전을 받거나 첫 번째 선택지를 골라요)') : ''}
     </div>`;
@@ -390,6 +476,6 @@
 
   window.GAME_UI.duel = {
     name: '세븐 원더스 듀얼', label: '🏛️ 세븐 원더스 듀얼', range: '2명', rules: RULES, render: renderDuel, sync, click, afterRender,
-    helpers: { prodOf },
+    helpers: { prodOf, liveScore, threatList, winsWith },
   };
 }());

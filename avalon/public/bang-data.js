@@ -47,7 +47,7 @@ const BANG_DATA = {
     saloon: { name: '살롱', type: 'brown', icon: '🥃', n: 1, desc: '살아 있는 모두가 체력 +1.' },
     jail: { name: '감옥', type: 'blue', icon: '⛓️', n: 3, desc: '보안관이 아닌 사람 앞에 놓아요. 그 사람은 턴 시작에 ♥를 못 뽑으면 턴을 건너뛰어요.' },
     dynamite: { name: '다이너마이트', type: 'blue', icon: '🧨', n: 1, desc: '내 앞에 놓아요. 턴 시작에 ♠2~9가 나오면 체력 -3, 아니면 다음 사람에게 넘어가요.' },
-    barrel: { name: '배럴', type: 'blue', icon: '🛢️', n: 2, desc: '뱅!을 맞을 때 자동으로 한 장 뽑아 ♥면 막아요.' },
+    barrel: { name: '배럴', type: 'blue', icon: '🛢️', n: 2, desc: '뱅!·개틀링을 맞을 때 카드 1장을 뒤집어 ♥면 막아요. (쓸지 말지 고를 수 있어요)' },
     scope: { name: '스코프', type: 'blue', icon: '🔭', n: 1, desc: '내가 다른 사람을 볼 때 거리가 -1.' },
     mustang: { name: '머스탱', type: 'blue', icon: '🐴', n: 2, desc: '다른 사람이 나를 볼 때 거리가 +1.' },
     volcanic: { name: '볼캐닉', type: 'gun', icon: '🌋', range: 1, n: 2, desc: '사거리 1. 뱅!을 횟수 제한 없이 쓸 수 있어요.' },

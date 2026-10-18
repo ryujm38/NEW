@@ -16,44 +16,56 @@ body:has(.uno-scr) {
 .uno-scr .c-b { --c1: #6cbaff; --c2: #2450e3; --ink: #2450e3; --cur: #3d8bff; --cura: #3d8bff55; }
 .uno-scr .c-w { --c1: #3a3d5c; --c2: #0d0e18; --ink: #fff; --cur: #c9b8ff; --cura: #c9b8ff44; }
 
-/* ---- 자리(상대 카드 수) ---- */
-.uno-seats { display: grid; grid-template-columns: repeat(auto-fill, minmax(102px, 1fr)); gap: 10px 8px; padding-top: 6px; }
+/* ---- 차례 띠 (모든 사람의 카드 수) ---- */
+.uno-seats { display: grid; grid-template-columns: repeat(var(--cols, 5), minmax(0, 1fr)); gap: 12px 7px; padding-top: 8px; }
 .uno-seat {
-  position: relative; min-width: 0; display: grid; grid-template-columns: 32px minmax(0, 1fr); column-gap: 7px; row-gap: 1px; align-items: center;
-  padding: 8px 8px 7px; border-radius: 14px;
-  background: linear-gradient(160deg, #ffffff12, #ffffff05); border: 1px solid #ffffff1c;
-  transition: border-color .2s, box-shadow .2s;
+  position: relative; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 1px;
+  padding: 8px 3px 6px; border-radius: 14px; text-align: center;
+  background: linear-gradient(170deg, #ffffff14, #ffffff06); border: 1.5px solid #ffffff1c;
+  transition: border-color .2s, box-shadow .2s, background .2s;
 }
-.uno-seat.me { border-color: #8f86ff66; }
-.uno-seat.turn { border-color: #ffd36a; background: linear-gradient(160deg, #ffd36a33, #ff9f4314); box-shadow: 0 0 0 2px #ffd36a44, 0 6px 18px #ffb84a2a; }
-.uno-seat.win { border-color: #ffd36a; background: linear-gradient(160deg, #ffd36a44, #ff9f4320); }
-.uno-seat.last { animation: unoLast 1.3s ease-in-out infinite; }
+.uno-seat.me { border-color: #8f86ff88; background: linear-gradient(170deg, #8f86ff26, #ffffff06); }
+.uno-seat.next { border-color: #7f8cff; border-style: dashed; }
+.uno-seat.turn { border-color: #ffd36a; background: linear-gradient(170deg, #ffd36a3d, #ff9f4312); box-shadow: 0 0 0 2px #ffd36a55, 0 6px 18px #ffb84a33; }
+.uno-seat.win { border-color: #ffd36a; background: linear-gradient(170deg, #ffd36a44, #ff9f4320); }
+.uno-seat.off { opacity: .6; }
+.uno-seat.last { border-color: #ff5d6c; animation: unoLast 1.3s ease-in-out infinite; }
 .us-av {
-  grid-row: 1 / 3; position: relative; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center;
-  font-weight: 800; font-size: 15px; color: #fff; text-shadow: 0 1px 2px #0006;
+  position: relative; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; flex: none;
+  font-weight: 800; font-size: 14px; color: #fff; text-shadow: 0 1px 2px #0006;
   background: linear-gradient(135deg, hsl(var(--h) 85% 62%), hsl(calc(var(--h) + 50) 70% 40%)); box-shadow: 0 0 0 2px #ffffff22;
 }
-.us-av .dot { position: absolute; right: -2px; bottom: -2px; width: 11px; height: 11px; border: 2px solid #1b1d3e; }
-.us-nm { min-width: 0; font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.25; }
-.us-nm small { font-size: 10px; font-weight: 800; color: #1b1d3e; background: #c9b8ff; border-radius: 6px; padding: 0 4px; vertical-align: 1px; }
-.us-cards { display: flex; align-items: center; gap: 4px; white-space: nowrap; font-size: 12px; color: #b8bdd8; min-width: 0; }
-.us-cards b { color: #e9ebff; }
-.uno-seat.last .us-cards b { color: #ff7a86; }
-.us-fan { position: relative; flex: none; width: 19px; height: 17px; }
-.us-fan i {
-  position: absolute; left: calc(var(--k) * 2px); top: 0; width: 11px; height: 16px; border-radius: 3px;
-  background: linear-gradient(135deg, #3b3f8f, #15173d); border: 1px solid #ffffffaa; transform: rotate(calc(var(--k) * 9deg - 14deg)); transform-origin: 50% 100%;
+.uno-seat.turn .us-av { box-shadow: 0 0 0 2px #ffd36a, 0 0 10px #ffd36a99; }
+.us-av .dot { position: absolute; right: -2px; bottom: -2px; width: 10px; height: 10px; border: 2px solid #1b1d3e; }
+.us-nm { max-width: 100%; font-size: 12px; font-weight: 700; color: #dfe3ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
+.uno-seat.me .us-nm { color: #d9d0ff; }
+.us-cnt { display: flex; align-items: baseline; gap: 1px; line-height: 1; color: #f1f2ff; }
+.us-cnt b { font-size: 21px; font-weight: 900; letter-spacing: -.5px; font-family: 'Arial Black', 'Segoe UI Black', system-ui, sans-serif; }
+.us-cnt small { font-size: 11px; font-weight: 700; color: #aab0d6; }
+.uno-seat.last .us-cnt b { color: #ff7a86; }
+.us-win { position: absolute; top: 13px; right: 3px; font-size: 11px; font-weight: 700; color: #ffd36a; line-height: 1; }
+.us-badge {
+  position: absolute; top: -9px; left: 50%; transform: translateX(-50%); white-space: nowrap;
+  font-style: normal; font-size: 11px; font-weight: 800; padding: 0 7px; border-radius: 99px; line-height: 1.55;
 }
-.us-win { font-size: 11px; color: #ffd36a; margin-left: auto; }
-.us-badge { position: absolute; top: -9px; right: 6px; font-style: normal; font-size: 10.5px; font-weight: 800; padding: 1px 8px; border-radius: 99px; line-height: 1.5; }
 .us-badge.now { background: linear-gradient(135deg, #ffe27a, #ffa53b); color: #3a2300; box-shadow: 0 2px 8px #ffa53b66; }
-.us-badge.next { background: #262b5c; color: #c9d0ff; border: 1px solid #5a63b0; }
+.us-badge.next { background: #262b5c; color: #c9d0ff; border: 1px solid #7f8cff; }
+.us-alert {
+  margin-top: 3px; font-style: normal; font-size: 11px; font-weight: 900; line-height: 1.5; padding: 0 6px; border-radius: 99px; white-space: nowrap;
+  color: #fff; background: linear-gradient(135deg, #ff5d6c, #c3123c); box-shadow: 0 2px 8px #c3123c66;
+}
+.us-alert.catch { background: linear-gradient(135deg, #ffb13b, #e3163f); }
+.us-arrow {
+  position: absolute; right: -8px; top: 50%; z-index: 1; width: 9px; margin-top: -9px; text-align: center;
+  font-style: normal; font-size: 17px; font-weight: 900; line-height: 18px; color: #8f96ff; pointer-events: none;
+}
+.us-dot { display: inline-block; width: 12px; height: 12px; margin-right: 7px; border-radius: 50%; vertical-align: 2px; background: linear-gradient(135deg, hsl(var(--h) 85% 62%), hsl(calc(var(--h) + 50) 70% 40%)); box-shadow: 0 0 0 2px #ffffff33; }
 
-/* ---- 테이블 ---- */
+/* ---- 테이블: 뽑는 더미 | 맨 위 카드 | 지금 색·방향 ---- */
 .uno-table {
   --cur: #c9b8ff; --cura: #c9b8ff44;
-  position: relative; isolation: isolate; display: grid; grid-template-columns: 1fr 1.25fr; align-items: center; justify-items: center;
-  min-height: 196px; padding: 28px 10px 12px; border-radius: 28px; overflow: hidden;
+  position: relative; isolation: isolate; display: grid; grid-template-columns: 1fr 1.15fr 1fr; grid-template-rows: auto auto; align-items: center; justify-items: center;
+  column-gap: 4px; row-gap: 8px; padding: 12px 8px; border-radius: 26px; overflow: hidden;
   background: radial-gradient(95% 85% at 50% 40%, #2f3688 0%, #1c2052 55%, #11132f 100%);
   box-shadow: inset 0 0 0 1px #ffffff1f, inset 0 -24px 40px #0007, 0 14px 30px #0008;
 }
@@ -63,31 +75,37 @@ body:has(.uno-scr) {
 }
 .uno-table::after {
   content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; transition: background .4s;
-  background: radial-gradient(55% 75% at 70% 52%, var(--cura), transparent 72%);
+  background: radial-gradient(60% 90% at 55% 50%, var(--cura), transparent 72%);
 }
+.uno-table > .uno-pile { grid-column: 1; grid-row: 1 / 3; }
+.uno-table > .uno-discard { grid-column: 2; grid-row: 1 / 3; }
+.uno-table > .uno-color { grid-column: 3; grid-row: 1; align-self: end; }
+.uno-table > .uno-dir { grid-column: 3; grid-row: 2; align-self: start; }
 .uno-dir {
-  position: absolute; top: 9px; left: 12px; display: flex; align-items: center; gap: 4px;
-  font-size: 11px; font-weight: 700; color: #c9d0ff; background: #0007; border: 1px solid #ffffff1f; border-radius: 99px; padding: 2px 9px 2px 4px;
+  display: flex; align-items: center; gap: 4px;
+  font-size: 12px; font-weight: 800; color: #c9d0ff; background: #0007; border: 1px solid #ffffff26; border-radius: 99px; padding: 3px 10px 3px 5px; white-space: nowrap;
 }
-.uno-dir small { font-size: 11px; }
+.uno-dir small { font-size: 12px; }
 .uno-dir svg { width: 18px; height: 18px; display: block; }
 .uno-dir svg g { transform-origin: 12px 12px; animation: unoSpin 7s linear infinite; }
+.uno-dir.ccw { color: #ffc4a8; border-color: #ff9f7a66; }
 .uno-dir.ccw svg { transform: scaleX(-1); }
 
 /* 뽑는 더미 */
 .uno-scr .uno-pile {
-  width: auto; min-height: 0; padding: 4px; background: none; border: 0; border-radius: 14px; color: inherit;
-  display: flex; flex-direction: column; align-items: center; gap: 10px; font-size: 15.5px;
+  width: auto; min-height: 0; padding: 4px 2px; background: none; border: 0; border-radius: 14px; color: inherit;
+  display: flex; flex-direction: column; align-items: center; gap: 9px; font-size: 13px;
 }
-.uno-scr .uno-pile:disabled { opacity: .78; }
-.uno-pile small { font-size: 12px; font-weight: 700; color: #c9d0ff; white-space: nowrap; }
+.uno-scr .uno-pile:disabled { opacity: .8; }
+.uno-pile small { font-size: 11.5px; font-weight: 700; color: #aab3e0; white-space: nowrap; text-align: center; line-height: 1.35; }
+.uno-pile small b { font-size: 13px; color: #fff; }
 .up-stack { position: relative; display: block; width: 4.4em; height: 6.6em; }
 .uno-back {
   position: absolute; inset: 0; display: grid; place-items: center; overflow: hidden; border-radius: .62em;
   background: radial-gradient(circle at 30% 18%, #474ca8, #15173d 72%); border: .17em solid #f6f6ff; box-shadow: 0 .2em .6em #0008;
 }
-.uno-back.b3 { transform: translate(7px, 6px) rotate(5deg); filter: brightness(.7); }
-.uno-back.b2 { transform: translate(3.5px, 3px) rotate(2.5deg); filter: brightness(.85); }
+.uno-back.b3 { transform: translate(6px, 5px) rotate(5deg); filter: brightness(.7); }
+.uno-back.b2 { transform: translate(3px, 2.5px) rotate(2.5deg); filter: brightness(.85); }
 .ub-ring {
   width: 82%; height: 52%; border-radius: 50%; padding: .2em; transform: rotate(-28deg);
   background: conic-gradient(from 20deg, #ff4d5e, #ffc92e, #22c47a, #3d8bff, #ff4d5e);
@@ -98,11 +116,11 @@ body:has(.uno-scr) {
   color: #fff; font-size: 1em; font-weight: 900; font-style: italic; letter-spacing: -.02em; text-shadow: 0 0 .5em #c9b8ff;
 }
 .uno-pile.hot .up-stack { animation: unoHot 1.2s ease-in-out infinite; border-radius: .62em; }
-.uno-pile.hot small { color: #ffe27a; }
+.uno-pile.hot small b { color: #ffe27a; }
 
 /* 버린 더미 */
-.uno-discard { position: relative; display: flex; flex-direction: column; align-items: center; gap: 12px; }
-.ud-stack { position: relative; display: block; font-size: 19px; width: 4.4em; height: 6.6em; }
+.uno-discard { position: relative; display: flex; flex-direction: column; align-items: center; }
+.ud-stack { position: relative; display: block; font-size: 17px; width: 4.4em; height: 6.6em; }
 .ud-glow {
   position: absolute; inset: -30%; border-radius: 50%; z-index: -1;
   background: radial-gradient(circle, var(--cur) 0%, transparent 62%); opacity: .55; filter: blur(6px);
@@ -114,13 +132,17 @@ body:has(.uno-scr) {
 }
 .ud-ghost.g1 { transform: rotate(11deg) translate(4px, 2px); opacity: .55; }
 .ud-ghost.g2 { transform: rotate(-9deg) translate(-4px, 3px); opacity: .75; }
-.uno-discard .uno-card.big { position: absolute; inset: 0; font-size: 19px; transform: rotate(-3deg); }
+.uno-discard .uno-card.big { position: absolute; inset: 0; font-size: 17px; transform: rotate(-3deg); }
+
+/* 지금 색: 멀리서도 보이게 큰 색 동그라미 + 이름 */
 .uno-color {
-  display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px 4px 5px; border-radius: 99px; white-space: nowrap;
-  background: #0009; border: 1px solid var(--cur); font-size: 12px; font-weight: 600; color: #dfe3ff; box-shadow: 0 0 12px var(--cura);
+  display: grid; grid-template-columns: auto auto; grid-template-rows: auto auto; column-gap: 7px; align-items: center;
+  padding: 7px 12px 7px 8px; border-radius: 16px; white-space: nowrap;
+  background: #0009; border: 1.5px solid var(--cur); box-shadow: 0 0 16px var(--cura);
 }
-.uno-color i { width: 16px; height: 16px; border-radius: 50%; background: var(--cur); box-shadow: 0 0 8px var(--cur); }
-.uno-color b { color: var(--cur); font-weight: 900; }
+.uno-color i { grid-row: 1 / 3; width: 30px; height: 30px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #ffffffaa 0 12%, transparent 45%), var(--cur); box-shadow: 0 0 10px var(--cur), 0 0 0 2px #fff6; }
+.uno-color span { font-size: 11px; font-weight: 700; color: #b8bfe6; line-height: 1.2; }
+.uno-color b { font-size: 18px; font-weight: 900; color: var(--cur); line-height: 1.15; }
 
 /* ---- 카드 앞면 ---- */
 .uno-scr .uno-card {
@@ -176,10 +198,14 @@ body:has(.uno-scr) {
 
 /* ---- 내 손패 (부채꼴) ---- */
 .uno-dock { display: flex; flex-direction: column; gap: 10px; }
-.uno-hand { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 28px 0 8px; border-radius: 22px; background: linear-gradient(180deg, #ffffff08, #ffffff02); border: 1px solid #ffffff10; }
+.uno-hand { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 34px 0 8px; border-radius: 22px; background: linear-gradient(180deg, #ffffff08, #ffffff02); border: 1px solid #ffffff10; }
 .uno-dock.mine .uno-hand { border-color: #ffd36a40; background: linear-gradient(180deg, #ffd36a12, #ffffff02); }
-.uno-hand-lbl { position: absolute; top: 6px; left: 12px; font-size: 11.5px; font-weight: 700; color: #9aa1c8; }
+.uno-hand-lbl { position: absolute; top: 6px; left: 12px; right: 12px; font-size: 12px; font-weight: 700; color: #9aa1c8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.uno-hand-lbl b { color: #e9ebff; }
+.uno-hand-lbl .ok { color: #ffe27a; }
 .uno-row { display: flex; justify-content: center; width: 100%; container-type: inline-size; }
+/* 손패가 두 줄이면 위 줄의 아래쪽을 살짝 덮어서 화면을 덜 차지하게 (왼쪽 위 숫자와 색은 그대로 보인다) */
+.uno-row + .uno-row { margin-top: -34px; }
 .uno-row .uno-card + .uno-card { margin-left: min(5px, calc((min(100vw, 480px) - 100px - 66px) / (var(--n) - 1) - 66px)); }
 @supports (width: 1cqw) {
   .uno-row .uno-card + .uno-card { margin-left: min(5px, calc((100cqw - 46px - 66px) / (var(--n) - 1) - 66px)); }
@@ -206,15 +232,18 @@ body:has(.uno-scr) {
 .uno-empty { margin: 4px 0; font-size: 13px; color: #9aa1c8; }
 
 /* ---- 상태 / 기록 ---- */
-.uno-status { display: grid; gap: 2px; text-align: center; }
+.uno-status { display: grid; gap: 2px; text-align: center; padding: 2px 0; }
 .uno-status b { font-size: 21px; font-weight: 900; letter-spacing: -.3px; color: #dfe3ff; }
-.uno-status small { font-size: 13px; color: #aab0d6; }
+.uno-status small { font-size: 13.5px; color: #aab0d6; }
+.uno-status small em { font-style: normal; font-weight: 800; color: #ffe27a; }
 .uno-status.mine b, .uno-status.win b {
   background: linear-gradient(90deg, #ff7a86, #ffd36a 35%, #5cefa6 65%, #6cbaff); -webkit-background-clip: text; background-clip: text; color: transparent;
 }
-.uno-status.mine small { color: #ffe9a8; }
-.uno-log { display: grid; gap: 3px; padding: 9px 12px; border-radius: 14px; font-size: 12.5px; color: #8f96bf; background: #0b0d1c99; border: 1px solid #ffffff12; }
-.uno-log .new { color: #f1f2ff; font-weight: 600; }
+.uno-status.mine small { color: #ffe9a8; font-weight: 600; }
+.uno-log { display: grid; gap: 2px; padding: 7px 12px; border-radius: 12px; font-size: 13px; line-height: 1.4; color: #8f96bf; background: #0b0d1c99; border: 1px solid #ffffff12; }
+.uno-log div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.uno-log .new { color: #f1f2ff; font-weight: 600; white-space: normal; }
+.uno-log .new::before { content: '● '; color: #8f96ff; font-size: 10px; vertical-align: 2px; }
 
 /* ---- 버튼 ---- */
 .uno-acts { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -228,9 +257,12 @@ body:has(.uno-scr) {
 .uno-scr .uno-catch { background: linear-gradient(135deg, #ff5d6c, #c3123c); border: 0; color: #fff; font-size: 15px; box-shadow: 0 6px 16px #c3123c66; }
 .uno-scr .uno-pass { background: #ffffff14; border: 1px solid #ffffff30; color: #f1f2ff; font-size: 16px; }
 .uno-scr .uno-play {
+  display: flex; align-items: center; justify-content: center; gap: 9px;
   border: 0; color: #2b1a00; font-weight: 800; background: linear-gradient(135deg, #ffe27a, #ffa53b);
   box-shadow: 0 6px 18px #ffa53b55; animation: unoPop .25s ease-out;
 }
+.uno-play i { width: 18px; height: 18px; border-radius: 50%; flex: none; background: var(--cur); box-shadow: 0 0 0 2px #fff, 0 1px 3px #0006; }
+.uno-play.c-w i { background: conic-gradient(#ff4d5e 0 25%, #ffc92e 0 50%, #22c47a 0 75%, #3d8bff 0); }
 .uno-note { margin: -2px 0 0; text-align: center; font-size: 12.5px; color: #c9b8ff; }
 .uno-scr .foot { margin-top: 0; }
 
@@ -277,8 +309,10 @@ body:has(.uno-scr) {
 @keyframes unoPop { from { transform: scale(.94); opacity: .4; } }
 
 @media (max-width: 360px) {
-  .ud-stack, .uno-discard .uno-card.big { font-size: 18px; }
-  .uno-scr .uno-pile { font-size: 13.5px; }
+  .ud-stack, .uno-discard .uno-card.big { font-size: 15.5px; }
+  .uno-seats { gap: 12px 5px; }
+  .us-nm { font-size: 11px; }
+  .uno-scr .uno-pile { font-size: 12px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .uno-scr *, .uno-scr *::before, .uno-scr *::after { animation: none !important; transition: none !important; }

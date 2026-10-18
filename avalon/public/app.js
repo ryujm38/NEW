@@ -515,26 +515,46 @@ const avCoin = (yes, cls = '') => `<span class="av-coin ${yes ? 'y' : 'n'} ${cls
 const avSlot = (id) => `<span class="av-slot ${id ? 'on' : ''}">${id ? `${avIcon('sword')}${nm(id)}` : '?'}</span>`;
 const AV_ROMAN = ['Ⅰ', 'Ⅱ', 'Ⅲ', 'Ⅳ', 'Ⅴ'];
 
+// 원정 판: 원정 메달 5개 + 점수 + 지금 리더 + 연속 부결을 한 덩어리로 모아 한눈에 보이게
 function renderTrack() {
+  const live = S.phase !== 'over' && S.phase !== 'assassin';
   const medals = S.teamSizes.map((size, i) => {
     const r = S.results[i];
-    const cls = r ? (r.ok ? 'ok' : 'bad') : i === S.round && S.phase !== 'over' && S.phase !== 'assassin' ? 'cur' : '';
-    const label = r ? (r.ok ? '성공' : `실패 ${r.fails}장`) : `${size}명`;
-    const two = S.failsNeeded[i] > 1 ? '<em class="av-two" title="실패 카드 2장 필요">2</em>' : '';
+    const cur = !r && i === S.round && live;
+    const cls = r ? (r.ok ? 'ok' : 'bad') : cur ? 'cur' : '';
+    const label = r ? (r.ok ? '성공' : `실패 ${r.fails}장`) : cur ? '이번 원정' : `${size}명`;
+    const two = S.failsNeeded[i] > 1 ? '<em class="av-two" title="실패 카드 2장이 나와야 실패">2</em>' : '';
     const face = r ? avIcon(r.ok ? 'grail' : 'swords') : `<b>${size}</b>`;
     return `<div class="av-q ${cls}"><span class="av-qi">${AV_ROMAN[i]}</span><div class="av-medal">${face}${two}</div><span class="lbl">${label}</span></div>`;
   }).join('');
-  const rej = Array.from({ length: S.maxRejects }, (_, i) => `<i class="${i < S.rejects ? 'on' : ''} ${i === S.maxRejects - 1 ? 'last' : ''}"></i>`).join('');
+  const rej = Array.from({ length: S.maxRejects }, (_, i) => `<i class="${i < S.rejects ? 'on' : ''}${i === S.maxRejects - 1 ? ' last' : ''}"></i>`).join('');
   const good = S.results.filter((r) => r.ok).length;
   const bad = S.results.length - good;
+  const hot = live && S.rejects >= S.maxRejects - 1;
+  const ldr = live && S.leaderId
+    ? `<span class="av-ldr" title="지금 리더">${avIcon('crown')}<b>${nm(S.leaderId)}</b>${S.leaderId === S.me ? '<small>나</small>' : ''}</span>`
+    : '';
+  const two = live && S.failsNeeded[S.round] > 1 && ['propose', 'vote', 'quest'].includes(S.phase)
+    ? '<p class="av-note"><em class="av-two inline">2</em> 이번 원정은 실패 카드가 <b>2장</b> 나와야 실패예요.</p>' : '';
+  const last = S.history[S.history.length - 1];
+  let lastLine = '';
+  if (last && (S.phase === 'propose' || S.phase === 'vote')) {
+    const yes = Object.values(last.votes).filter(Boolean).length;
+    const no = Object.keys(last.votes).length - yes;
+    const res = !last.approved ? '<b class="n">부결</b>' : last.quest ? (last.quest.ok ? '<b class="y">원정 성공</b>' : '<b class="n">원정 실패</b>') : '<b class="y">가결</b>';
+    lastLine = `<button class="av-last" data-act="history"><span>📜 지난 제안 · ${nm(last.leader)}의 원정대 ${res} <small>찬 ${yes} · 반 ${no}</small></span><i>›</i></button>`;
+  }
   return `<div class="av-board">
-    <div class="av-score"><span class="g">선 ${good}</span><small>원정 5번 중 3번을 먼저!</small><span class="e">악 ${bad}</span></div>
     <div class="av-quests">${medals}</div>
-    <div class="av-rej"><span>연속 부결</span>${rej}<span class="${S.rejects >= S.maxRejects - 1 ? 'hot' : ''}">${S.rejects}/${S.maxRejects}</span></div>
-    ${S.failsNeeded.some((n) => n > 1) ? '<p class="av-note"><em class="av-two inline">2</em> 표시 원정은 실패 카드가 2장 나와야 실패예요.</p>' : ''}</div>`;
+    <div class="av-stat">
+      <span class="av-sc"><b class="g">선 ${good}</b><b class="e">악 ${bad}</b></span>
+      ${ldr}
+      <span class="av-rej${hot ? ' hot' : ''}" title="연속 부결 (5번이면 악의 승리)"><small>부결</small>${rej}<b>${S.rejects}/${S.maxRejects}</b></span>
+    </div>${two}${lastLine}</div>`;
 }
 
-// 플레이어 자리. o: team(원정대), sel(누를 수 있음), aim(암살 지목 중), vote(true/false 공개된 표), voted(표를 냈지만 비공개), carded, shot, sub
+// 플레이어 자리. o: team(원정대), sel(누를 수 있음), aim(암살 지목 중), vote(true/false 공개된 표), voted(표를 냈지만 비공개),
+//   carded(원정 카드 냄), acked(확인함), wait(아직 안 함), shot(암살 지목됨), sub(작은 글)
 function playerCard(p, o = {}) {
   const cls = ['av-seat'];
   if (p.id === S.me) cls.push('me');
@@ -543,6 +563,7 @@ function playerCard(p, o = {}) {
   if (o.aim) cls.push('aim');
   if (o.vote === true) cls.push('vy');
   if (o.vote === false) cls.push('vn');
+  if (o.wait) cls.push('wait');
   if (o.shot) cls.push('shot');
   if (!p.connected) cls.push('off');
   let sub = o.sub ? esc(o.sub) : '';
@@ -550,16 +571,18 @@ function playerCard(p, o = {}) {
   if (p.role) {
     const r = S.roleNames[p.role];
     cls.push(r.team === 'good' ? 'good-r' : 'evil-r');
-    sub = esc(r.name) + (o.shot ? ' · 암살 지목' : '');
+    sub = esc(r.name) + (o.shot ? ' · 🎯지목' : '');
     ava = `<span class="av-ava role ${r.team}">${avRoleArt(p.role)}</span>`;
   }
   let side = '';
   if (o.vote === true || o.vote === false) side = avCoin(o.vote);
-  else if (o.voted) side = `<span class="av-coin seal">${avIcon('seal')}</span>`;
-  else if (o.carded) side = `<span class="av-mback">${avIcon('tower')}</span>`;
+  else if (o.voted) side = `<span class="av-coin seal" title="투표함">${avIcon('seal')}</span>`;
+  else if (o.carded) side = `<span class="av-mback" title="카드 냄">${avIcon('tower')}</span>`;
   else if (o.aim) side = `<span class="av-aim">${avIcon('target')}</span>`;
   else if (o.sel && o.team) side = `<span class="av-coin pick">${avIcon('check')}</span>`;
-  const crown = p.id === S.leaderId && S.phase !== 'over' && S.phase !== 'assassin' ? `<span class="av-crown" title="리더">${avIcon('crown')}</span>` : '';
+  else if (o.acked) side = `<span class="av-ok" title="확인함">${avIcon('check')}</span>`;
+  const live = S.phase !== 'over' && S.phase !== 'assassin' && S.phase !== 'roles';
+  const crown = live && p.id === S.leaderId ? `<span class="av-crown" title="리더">${avIcon('crown')}</span>` : '';
   const flag = o.team && !p.role ? '<span class="av-flag">원정대</span>' : '';
   const off = p.connected ? '' : '<span class="av-offdot" title="접속 끊김"></span>';
   const attrs = o.sel ? ` data-act="pick" data-id="${p.id}"` : '';
@@ -567,6 +590,7 @@ function playerCard(p, o = {}) {
   return `<${tag} class="${cls.join(' ')}"${attrs}>${crown}${flag}${ava}${off}<span class="av-pn"><span class="nm">${esc(p.name)}${p.id === S.me ? ' <small>(나)</small>' : ''}</span><span class="sub">${sub}</span></span>${side}</${tag}>`;
 }
 
+// 화면 짜임: 맨 위 줄 → (가이드) → 원정 판 → 지금 단계 안내 → 자리 → 아래에 붙은 행동 버튼
 function renderGame() {
   const isHost = S.hostId === S.me;
   const phase = S.phase;
@@ -575,144 +599,148 @@ function renderGame() {
   const ackCount = S.players.filter((p) => p.acked).length;
   const meP = byId(S.me);
   const marked = new Set(phase === 'propose' ? S.draft : S.team);
+  const rn = AV_ROMAN[Math.min(S.round, 4)];
+  const crown = avIcon('crown', 'inl');
 
-  let panel = '';
-  let cards = '';
-
-  const playersHtml = (fn) => `<div class="av-seats">${S.players.map((p) => playerCard(p, fn(p))).join('')}</div>`;
+  let info = ''; // 원정 판 아래: 지금 무슨 일이 일어나는지
+  let dock = ''; // 화면 아래: 내가 누를 것
+  let seatOpt = () => ({});
+  const ackSeat = (p) => ({ acked: p.acked, wait: !p.acked && p.connected, sub: p.acked ? '확인 완료' : p.connected ? '확인 중…' : '접속 끊김' });
+  const meter = (n, total, text) => `<div class="av-meter"><i><b style="width:${total ? Math.round((n / total) * 100) : 0}%"></b></i><span>${text}</span></div>`;
 
   if (phase === 'roles') {
-    const ri = S.roleInfo;
     const comp = S.composition;
     const compHtml = comp
       ? `<div class="av-comp"><div class="av-comp-h">이번 판 ${S.players.length}명 · <b class="g">선 ${comp.good}</b> · <b class="e">악 ${comp.evil}</b></div>
         <div class="av-chips">${comp.roles.map((r) => `<span class="av-chip ${r.team}">${avRoleArt(r.key)}${esc(r.name)}${r.count > 1 ? ` ×${r.count}` : ''}</span>`).join('')}</div></div>`
       : '';
-    panel = `<div class="av-panel">
-      <div class="av-ph">당신의 역할</div>
-      ${roleCardHtml(ri, true)}${compHtml}
-      ${meP.acked
-        ? `<p class="progress">다른 사람을 기다리는 중 (${ackCount}/${connectedCount})</p>${isHost ? '<button class="ghost" data-act="force">기다리지 않고 시작</button>' : ''}`
-        : '<button class="primary" data-act="ack">확인했어요</button>'}
-    </div>`;
-    cards = playersHtml(() => ({}));
+    info = `<div class="av-panel"><div class="av-ph">당신의 역할</div>${roleCardHtml(S.roleInfo, true)}${compHtml}</div>`;
+    dock = ackHtml(meP, ackCount, connectedCount, isHost, '확인했어요', '기다리지 않고 시작');
+    seatOpt = ackSeat;
   } else if (phase === 'propose') {
     const size = S.teamSize;
     const left = size - S.draft.length;
-    cards = playersHtml((p) => ({ team: marked.has(p.id), sel: isLeader, sub: marked.has(p.id) ? '원정대' : '' }));
+    seatOpt = (p) => ({ team: marked.has(p.id), sel: isLeader, sub: marked.has(p.id) ? '원정대 후보' : '' });
     const slots = Array.from({ length: size }, (_, i) => avSlot(S.draft[i])).join('');
-    panel = `<div class="av-panel">
-      <div class="av-ph">${S.round + 1}번째 원정대 구성</div>
+    info = `<div class="av-panel"><div class="av-ph">${rn} 원정대 구성 · ${size}명</div>
       <div class="av-slots">${slots}</div>
       ${isLeader
-        ? `<p class="center">${avIcon('crown', 'inl')} 당신이 리더예요. 아래 자리에서 <b>${size}명</b>을 눌러 고르세요. 본인을 넣어도 돼요.</p>
-           <button class="primary" data-act="propose" ${left === 0 ? '' : 'disabled'}>${left === 0 ? '이 원정대로 확정' : `${left}명 더 골라 주세요`}</button>`
-        : `<p class="center">${avIcon('crown', 'inl')} <b>${nm(S.leaderId)}</b>님이 원정대 <b>${size}명</b>을 고르는 중… (${S.draft.length}/${size})</p><p class="dim small center">누구를 넣을지 같이 이야기해 보세요.</p>`}
+        ? `<p class="av-say">${crown} <b>당신이 리더예요!</b> 자리를 눌러 <b>${size}명</b>을 골라요. 나도 넣을 수 있어요.</p>`
+        : `<p class="av-say">${crown} <b>${nm(S.leaderId)}</b>님이 고르는 중 <b class="av-cnt">${S.draft.length}/${size}</b></p><p class="dim small center">누구를 넣을지 같이 이야기해 보세요.</p>`}
+      ${S.rejects >= S.maxRejects - 1 ? '<p class="av-warn">또 부결되면 5연속 부결로 악의 승리예요!</p>' : ''}
     </div>`;
+    if (isLeader) dock = `<button class="primary" data-act="propose" ${left === 0 ? '' : 'disabled'}>${left === 0 ? '이 원정대로 확정' : `${left}명 더 골라 주세요`}</button>`;
   } else if (phase === 'vote') {
-    cards = playersHtml((p) => ({ team: marked.has(p.id), voted: p.voted, sub: p.voted ? '투표 완료' : marked.has(p.id) ? '원정대' : '' }));
+    seatOpt = (p) => ({ team: marked.has(p.id), voted: p.voted, wait: !p.voted, sub: p.voted ? '투표 완료' : '고민 중…' });
     const votedN = S.players.filter((p) => p.voted).length;
-    panel = `<div class="av-panel">
-      <div class="av-ph">원정대 투표</div>
-      <p class="center">${avIcon('crown', 'inl')} <b>${nm(S.leaderId)}</b>님이 고른 원정대</p>
+    info = `<div class="av-panel"><div class="av-ph">${rn} 원정대 투표 · ${S.rejects + 1}번째 제안</div>
       <div class="av-slots">${S.team.map(avSlot).join('')}</div>
-      ${S.myVote === null
-        ? `<div class="av-tokens">
-            <button class="av-token ty" data-act="vote" data-v="1">${avCoin(true)}<b>찬성</b><small>이 원정대로 출발</small></button>
-            <button class="av-token tn" data-act="vote" data-v="0">${avCoin(false)}<b>반대</b><small>다음 리더에게</small></button></div>`
-        : `<div class="av-voted">${avCoin(S.myVote)}<b>${S.myVote ? '찬성' : '반대'}에 투표했어요</b></div>`}
-      ${S.rejects >= S.maxRejects - 1 ? '<p class="av-warn">이번에도 부결되면 5번 연속 부결로 악이 이겨요!</p>' : ''}
-      <p class="progress">${votedN}/${S.players.length}명 투표 · 전원이 투표하면 한꺼번에 공개돼요</p>
+      <p class="av-say">${crown} <b>${nm(S.leaderId)}</b>님이 고른 원정대예요. 찬성? 반대?</p>
+      ${S.rejects >= S.maxRejects - 1 ? '<p class="av-warn">또 부결되면 5연속 부결로 악의 승리예요!</p>' : ''}
+      ${meter(votedN, S.players.length, `${votedN}/${S.players.length}명 투표 · 다 모이면 한꺼번에 공개`)}
     </div>`;
+    dock = S.myVote === null
+      ? `<div class="av-tokens">
+          <button class="av-token ty" data-act="vote" data-v="1">${avCoin(true)}<span><b>찬성</b><small>원정 출발</small></span></button>
+          <button class="av-token tn" data-act="vote" data-v="0">${avCoin(false)}<span><b>반대</b><small>리더 교체</small></span></button></div>`
+      : `<div class="av-voted">${avCoin(S.myVote)}<b>${S.myVote ? '찬성' : '반대'}에 투표했어요</b><small>공개를 기다려요</small></div>`;
   } else if (phase === 'voteResult') {
     const lv = S.lastVote;
     const yes = Object.values(lv.votes).filter(Boolean).length;
-    const no = S.players.length - yes;
-    cards = playersHtml((p) => ({ team: marked.has(p.id), vote: lv.votes[p.id], sub: lv.votes[p.id] ? '찬성' : '반대' }));
+    const no = Object.keys(lv.votes).length - yes;
+    seatOpt = (p) => ({ team: marked.has(p.id), vote: lv.votes[p.id], sub: `${lv.votes[p.id] ? '찬성' : '반대'}${p.acked ? ' · 확인' : ''}` });
     const an = avAnim(`v${S.gameNo}-${S.history.length}`, 900);
     const coins = [...Array(yes).fill(true), ...Array(no).fill(false)].map((v, i) => `<span style="--i:${i}">${avCoin(v)}</span>`).join('');
-    panel = `<div class="av-panel">
-      <div class="av-ph">투표 결과</div>
+    const fifth = !lv.approved && S.rejects >= S.maxRejects;
+    info = `<div class="av-panel"><div class="av-ph">${rn} 투표 결과</div>
+      <div class="av-verdict ${lv.approved ? 'ok' : 'bad'}">${lv.approved ? '가결 — 원정 출발!' : fifth ? '5번째 부결…' : '부결'}</div>
       <div class="av-tally${an.cls}"${an.st}>${coins}</div>
-      <div class="av-verdict ${lv.approved ? 'ok' : 'bad'}">${lv.approved ? '가결 — 원정 출발!' : '부결'}</div>
-      <p class="center">찬성 <b class="y">${yes}</b> · 반대 <b class="n">${no}</b>${lv.approved ? '' : ` · 연속 부결 ${S.rejects}/${S.maxRejects}`}</p>
-      ${lv.approved ? '' : S.rejects < S.maxRejects ? '<p class="dim small center">리더가 다음 사람에게 넘어가요. 누가 찬성·반대했는지 기억해 두세요.</p>' : '<p class="av-warn">5번째 부결이에요… 악의 승리!</p>'}
-      ${ackHtml(meP, ackCount, connectedCount, isHost)}
+      <p class="center">찬성 <b class="y">${yes}</b> · 반대 <b class="n">${no}</b>${lv.approved ? '' : ` · 연속 부결 <b class="n">${S.rejects}/${S.maxRejects}</b>`}</p>
+      ${lv.approved ? '' : fifth ? '<p class="av-warn">5번 연속 부결이에요. 악의 승리!</p>' : '<p class="dim small center">리더가 다음 사람에게 넘어가요. 누가 어떻게 투표했는지는 아래 자리에 보여요.</p>'}
     </div>`;
+    dock = ackHtml(meP, ackCount, connectedCount, isHost);
   } else if (phase === 'quest') {
     const onTeam = S.team.includes(S.me);
-    cards = playersHtml((p) => ({ team: marked.has(p.id), carded: marked.has(p.id) && p.carded, sub: marked.has(p.id) ? (p.carded ? '카드 제출' : '원정대') : '' }));
+    seatOpt = (p) => ({ team: marked.has(p.id), carded: marked.has(p.id) && p.carded, wait: marked.has(p.id) && !p.carded, sub: marked.has(p.id) ? (p.carded ? '카드 냄' : '카드 고르는 중…') : '' });
     const backs = `<div class="av-backs">${S.team.map((_, i) => `<span class="av-back ${i < S.cardsIn ? 'in' : ''}">${avIcon('tower')}</span>`).join('')}</div>`;
-    let body;
-    if (!onTeam) {
-      body = `${backs}<p class="center">원정대원이 몰래 카드를 내는 중…</p>`;
-    } else if (S.myCard !== null) {
-      body = `${backs}<p class="center av-gold">카드를 냈어요. 다른 대원을 기다려요.</p>`;
-    } else {
-      const good = S.roleInfo.team === 'good';
-      body = `<p class="center">몰래 카드를 한 장 내세요. ${good ? '선은 <b>성공</b>만 낼 수 있어요.' : '악은 <b>성공</b>과 <b>실패</b> 중에 고를 수 있어요.'}</p>
-        <div class="av-qcards">
-          <button class="av-qc ok" data-act="card" data-v="1"><span class="art">${avIcon('grail')}</span><b>성공</b></button>
-          <button class="av-qc bad" data-act="card" data-v="0" ${good ? 'disabled' : ''}><span class="art">${avIcon('swords')}</span><b>실패</b>${good ? '<small>선은 낼 수 없어요</small>' : ''}</button>
-        </div>`;
-    }
-    panel = `<div class="av-panel"><div class="av-ph">${S.round + 1}번째 원정</div>
+    const say = !onTeam ? '원정대원이 몰래 카드를 내는 중이에요…' : S.myCard !== null ? '카드를 냈어요. 다른 대원을 기다려요.' : '맨 아래에서 카드를 한 장 몰래 내세요.';
+    info = `<div class="av-panel"><div class="av-ph">${rn} 원정 진행 중</div>
       <div class="av-slots">${S.team.map(avSlot).join('')}</div>
-      ${S.failsNeeded[S.round] > 1 ? `<p class="small dim center">이번 원정은 실패 카드 ${S.failsNeeded[S.round]}장이 나와야 실패예요.</p>` : ''}${body}
-      <p class="progress">${S.cardsIn}/${S.team.length}명 제출</p></div>`;
+      ${backs}
+      <p class="av-say">${say}</p>
+      ${meter(S.cardsIn, S.team.length, `${S.cardsIn}/${S.team.length}명 제출`)}
+    </div>`;
+    if (onTeam && S.myCard === null) {
+      // 선이든 악이든 두 카드가 똑같이 보이게 그린다 (옆 사람이 버튼 색만 보고 정체를 알지 못하게)
+      const good = S.roleInfo.team === 'good';
+      dock = `<p class="av-hint">선은 <b>성공</b>만, 악은 <b>성공·실패</b> 중에 낼 수 있어요.</p>
+        <div class="av-qcards">
+          <button class="av-qc ok" data-act="card" data-v="1"><span class="art">${avIcon('grail')}</span><b>성공</b><small>누구나 낼 수 있어요</small></button>
+          <button class="av-qc bad" data-act="card" data-v="0" ${good ? 'disabled' : ''}><span class="art">${avIcon('swords')}</span><b>실패</b><small>${good ? '선은 낼 수 없어요' : '악만 낼 수 있어요'}</small></button>
+        </div>`;
+    } else if (onTeam) {
+      dock = `<div class="av-voted"><span class="av-mback big">${avIcon('tower')}</span><b>카드를 냈어요</b><small>결과를 기다려요</small></div>`;
+    }
   } else if (phase === 'questResult') {
     const q = S.lastQuest;
     const n = S.team.length;
-    cards = playersHtml((p) => ({ team: marked.has(p.id) }));
+    seatOpt = (p) => ({ team: marked.has(p.id), acked: p.acked, wait: !p.acked && p.connected, sub: p.acked ? '확인 완료' : '' });
     const an = avAnim(`q${S.gameNo}-${S.round}`, 1600);
     // 카드는 섞여서 공개된다: 성공 먼저, 실패는 뒤에 (누가 냈는지와는 상관없음)
     const faces = Array.from({ length: n }, (_, i) => {
       const ok = i < n - q.fails;
       return `<span class="av-rc ${ok ? 'ok' : 'bad'}" style="--i:${i}">${avIcon(ok ? 'grail' : 'swords')}<b>${ok ? '성공' : '실패'}</b></span>`;
     }).join('');
-    panel = `<div class="av-panel"><div class="av-ph">${S.round + 1}번째 원정 결과</div>
-      <div class="av-reveal${an.cls}"${an.st}>${faces}</div>
+    const good = S.results.filter((r) => r.ok).length;
+    const bad = S.results.length - good;
+    const next = bad >= 3 ? '<p class="av-warn">원정이 3번 실패했어요. 악의 승리!</p>'
+      : good >= 3 ? '<p class="av-gold center">선이 3번 성공! 이제 암살 단계예요.</p>'
+        : '<p class="center dim small">누가 실패를 냈는지는 공개되지 않아요.</p>';
+    info = `<div class="av-panel"><div class="av-ph">${rn} 원정 결과</div>
       <div class="av-verdict ${q.ok ? 'ok' : 'bad'}">${q.ok ? '원정 성공!' : '원정 실패'}</div>
+      <div class="av-reveal${an.cls}"${an.st}>${faces}</div>
       <p class="center">실패 카드 <b class="${q.fails ? 'n' : 'y'}">${q.fails}장</b>${q.needed > 1 ? ` · 이번엔 ${q.needed}장이 나와야 실패예요` : ''}</p>
-      <p class="center dim small">누가 실패를 냈는지는 공개되지 않아요.</p>
-      ${ackHtml(meP, ackCount, connectedCount, isHost)}
+      ${next}
     </div>`;
+    dock = ackHtml(meP, ackCount, connectedCount, isHost);
   } else if (phase === 'assassin') {
     const amAssassin = S.roleInfo && S.roleInfo.key === 'assassin';
-    cards = playersHtml((p) => ({ sel: amAssassin && p.id !== S.me, aim: amAssassin && p.id !== S.me }));
-    panel = `<div class="av-panel dark"><div class="av-ph">암살 단계</div>
-      <div class="av-hero">${avRoleArt('assassin')}</div>
+    seatOpt = (p) => ({ sel: amAssassin && p.id !== S.me, aim: amAssassin && p.id !== S.me });
+    info = `<div class="av-panel dark"><div class="av-ph">암살 단계</div>
+      <div class="av-hero sm">${avRoleArt('assassin')}</div>
       <div class="av-verdict gold">선이 원정을 3번 성공했어요!</div>
       ${amAssassin
-        ? '<p class="center">하지만 끝이 아니에요. <b>멀린</b>이라고 생각하는 사람을 아래에서 눌러 지목하세요. 맞히면 악의 역전승!</p>'
-        : '<p class="center">암살자가 멀린을 찾고 있어요. 숨죽이고 기다리세요…</p>'}
+        ? '<p class="av-say">하지만 끝이 아니에요. <b>멀린</b>이라고 생각하는 사람을 아래 자리에서 눌러 지목하세요. 맞히면 악의 역전승!</p>'
+        : '<p class="av-say">암살자가 멀린을 찾고 있어요. 맞히면 악이, 틀리면 선이 이겨요.</p>'}
     </div>`;
   } else if (phase === 'over') {
     const goodWon = S.winner === 'good';
-    cards = playersHtml((p) => ({ shot: p.id === S.assassinTarget }));
-    panel = `<div class="av-panel end ${goodWon ? 'good' : 'evil'}">
+    seatOpt = (p) => ({ shot: p.id === S.assassinTarget });
+    info = `<div class="av-panel end ${goodWon ? 'good' : 'evil'}">
       <div class="av-hero">${avEndArt(goodWon)}</div>
       <div class="av-verdict xl ${goodWon ? 'ok' : 'bad'}">${goodWon ? '선의 승리!' : '악의 승리!'}</div>
       <p class="center">${REASONS[S.reason] || ''}</p>
       ${S.assassinTarget ? `<p class="center dim small">암살자의 선택: ${nm(S.assassinTarget)}</p>` : ''}
-      <p class="center dim small">아래에서 모두의 역할을 확인해 보세요.</p>
-      ${isHost
-        ? `<button class="primary" data-act="restart">같은 멤버로 바로 다시 하기</button>
-           <button data-act="again">대기실로 돌아가기</button>`
-        : '<p class="progress">방장이 다시 시작하길 기다리는 중…</p>'}
+      <p class="center dim small">아래 자리에서 모두의 역할을 확인해 보세요.</p>
     </div>`;
+    dock = isHost
+      ? `<button class="primary" data-act="restart">같은 멤버로 바로 다시 하기</button><button class="ghost sm av-force" data-act="again">대기실로 돌아가기</button>`
+      : '<p class="progress">방장이 다시 시작하길 기다리는 중…</p>';
   }
 
   const title = { roles: '역할 확인', propose: '원정대 구성', vote: '투표', voteResult: '투표 결과', quest: '원정', questResult: '원정 결과', assassin: '암살', over: '게임 끝' }[phase];
   return `<div class="av ph-${phase}${phase === 'over' ? ` win-${S.winner}` : ''}">${AV_DEFS}
-  <div class="top"><span>${roomTag()}</span><span class="av-round">${S.round + 1 > 5 ? 5 : S.round + 1}라운드 · ${title}</span></div>
+  <div class="top"><span>${roomTag()}</span><span class="av-round">${Math.min(S.round + 1, 5)}라운드 · ${title}</span></div>
   ${phase === 'roles' ? '' : renderTrack()}
-  ${panel}
-  ${cards}
-  <div class="foot">
-    <button data-act="role">🎭 내 역할</button>
-    <button data-act="history">📜 기록</button>
-    ${isHost ? '<button data-act="hostmenu">⚙ 방장</button>' : ''}
+  ${info}
+  <div class="av-seats n${S.players.length}">${S.players.map((p) => playerCard(p, seatOpt(p))).join('')}</div>
+  <div class="bdock av-dock">
+    ${dock ? `<div class="av-act">${dock}</div>` : ''}
+    <div class="foot">
+      <button data-act="role">🎭 내 역할</button>
+      <button data-act="history">📜 기록</button>
+      ${isHost ? '<button data-act="hostmenu">⚙ 방장</button>' : ''}
+    </div>
   </div>
   ${ui.roleOpen ? `<div class="overlay" data-act="closeall"><div class="sheet">${roleCardHtml(S.roleInfo)}<button data-act="closeall">닫기</button></div></div>` : ''}
   ${ui.hostOpen && isHost ? hostMenuHtml() : ''}
@@ -749,23 +777,26 @@ function genericOverButtons(isHost) {
     : '<p class="progress">방장이 다시 시작하길 기다리는 중…</p>';
 }
 
-function ackHtml(meP, ackCount, connectedCount, isHost) {
+// 확인 단계의 아래 버튼: 아직이면 확인 버튼, 눌렀으면 기다리는 사람 수 (방장은 넘기기)
+function ackHtml(meP, ackCount, connectedCount, isHost, label = '확인', forceLabel = '기다리지 않고 넘어가기') {
   if (meP.acked) {
-    return `<p class="progress">다른 사람을 기다리는 중 (${ackCount}/${connectedCount})</p>${isHost ? '<button class="ghost" data-act="force">기다리지 않고 넘어가기</button>' : ''}`;
+    return `<p class="progress">다른 사람을 기다리는 중 (${ackCount}/${connectedCount})</p>${isHost ? `<button class="ghost sm av-force" data-act="force">${forceLabel}</button>` : ''}`;
   }
-  return '<button class="primary" data-act="ack">확인</button>';
+  return `<button class="primary" data-act="ack">${label}</button>`;
 }
 
-// 역할 카드: 선은 푸른 바탕에 금테, 악은 붉은 바탕에 검붉은 테. reveal이면 처음 한 번 뒤집히며 나타난다
+// 역할 카드: 선이든 악이든 같은 색·같은 모양으로 그린다. 같은 방에서 옆 사람이 화면 색만 보고 정체를 알아채지 못하게.
+// 그림도 모두 같은 금빛 단색으로 칠하고, 알고 있는 정보 칸도 역할과 상관없이 늘 같은 자리에 같은 모양으로 둔다.
+// reveal이면 처음 한 번 뒤집히며 나타난다
 function roleCardHtml(ri, reveal) {
   if (!ri) return '<p class="dim">역할이 아직 없어요.</p>';
-  const intel = ri.night
-    ? `<div class="av-intel ${ri.team}"><div class="t">${esc(ri.night.title)}</div><div class="av-names">${ri.night.names.length
-      ? ri.night.names.map((n) => `<span class="av-name ${ri.key === 'percival' ? 'q' : 'e'}">${esc(n)}</span>`).join('')
-      : '<span class="dim">없음</span>'}</div></div>`
-    : '';
+  const night = ri.night || { title: '알고 있는 정보', names: [] };
+  const empty = ri.night ? '없음' : '없어요 · 투표와 원정 결과로 추리해요';
+  const intel = `<div class="av-intel"><div class="t">${esc(night.title)}</div><div class="av-names">${night.names.length
+    ? night.names.map((n) => `<span class="av-name">${esc(n)}</span>`).join('')
+    : `<span class="av-none">${empty}</span>`}</div></div>`;
   const an = reveal ? avAnim(`role${S.gameNo}`, 900) : { cls: '', st: '' };
-  return `<div class="av-card ${ri.team} r-${ri.key}${an.cls}"${an.st}><div class="av-card-in">
+  return `<div class="av-card${an.cls}"${an.st}><div class="av-card-in">
       <div class="av-card-side">${sideLabel(ri.team)}</div>
       <div class="av-card-art">${avRoleArt(ri.key)}</div>
       <div class="av-card-name">${esc(ri.name)}</div>
@@ -776,10 +807,12 @@ function roleCardHtml(ri, reveal) {
 function historyHtml() {
   if (!S.history.length) return '<p class="dim center">아직 기록이 없어요.</p>';
   return S.history.map((h) => {
+    const yes = Object.values(h.votes).filter(Boolean).length;
+    const no = Object.keys(h.votes).length - yes;
     const votes = S.players.map((p) => `<span class="av-hv ${h.votes[p.id] ? 'y' : 'n'}">${h.votes[p.id] ? '○' : '✕'} ${esc(p.name)}</span>`).join('');
     const result = !h.approved ? '<span class="av-badge bad">부결</span>' : h.quest ? (h.quest.ok ? '<span class="av-badge ok">원정 성공</span>' : `<span class="av-badge bad">원정 실패 · 실패 ${h.quest.fails}장</span>`) : '<span class="av-badge">진행 중</span>';
     return `<div class="av-hist"><div class="av-hist-h"><b>${h.round}라운드 · ${h.attempt}번째 제안</b>${result}</div>
-      <p class="small">👑 리더 ${nm(h.leader)} · 원정대 <b>${nameList(h.team)}</b></p><div class="av-hvotes">${votes}</div></div>`;
+      <p class="small">👑 리더 ${nm(h.leader)} · 원정대 <b>${nameList(h.team)}</b> · 찬 ${yes} / 반 ${no}</p><div class="av-hvotes">${votes}</div></div>`;
   }).reverse().join('');
 }
 

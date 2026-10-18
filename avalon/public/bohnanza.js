@@ -98,6 +98,7 @@
     if (o.size) cls.push(o.size);
     if (o.sel) cls.push('sel');
     if (o.front) cls.push('front');
+    if (o.next) cls.push('next');
     if (o.dim) cls.push('dim');
     const inner = `${o.tag ? `<em class="bz-tag ${o.tagCls || ''}">${o.tag}</em>` : ''}${o.no ? `<span class="bz-no">${o.no}</span>` : ''}
       <span class="bz-card-nm">${b.name}</span>
@@ -139,16 +140,33 @@
     return `<span class="bz-mini" style="${beanVars(f.type)}">${beanSvg(f.type)}<b>×${f.count}</b>${coin(f.value, 'xs')}</span>`;
   }
 
-  function deckBar() {
+  // 맨 위 상태판: 누구 차례 · 지금 몇 단계 · 덱 상황을 한눈에
+  function statusHtml() {
+    if (S.phase !== 'play') return '';
+    const mine = S.turnId === S.me;
+    const stepIdx = { plant1: 0, trade: 1, plantAll: 2 }[S.step] || 0;
+    const planters = S.players.filter((p) => p.tableCount);
+    const what = {
+      plant1: S.plantCount ? '2번째 카드도 심을지 고르는 중 (선택)' : '손패 맨 앞 카드를 심는 중',
+      trade: `펼친 카드 ${S.faceUp.length}장으로 거래 중 · 제안 ${S.proposals.length}건`,
+      plantAll: planters.length ? `받은 카드 심는 중: ${planters.map((p) => `${p.id === S.me ? '나' : esc(p.name)} ${p.tableCount}장`).join(', ')}` : '다 심었어요',
+    }[S.step] || '';
+    const steps = ['심기', '거래', '모두 심기'].map((t, i) => `<li class="${i < stepIdx ? 'done' : i === stepIdx ? 'now' : ''}"><i>${i < stepIdx ? '✓' : i + 1}</i>${t}</li>`).join('');
     const runs = Array.from({ length: S.maxRuns }, (_, i) => `<i class="${i + 1 < S.deckRuns ? 'done' : i + 1 === S.deckRuns ? 'now' : ''}">${i + 1}</i>`).join('');
     const disc = S.discardTop
-      ? `<span class="bz-disc" style="${beanVars(S.discardTop)}">${beanSvg(S.discardTop)}</span>`
-      : '<span class="bz-disc none">없음</span>';
-    return `<div class="bz-deckbar">
-      <div class="bz-pile-deck"><span class="bz-back"></span><span class="bz-back"></span><span class="bz-back up"><b>${S.deckCount}</b></span></div>
-      <div class="bz-deckinfo"><b>덱 ${S.deckCount}장</b><span class="bz-runs">${runs}</span><small>덱이 3번째로 바닥나면 끝나요</small></div>
-      <div class="bz-discbox">${disc}<small>버린 더미</small></div>
-    </div>`;
+      ? `<span class="bz-disc" style="${beanVars(S.discardTop)}" title="버린 더미 맨 위">${beanSvg(S.discardTop)}</span>`
+      : '<span class="bz-disc none">버린<br>카드<br>없음</span>';
+    return `<section class="bz-status ${mine ? 'mine' : ''}">
+      <div class="bz-st-row">
+        <div class="bz-st-who"><b class="bz-st-name">${mine ? '🧑‍🌾 내 차례!' : `${pname(S.turnId)}님 차례`}</b><small>${what}</small></div>
+        <div class="bz-st-deck" title="덱이 3번째로 바닥나면 게임이 끝나요">
+          <span class="bz-pile-deck"><span class="bz-back"></span><span class="bz-back up"><b>${S.deckCount}</b></span></span>
+          <span class="bz-st-runs"><small>덱 ${S.deckRuns}/${S.maxRuns}바퀴</small><span class="bz-runs">${runs}</span></span>
+          ${disc}
+        </div>
+      </div>
+      <ol class="bz-steps">${steps}<li class="end" title="모두 심으면 차례인 사람이 3장을 뽑고 다음 사람 차례">↻ 3장 뽑기</li></ol>
+    </section>`;
   }
 
   function opponentsHtml() {
@@ -156,10 +174,16 @@
     return `<div class="bz-opps">${others.map((p) => {
       const turn = p.id === S.turnId;
       const win = S.winnerIds.includes(p.id);
+      let badge = '';
+      if (S.phase === 'play' && S.step === 'trade' && !turn) {
+        badge = S.proposals.some((x) => x.from === p.id) ? '<span class="bz-sb on">📨 제안함</span>' : '<span class="bz-sb">제안 없음</span>';
+      } else if (S.phase === 'play' && S.step === 'plantAll') {
+        badge = p.tableCount ? `<span class="bz-sb todo">🌱 ${p.tableCount}장 심는 중</span>` : '<span class="bz-sb done">✓ 다 심음</span>';
+      }
       return `<div class="bz-opp ${turn ? 'turn' : ''}">
-        <div class="bz-opp-h"><span class="dot ${p.connected ? '' : 'off'}"></span><b class="bz-opp-nm">${esc(p.name)}</b>${turn ? '<span class="bz-turnb">차례</span>' : ''}${win ? ' 🏆' : ''}
-          <span class="bz-opp-s"><span class="bz-handc" title="손패">${p.handCount}</span>${coin()}<b>${S.phase === 'over' ? S.scores[p.id] : p.coins}</b></span></div>
-        <div class="bz-opp-f">${p.fields.map(miniPlot).join('')}${p.tableCount ? `<span class="bz-mini todo">🌱 심을 카드 ${p.tableCount}</span>` : ''}</div>
+        <div class="bz-opp-h"><span class="dot ${p.connected ? '' : 'off'}"></span><b class="bz-opp-nm">${esc(p.name)}</b>${turn ? '<span class="bz-turnb">차례</span>' : ''}${badge}${win ? ' 🏆' : ''}
+          <span class="bz-opp-s"><span class="bz-handc" title="손패 ${p.handCount}장">${p.handCount}</span>${coin()}<b>${S.phase === 'over' ? S.scores[p.id] : p.coins}</b></span></div>
+        <div class="bz-opp-f">${p.fields.map(miniPlot).join('')}</div>
       </div>`;
     }).join('')}</div>`;
   }
@@ -206,13 +230,23 @@
     const help = isA
       ? '다른 사람의 제안을 기다려요. 필요 없는 손패를 아래에서 눌러 내놓으면 더 많은 제안을 받을 수 있어요.'
       : `받고 싶은 카드를 누르고, 아래 내 손패에서 줄 카드를 골라 제안해요. (${pname(A)}님하고만 거래할 수 있어요)`;
-    return `<section class="bz-trade">
-      <div class="bz-trade-h"><b>🤝 거래 테이블</b><small>${isA ? '내 차례' : `${pname(A)}님 차례`}</small></div>
-      <p class="bz-help">${help}</p>
-      <div class="bz-sec bz-faceup"><small>펼친 카드 (거래 안 되면 ${isA ? '내가' : `${pname(A)}님이`} 심어요)</small><div class="bz-row">${faceUp}</div></div>
-      <div class="bz-sec bz-offered"><small>${isA ? '내가' : `${pname(A)}님이`} 내놓은 손패</small><div class="bz-row">${offered}</div></div>
-      ${S.proposals.length ? `<div class="bz-props"><div class="bz-props-h">📨 제안 ${S.proposals.length}건</div>${props}</div>` : '<p class="bz-none center">아직 제안이 없어요.</p>'}
-    </section>`;
+    const myProp = S.proposals.find((p) => p.from === S.me);
+    const chips = [
+      `<span class="bz-chip">펼친 카드 <b>${S.faceUp.length}</b></span>`,
+      `<span class="bz-chip">내놓은 손패 <b>${S.offered.length}</b></span>`,
+      `<span class="bz-chip ${S.proposals.length ? 'hot' : ''}">📨 제안 <b>${S.proposals.length}</b>건</span>`,
+      isA ? '' : `<span class="bz-chip ${myProp ? 'ok' : ''}">${myProp ? '✅ 내 제안 보냄' : '내 제안 아직 없음'}</span>`,
+    ].join('');
+    const head = `
+      <div class="bz-trade-h"><b>🤝 거래 테이블</b><small>${isA ? '내가 받는 쪽' : `${pname(A)}님과 거래`}</small></div>
+      <div class="bz-chips">${chips}</div>
+      <p class="bz-help">${help}</p>`;
+    const pool = `<div class="bz-pool">
+      <div class="bz-sec bz-faceup"><small>펼친 카드 <span>(거래 안 되면 ${isA ? '내가' : `${pname(A)}님이`} 심어요)</span></small><div class="bz-row">${faceUp}</div></div>
+      <div class="bz-sec bz-offered"><small>${isA ? '내가' : `${pname(A)}님이`} 내놓은 손패</small><div class="bz-row">${offered}</div></div></div>`;
+    const propBox = S.proposals.length ? `<div class="bz-props"><div class="bz-props-h">📨 제안 ${S.proposals.length}건</div>${props}</div>` : '<p class="bz-none center">아직 제안이 없어요.</p>';
+    // 차례인 사람은 받은 제안이 먼저, 다른 사람은 고를 카드가 먼저 보이게
+    return `<section class="bz-trade">${head}${isA ? propBox + pool : pool + propBox}</section>`;
   }
 
   function tableHtml() {
@@ -235,11 +269,14 @@
       let tagCls = 'front';
       if (offered) { tag = '내놓음'; tagCls = 'offer'; }
       if (give) { tag = '줄 카드'; tagCls = 'give'; }
-      return bean(c, { act: clickable ? 'bzHand' : '', sel: offered || give, front, tag, tagCls, no: i + 1 });
+      return bean(c, { act: clickable ? 'bzHand' : '', sel: offered || give, front, next: i === 1 && S.phase === 'play', tag, tagCls, no: i + 1 });
     }).join('');
-    const sub = m === 'tradeA' ? '눌러서 내놓기/거두기' : m === 'tradeB' ? '눌러서 줄 카드 고르기' : '순서는 못 바꿔요';
+    const sub = m === 'tradeA' ? '👆 눌러서 내놓기/거두기' : m === 'tradeB' ? '👆 눌러서 줄 카드 고르기' : '순서는 못 바꿔요';
+    const plan = S.hand.length && S.phase === 'play'
+      ? `<div class="bz-handplan"><span>${m === 'plant1' ? '지금 심을 카드' : '내 차례에 심을 카드'}</span>${S.hand.slice(0, m === 'plant1' && S.plantCount ? 1 : 2).map((c, i) => `<b class="bz-hp" style="${beanVars(c.type)}"><i>${i + 1}</i>${tname(c.type)}${i || (m === 'plant1' && S.plantCount) ? ' <small>(선택)</small>' : ''}</b>`).join('')}</div>` : '';
     return `<section class="bz-handbox"><div class="bz-sec-h"><b>🖐 내 손패 ${S.hand.length}장</b><small>${sub}</small></div>
-      ${S.hand.length ? `<div class="bz-handrail"><span class="bz-rail-l">◀ 맨 앞(먼저 심어요)</span><span class="bz-rail-r">맨 뒤 ▶</span></div>
+      ${plan}
+      ${S.hand.length ? `<div class="bz-handrail"><span class="bz-rail-l">◀ 맨 앞(먼저 심어요)</span><span class="bz-rail-r">새 카드는 맨 뒤 ▶</span></div>
       <div class="bz-hand">${cards}</div>` : '<p class="bz-none">손패가 없어요. 차례가 끝나면 3장을 뽑아요.</p>'}</section>`;
   }
 
@@ -247,16 +284,19 @@
   function fieldButtons(card, act) {
     const m = me();
     const btns = m.fields.map((f, i) => {
-      if (f.type === null || !f.count) return `<button class="bz-pb new" data-act="${act}" data-i="${i}"><span class="bz-pb-no">밭 ${i + 1}</span><span class="bz-pb-art">🌱</span><b>빈 밭에 심기</b></button>`;
+      if (f.type === null || !f.count) return `<button class="bz-pb new" data-act="${act}" data-i="${i}"><span class="bz-pb-art">🌱</span><span class="bz-pb-t"><span class="bz-pb-no">밭 ${i + 1}</span><b>빈 밭에 심기</b></span></button>`;
       if (f.type === card.type) {
         const after = BOHNANZA_DATA.coinsFor(card.type, f.count + 1);
-        return `<button class="bz-pb add" style="${beanVars(f.type)}" data-act="${act}" data-i="${i}"><span class="bz-pb-no">밭 ${i + 1}</span><span class="bz-pb-art">${beanSvg(f.type)}</span><b>×${f.count} → ×${f.count + 1}</b><small>수확 시 ${coin(after, 'xs')}</small></button>`;
+        return `<button class="bz-pb add" style="${beanVars(f.type)}" data-act="${act}" data-i="${i}"><span class="bz-pb-art">${beanSvg(f.type)}</span><span class="bz-pb-t"><span class="bz-pb-no">밭 ${i + 1} · 같은 콩</span><b>×${f.count} → ×${f.count + 1}</b><small>수확 시 ${coin(after, 'xs')}</small></span></button>`;
       }
-      return `<button class="bz-pb blocked" style="${beanVars(f.type)}" disabled><span class="bz-pb-no">밭 ${i + 1}</span><span class="bz-pb-art">${beanSvg(f.type)}</span><b>다른 콩</b><small>먼저 수확해야 해요</small></button>`;
+      return `<button class="bz-pb blocked" style="${beanVars(f.type)}" disabled><span class="bz-pb-art">${beanSvg(f.type)}</span><span class="bz-pb-t"><span class="bz-pb-no">밭 ${i + 1}</span><b>다른 콩</b><small>수확 먼저</small></span></button>`;
     });
     const blocked = m.fields.every((f) => f.type !== null && f.count && f.type !== card.type);
     return `<div class="bz-pbs">${btns.join('')}</div>${blocked ? '<p class="bz-warn">심을 밭이 없어요. 위 <b>내 농장</b>에서 밭 하나를 눌러 먼저 수확하세요.</p>' : ''}`;
   }
+
+  // 아래 고정 영역 머리: 콩 그림 + 할 일 한 줄
+  const dockHead = (card, title, sub) => `<div class="bz-dock-h"><span class="bz-dock-bean" style="${beanVars(card.type)}">${beanSvg(card.type)}</span><div><b>${title}</b><small>${sub}</small></div></div>`;
 
   function dock() {
     const s = st();
@@ -265,13 +305,13 @@
       const card = S.hand[0];
       if (!card) return '';
       const second = S.plantCount >= 1;
-      return `<div class="bz-dock-plant">${bean(card, { front: true, tag: '맨 앞', tagCls: 'front' })}
-          <div><b>${second ? '다음 카드도 심을까요? (선택)' : '맨 앞 카드를 꼭 심어요'}</b><small>${tname(card.type)} · 어느 밭에 심을지 골라요</small></div></div>
+      return `${dockHead(card, second ? `2번째 카드 ${tname(card.type)}도 심을까요? (선택)` : `맨 앞 ${josa(tname(card.type), '을', '를')} 꼭 심어요`, '심을 밭을 골라요 · 한 밭에는 한 종류만')}
         ${fieldButtons(card, 'bzPlantHand')}
-        ${second ? '<button class="ghost" data-act="bzSkip">그만 심고 카드 2장 펼치기 ▶</button>' : ''}`;
+        ${second ? '<button class="bz-skip" data-act="bzSkip">그만 심고 카드 2장 펼치기 ▶</button>' : ''}`;
     }
     if (m === 'tradeA') {
-      return `<p class="bz-dock-msg">제안이 오면 위에서 <b>수락</b>할 수 있어요. 거래를 마치면 남은 펼친 카드는 내가 심어요.</p>
+      const n = S.proposals.length;
+      return `<p class="bz-dock-msg">${n ? `📨 제안 <b>${n}건</b>이 왔어요. 위에서 <b>수락/거절</b>해요.` : '제안을 기다리는 중이에요.'}<br><small>거래를 마치면 남은 펼친 카드 ${S.faceUp.length}장은 내가 심어요.</small></p>
         <button class="primary" data-act="bzEndTrade">거래 끝내기 ✋</button>`;
     }
     if (m === 'tradeB') {
@@ -283,7 +323,7 @@
     if (m === 'plantAll') {
       const card = S.table.find((c) => c.id === s.table);
       return card
-        ? `<div class="bz-dock-plant">${bean(card, { size: 'sm' })}<div><b>${josa(tname(card.type), '을', '를')} 심을 밭</b><small>남은 카드 ${S.table.length}장 · 모두 심어야 해요</small></div></div>${fieldButtons(card, 'bzPlantTable')}`
+        ? `${dockHead(card, `받은 ${josa(tname(card.type), '을', '를')} 심을 밭`, `남은 카드 ${S.table.length}장 · 모두 심어야 해요`)}${fieldButtons(card, 'bzPlantTable')}`
         : '<p class="bz-dock-msg">위의 <b>꼭 심어야 할 카드</b>를 눌러 고른 뒤 밭을 고르세요.</p>';
     }
     if (m === 'over') return '';
@@ -311,18 +351,18 @@
     const isHost = S.hostId === S.me;
     const log = S.log.length ? `<div class="ulog bz-log">${S.log.slice(-4).reverse().map((l, i) => `<div class="${i === 0 ? 'new' : ''}">${esc(l)}</div>`).join('')}</div>` : '';
     return `
-    <div class="top bz-top"><span>${roomTag()}</span><span>🫘 보난자 · ${stepText()}</span></div>
+    <div class="top"><span>${roomTag()}</span><span class="bz-top">🫘 보난자 · ${stepText()}</span></div>
     ${overHtml(isHost)}
-    ${deckBar()}
+    ${statusHtml()}
     ${opponentsHtml()}
     ${tradeZone()}
     ${myFarm()}
     ${tableHtml()}
     ${handHtml()}
     ${log}
+    ${isHost ? '<div class="foot bz-foot"><button class="sm ghost" data-act="hostmenu">⚙ 방장 메뉴</button></div>' : ''}
     <div class="bdock bz-dock">
       ${dock()}
-      ${isHost ? '<div class="foot"><button data-act="hostmenu">⚙ 방장</button></div>' : ''}
     </div>
     ${ui.hostOpen && isHost ? genericHostMenu('멈춘 곳 대신 진행 (대신 심기 / 거래 끝내기)', '자리를 비운 사람 대신 진행할까요? (대신 심고, 거래를 끝내요)') : ''}`;
   }

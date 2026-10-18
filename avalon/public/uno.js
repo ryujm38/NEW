@@ -88,26 +88,40 @@ function unoNextId() {
   return ti >= 0 && n > 1 ? S.players[(((ti + S.dir) % n) + n) % n].id : null;
 }
 
+// 차례 띠: 나부터 앉은 순서(정방향 기준)로 늘어놓는다. 자리는 고정, 화살표가 지금 도는 방향을 보여 준다.
 function unoSeatsHtml(over) {
   const nextId = over ? null : unoNextId();
-  return S.players.map((p) => {
+  const w = S.unoWindow;
+  const mi = Math.max(0, S.players.findIndex((p) => p.id === S.me));
+  const order = [...S.players.slice(mi), ...S.players.slice(0, mi)];
+  const cols = Math.min(order.length, 5);
+  const chips = order.map((p, i) => {
     const cls = ['uno-seat'];
     if (p.id === S.turnId) cls.push('turn');
+    else if (p.id === nextId) cls.push('next');
     if (p.id === S.me) cls.push('me');
-    if (p.count === 1 && !over) cls.push('last');
+    if (!over && p.count === 1) cls.push('last');
+    if (!p.connected) cls.push('off');
     if (over && p.id === S.winnerId) cls.push('win');
+    const catchable = !over && w && !w.called && w.id === p.id;
     let badge = '';
-    if (p.id === S.turnId) badge = '<em class="us-badge now">차례</em>';
+    if (over && p.id === S.winnerId) badge = '<em class="us-badge now">🏆 승리</em>';
+    else if (p.id === S.turnId) badge = '<em class="us-badge now">차례</em>';
     else if (p.id === nextId) badge = '<em class="us-badge next">다음</em>';
-    else if (over && p.id === S.winnerId) badge = '<em class="us-badge now">승리</em>';
-    const fan = Array.from({ length: Math.min(p.count, 5) }, (_, i) => `<i style="--k:${i}"></i>`).join('');
+    let alert = '';
+    if (catchable) alert = '<em class="us-alert catch">🚨 안 외침</em>';
+    else if (!over && p.count === 1) alert = '<em class="us-alert">우노!</em>';
+    // 자리 사이 화살표: 마지막 칸이 아니고 같은 줄 안일 때만
+    const arrow = i < order.length - 1 && (i + 1) % cols !== 0 ? `<i class="us-arrow" aria-hidden="true">${S.dir === 1 ? '›' : '‹'}</i>` : '';
     return `<div class="${cls.join(' ')}" style="--h:${unoHue(p.name)}">
       ${badge}
       <span class="us-av">${esc([...p.name][0] || '?')}<span class="dot ${p.connected ? '' : 'off'}"></span></span>
-      <span class="us-nm">${esc(p.name)}${p.id === S.me ? ' <small>나</small>' : ''}</span>
-      <span class="us-cards"><span class="us-fan">${fan}</span><b>${p.count}장</b>${p.wins ? `<span class="us-win">🏆${p.wins}</span>` : ''}</span>
+      <span class="us-nm">${p.id === S.me ? '나' : esc(p.name)}</span>
+      <span class="us-cnt"><b>${p.count}</b><small>장</small></span>
+      ${alert}${p.wins ? `<span class="us-win">🏆${p.wins}</span>` : ''}${arrow}
     </div>`;
   }).join('');
+  return `<div class="uno-seats" style="--cols:${cols}">${chips}</div>`;
 }
 
 // 손패를 한 줄 최대 7장씩 부채꼴로 나눈다 (겹쳐도 한 장당 40px 넘게 보이게)
@@ -147,19 +161,22 @@ function renderUno() {
   const over = S.phase === 'over';
   const turnP = S.players.find((p) => p.id === S.turnId);
   const w = S.unoWindow;
-  const anyPlayable = S.hand.some((c) => c.playable);
+  const playableN = S.hand.filter((c) => c.playable).length;
+  const anyPlayable = playableN > 0;
+  const nextId = over ? null : unoNextId();
+  const nextP = S.players.find((p) => p.id === nextId);
 
   let status;
   if (over) {
     const winner = S.players.find((p) => p.id === S.winnerId);
-    status = `<div class="uno-status win"><b>🎉 ${esc(winner ? winner.name : '?')}님 승리!</b><small>${S.winnerId === S.me ? '카드를 모두 털어냈어요!' : '다음 판엔 내가 이겨 봐요'}</small></div>`;
+    status = `<div class="uno-status win"><b>🎉 ${S.winnerId === S.me ? '내가' : `${esc(winner ? winner.name : '?')}님이`} 이겼어요!</b><small>${S.winnerId === S.me ? '카드를 모두 털어냈어요!' : '다음 판엔 내가 이겨 봐요'}</small></div>`;
   } else if (myTurn) {
-    const sub = S.drewId !== null ? '뽑은 카드를 내거나 넘기세요'
-      : anyPlayable ? '빛나는 카드 중 하나를 골라 내세요' : '낼 카드가 없어요. 더미에서 1장 뽑으세요';
+    const sub = S.drewId !== null ? '방금 뽑은 카드를 내거나 넘기세요'
+      : anyPlayable ? `반짝이는 카드 ${playableN}장 중 하나를 골라 내세요` : '낼 카드가 없어요. 더미에서 1장 뽑으세요';
     status = `<div class="uno-status mine"><b>내 차례예요!</b><small>${sub}</small></div>`;
   } else {
-    const nextMe = unoNextId() === S.me;
-    status = `<div class="uno-status"><b>${esc(turnP ? turnP.name : '')}님 차례</b><small>${nextMe ? '다음이 내 차례예요' : '잠시 기다려요'}</small></div>`;
+    const sub = nextId === S.me ? '<em>다음이 내 차례예요!</em> 낼 카드를 미리 봐 두세요' : `다음은 ${esc(nextP ? nextP.name : '')}님`;
+    status = `<div class="uno-status"><b><span class="us-dot" style="--h:${unoHue(turnP ? turnP.name : '')}"></span>${esc(turnP ? turnP.name : '')}님 차례</b><small>${sub}</small></div>`;
   }
 
   const topAnim = S.top && UNO_ANIM.topAt ? unoAnimStyle(UNO_ANIM.topAt) : null;
@@ -167,12 +184,12 @@ function renderUno() {
   const center = `
     <div class="uno-table c-${S.color || 'w'}">
       <div class="uno-dir ${S.dir === 1 ? 'cw' : 'ccw'}">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19.5 12a7.5 7.5 0 0 1-12.8 5.3"/><path d="M4.5 12a7.5 7.5 0 0 1 12.8-5.3"/><path d="m17.6 3.2-.3 3.6-3.6-.3"/><path d="m6.4 20.8.3-3.6 3.6.3"/></g></svg>
-        <small>${S.dir === 1 ? '정방향' : '역방향'}</small>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19.5 12a7.5 7.5 0 0 1-12.8 5.3"/><path d="M4.5 12a7.5 7.5 0 0 1 12.8-5.3"/><path d="m17.6 3.2-.3 3.6-3.6-.3"/><path d="m6.4 20.8.3-3.6 3.6.3"/></g></svg>
+        <small>${S.dir === 1 ? '정방향 ›' : '‹ 역방향'}</small>
       </div>
       <button class="uno-pile ${canDraw && !anyPlayable ? 'hot' : ''}" data-act="unoDraw" ${canDraw ? '' : 'disabled'} aria-label="카드 1장 뽑기">
         <span class="up-stack">${unoBackHtml('b3')}${unoBackHtml('b2')}${unoBackHtml('b1')}</span>
-        <small>${canDraw ? '탭해서 뽑기' : '뽑는 더미'} · ${S.drawCount}장</small>
+        <small>${canDraw ? '<b>탭해서 뽑기</b>' : '뽑는 더미'}<br>${S.drawCount}장 남음</small>
       </button>
       <div class="uno-discard">
         <span class="ud-stack">
@@ -180,12 +197,12 @@ function renderUno() {
           <span class="ud-ghost g1"></span><span class="ud-ghost g2"></span>
           ${S.top ? unoCardHtml(S.top, { cls: `big${topAnim ? ' uno-land' : ''}`, style: topAnim }) : ''}
         </span>
-        <span class="uno-color c-${S.color}"><i></i>지금 색 <b>${esc(UNO_COLOR_NAME[S.color] || '')}</b></span>
       </div>
+      <div class="uno-color c-${S.color}"><i></i><span>지금 색</span><b>${esc(UNO_COLOR_NAME[S.color] || '')}</b></div>
     </div>`;
 
   const log = S.log.length
-    ? `<div class="uno-log">${S.log.slice(-3).reverse().map((l, i) => `<div class="${i === 0 ? 'new' : ''}">${esc(l)}</div>`).join('')}</div>`
+    ? `<div class="uno-log" aria-live="polite">${S.log.slice(-2).reverse().map((l, i) => `<div class="${i === 0 ? 'new' : ''}">${esc(l)}</div>`).join('')}</div>`
     : '';
 
   let actions = '';
@@ -204,7 +221,7 @@ function renderUno() {
 
   const selCard = S.hand.find((c) => c.id === ui.unoSel);
   const playBtn = selCard && selCard.playable && !over
-    ? `<button class="uno-play" data-act="unoPlay">${esc(unoCardName(selCard))} 내기${selCard.color === 'w' ? ' · 색 고르기' : ''}</button>`
+    ? `<button class="uno-play c-${selCard.color}" data-act="unoPlay"><i></i>${esc(unoCardName(selCard))} 내기${selCard.color === 'w' ? ' · 색 고르기' : ''}</button>`
     : '';
 
   let overPanel = '';
@@ -220,19 +237,20 @@ function renderUno() {
     </div>`;
   }
 
+  const handLbl = `내 손패 <b>${S.hand.length}</b>장${myTurn && !over ? ` · <span class="${anyPlayable ? 'ok' : ''}">낼 수 있는 카드 ${playableN}장</span>` : ''}`;
   return `<div class="uno-scr">
   <div class="top"><span>${roomTag()}</span><span>🃏 우노 · ${S.gameNo}번째 판</span></div>
-  <div class="uno-seats">${unoSeatsHtml(over)}</div>
+  ${unoSeatsHtml(over)}
   ${center}
+  ${log}
   ${status}
   ${overPanel}
   <div class="uno-dock ${myTurn ? 'mine' : ''}">
     ${actions}
     ${playBtn}
-    ${over && !S.hand.length ? '' : `<div class="uno-hand ${over ? 'dimmed' : ''}"><span class="uno-hand-lbl">내 손패 ${S.hand.length}장</span>${unoHandHtml(myTurn)}</div>`}
+    ${over && !S.hand.length ? '' : `<div class="uno-hand ${over ? 'dimmed' : ''}"><span class="uno-hand-lbl">${handLbl}</span>${unoHandHtml(myTurn)}</div>`}
   </div>
-  ${log}
-  ${isHost ? '<div class="foot"><button data-act="hostmenu">⚙ 방장</button></div>' : ''}
+  ${isHost ? '<div class="foot"><button data-act="hostmenu">⚙ 방장 메뉴</button></div>' : ''}
   ${ui.colorOpen ? unoColorSheetHtml() : ''}
   ${ui.hostOpen && isHost ? unoHostMenuHtml() : ''}
   </div>`;

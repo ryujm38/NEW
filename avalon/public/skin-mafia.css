@@ -1,4 +1,6 @@
-/* mafia 화면 꾸미기 — 누아르 도시: 밤은 남색 하늘과 달, 낮은 따뜻한 햇빛, 투표는 노을 */
+/* mafia 화면 꾸미기 — 누아르 도시: 밤은 남색 하늘과 달, 낮은 따뜻한 햇빛, 투표는 노을
+   짜임: 풍경 띠(낮/밤·며칠째·생존 수) → 사건 두 줄 → 지금 단계 → 사람 목록/채팅 → 아래에 붙은 행동 버튼
+   비밀 보호: 밤 화면, 고르는 칸, 확정 버튼, 채팅 칸, 내 역할 표시는 역할과 상관없이 모두 같은 색이다. */
 .mf {
   display: contents;
   --mf-accent: #f0b54a;
@@ -7,12 +9,12 @@
   --mf-panel: #121630e6;
   --mf-line: #2f3a72;
   --mf-dock: #0b0e1f;
-  --mf-text2: #b6bedf;
+  --mf-text2: #b9c1e2;
 }
-.mf.tone-day { --mf-panel: #2a1d16e8; --mf-line: #6a4630; --mf-dock: #1b130e; --mf-text2: #e2c9b0; }
-.mf.tone-dusk { --mf-panel: #26162ae8; --mf-line: #6a3a58; --mf-dock: #170d16; --mf-text2: #e0c0d0; }
+.mf.tone-day { --mf-panel: #2a1d16e8; --mf-line: #6a4630; --mf-dock: #1b130e; --mf-text2: #e6cfb8; }
+.mf.tone-dusk { --mf-panel: #26162ae8; --mf-line: #6a3a58; --mf-dock: #170d16; --mf-text2: #e4c6d6; }
 .mf.tone-end-citizen { --mf-panel: #1a2238e8; --mf-line: #5a6aa0; --mf-dock: #10162a; }
-.mf.tone-end-mafia { --mf-panel: #2a0c14ea; --mf-line: #7a2030; --mf-dock: #14060a; --mf-text2: #e6b8bc; }
+.mf.tone-end-mafia { --mf-panel: #2a0c14ea; --mf-line: #7a2030; --mf-dock: #14060a; --mf-text2: #e6bcc0; }
 .mf-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
 
 body:has(.mf.tone-night) { background: radial-gradient(120% 50% at 70% -5%, #24346e 0%, #121a3c 45%, transparent 80%), #0a0d1c; }
@@ -30,15 +32,14 @@ body:has(.mf.tone-end-mafia) { background: radial-gradient(120% 50% at 50% -5%, 
 .mf button.no { background: linear-gradient(180deg, #ff6b5e, #b81e2c); border-color: #ff9a8e; color: #fff; box-shadow: 0 4px 0 #5a0810, 0 8px 18px #0007; }
 .mf button.yes { background: linear-gradient(180deg, #6ee8a8, #1f9a5e); border-color: #a8f4cc; color: #05281a; box-shadow: 0 4px 0 #0a4a2a, 0 8px 18px #0007; }
 .mf button.no:active:not(:disabled), .mf button.yes:active:not(:disabled) { transform: translateY(3px); }
-.mf button.primary.mf-act.mafia { background: linear-gradient(180deg, #ff6b5e, #b81e2c); border-color: #ff9a8e; color: #fff; box-shadow: 0 4px 0 #5a0810, 0 8px 18px #0007; }
-.mf button.primary.mf-act.doctor { background: linear-gradient(180deg, #6ee8a8, #1f9a5e); border-color: #a8f4cc; color: #05281a; box-shadow: 0 4px 0 #0a4a2a, 0 8px 18px #0007; }
-.mf button.primary.mf-act.police { background: linear-gradient(180deg, #7fb0ff, #2a5ad0); border-color: #b0ccff; color: #fff; box-shadow: 0 4px 0 #0e2a6e, 0 8px 18px #0007; }
+.mf button:disabled { opacity: 1; color: var(--mf-text2); background: #ffffff0a; border-color: #ffffff22; box-shadow: none; }
 .mf .mf-abstain { flex: 0 0 30%; }
 .mf .mf-force { width: 100%; min-height: 40px; }
 .mf .foot button { background: #ffffff0c; border-color: var(--mf-line); }
+.mf .progress { color: var(--mf-text2); margin: 0; }
 
 /* 위쪽 풍경 띠 */
-.mf-hero { position: relative; height: 112px; border-radius: 18px; overflow: hidden; border: 1px solid var(--mf-line); box-shadow: 0 10px 28px #0009;
+.mf-hero { position: relative; height: 84px; flex: none; border-radius: 18px; overflow: hidden; border: 1px solid var(--mf-line); box-shadow: 0 10px 28px #0009;
   background: linear-gradient(180deg, #08102e 0%, #17245a 65%, #2a3478 100%); }
 .mf-scene { position: absolute; inset: 0; width: 100%; height: 100%; }
 .mf-scene .mf-stars { fill: #fff; opacity: 0.8; }
@@ -78,25 +79,26 @@ body:has(.mf.tone-end-mafia) { background: radial-gradient(120% 50% at 50% -5%, 
 .tone-end-mafia .mf-scene .mf-far { fill: #3a0810; }
 .tone-end-mafia .mf-scene .mf-near { fill: #0c0204; }
 .tone-end-mafia .mf-scene .mf-win { fill: #ff5a4e; opacity: 0.7; }
-.mf-hero-t { position: absolute; left: 14px; top: 12px; right: 120px; display: grid; gap: 2px; text-shadow: 0 2px 6px #000c; }
-.mf-hero-t b { font-size: 21px; font-weight: 900; color: #fff; letter-spacing: -0.02em; }
-.mf-hero-t small { font-size: 12.5px; font-weight: 600; color: #f1ecff; }
-.tone-day .mf-hero-t b, .tone-end-citizen .mf-hero-t b { color: #2a1406; text-shadow: 0 1px 0 #fff8; }
-.tone-day .mf-hero-t small, .tone-end-citizen .mf-hero-t small { color: #4a2a14; text-shadow: none; }
+.mf-hero-t { position: absolute; left: 8px; top: 8px; max-width: calc(100% - 104px); display: grid; gap: 1px; padding: 5px 12px 6px; border-radius: 12px; background: #000000a0; backdrop-filter: blur(3px); text-shadow: 0 1px 3px #000c; }
+.mf-hero-t b { font-size: 20px; font-weight: 900; color: #fff; letter-spacing: -0.02em; line-height: 1.25; }
+.mf-hero-t small { font-size: 13px; font-weight: 600; color: #f1ecff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 생존 수 (공개 정보) */
+.mf-alive { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 4px; padding: 6px 10px 6px 12px; border-radius: 14px; background: #000a; border: 1px solid #ffffff33; backdrop-filter: blur(4px); color: #fff; }
+.mf-alive b { font-size: 26px; font-weight: 900; line-height: 1; }
+.mf-alive small { font-size: 11px; font-weight: 700; line-height: 1.2; color: #e6e8f6; }
 
-/* 내 역할 띠 (풍경 위 오른쪽 아래) */
-.mf .mbanner { position: absolute; right: 8px; bottom: 8px; display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px 3px 4px; border-radius: 999px; font-size: 12.5px; color: #fff; background: #000a; border: 1px solid #ffffff3a; backdrop-filter: blur(4px); text-align: left; }
-.mf .mbanner .mf-art { width: 24px; height: 24px; }
-.mf .mbanner.mafia { border-color: #ff5a4e99; }
-.mf .mbanner.police { border-color: #6fa8ff99; }
-.mf .mbanner.doctor { border-color: #5ee0a099; }
-.mf .mbanner.citizen { border-color: #ffd27a99; }
-.mf .mbanner.dead { filter: grayscale(0.8); }
+/* 사건 두 줄 (누르면 전체 일지) */
+.mf .mf-ticker { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 7px 12px; border-radius: 14px; text-align: left; font-size: 13px; font-weight: 600; background: #0007; border: 1px solid var(--mf-line); color: var(--mf-text2); }
+.mf-ticker .h { flex: none; font-size: 18px; }
+.mf-ticker .l { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.mf-ticker .l span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mf-ticker .l .new { color: #fff; font-weight: 800; }
+.mf-ticker i { flex: none; font-style: normal; font-size: 12px; font-weight: 800; color: var(--mf-accent); }
 
 /* 패널 */
-.mf-panel { position: relative; display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 18px; background: var(--mf-panel); border: 1px solid var(--mf-line); box-shadow: 0 12px 28px #0009, inset 0 1px 0 #ffffff12; }
+.mf-panel { position: relative; display: flex; flex-direction: column; gap: 9px; padding: 12px 13px; border-radius: 18px; background: var(--mf-panel); border: 1px solid var(--mf-line); box-shadow: 0 12px 28px #0009, inset 0 1px 0 #ffffff12; }
 .mf-panel > p { margin: 0; }
-.mf-ph { display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 17px; font-weight: 800; color: var(--mf-accent); }
+.mf-ph { display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 16px; font-weight: 800; color: var(--mf-accent); }
 .mf-ph::before, .mf-ph::after { content: ''; flex: 1; max-width: 60px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, #f0b54a); }
 .mf-ph::after { transform: scaleX(-1); }
 .mf-big { text-align: center; font-size: 21px; font-weight: 900; line-height: 1.3; margin: 0; }
@@ -105,85 +107,85 @@ body:has(.mf.tone-end-mafia) { background: radial-gradient(120% 50% at 50% -5%, 
 .mf-big.ok { color: #7ef0b4; text-shadow: 0 0 16px #5ee0a066; }
 .mf-big.xl { font-size: 30px; }
 .mf-gold { color: var(--mf-accent); font-weight: 700; }
-.mf .dim { color: var(--mf-text2); opacity: 0.85; }
+.mf .dim { color: var(--mf-text2); opacity: 0.9; }
+.mf-role-line { margin: 0; text-align: center; font-size: 13px; line-height: 1.45; color: var(--mf-text2); }
 .mf-prog { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--mf-text2); }
 .mf-prog i { flex: 1; height: 8px; border-radius: 99px; background: #ffffff14; overflow: hidden; }
 .mf-prog i b { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #f0b54a, #ffd27a); transition: width 0.3s; }
 
 /* 아침 소식(신문 머리기사) */
-.mf-news { display: grid; gap: 3px; padding: 12px 14px; border-radius: 12px; text-align: center; color: #2a1c10; background: linear-gradient(180deg, #f6ecd6, #e4d2ae); box-shadow: inset 0 0 0 1px #00000022, 0 4px 10px #0006; }
-.mf-news small { font-size: 11px; font-weight: 800; letter-spacing: 0.08em; color: #7a5a3a; border-bottom: 1px solid #7a5a3a55; padding-bottom: 3px; }
-.mf-news > b { font-size: 20px; font-weight: 900; letter-spacing: -0.02em; font-family: 'Batang', 'Nanum Myeongjo', 'Noto Serif KR', Georgia, serif; }
+.mf-news { display: grid; gap: 2px; padding: 8px 12px; border-radius: 12px; text-align: center; color: #2a1c10; background: linear-gradient(180deg, #f6ecd6, #e4d2ae); box-shadow: inset 0 0 0 1px #00000022, 0 4px 10px #0006; }
+.mf-news small { font-size: 11px; font-weight: 800; letter-spacing: 0.08em; color: #6e5032; border-bottom: 1px solid #7a5a3a55; padding-bottom: 3px; }
+.mf-news > b { font-size: 19px; font-weight: 900; letter-spacing: -0.02em; font-family: 'Batang', 'Nanum Myeongjo', 'Noto Serif KR', Georgia, serif; }
 .mf-news p { margin: 0; font-size: 13px; color: #4a3420; }
 .mf-news.kill > b { color: #a01a24; }
 .mf-news.save > b { color: #14794a; }
 
-/* 역할 카드 */
-.mf-card { position: relative; width: 100%; max-width: 300px; margin: 0 auto; padding: 3px; border-radius: 18px; --c1: #ff5a4e; --c2: #3a0610;
-  background: linear-gradient(150deg, var(--c1), var(--c2) 45%, var(--c1) 70%, var(--c2)); box-shadow: 0 16px 40px #000c; }
-.mf-card.police { --c1: #7fb0ff; --c2: #0e2a6e; }
-.mf-card.doctor { --c1: #6ee8a8; --c2: #0a4a2a; }
-.mf-card.citizen { --c1: #ffd27a; --c2: #6a3a14; }
+/* 역할 카드: 모든 역할이 같은 흑백 누아르 사진 톤 */
+.mf-card { position: relative; width: 100%; max-width: 300px; margin: 0 auto; padding: 3px; border-radius: 18px;
+  background: linear-gradient(150deg, #d8d2c4, #4a4852 40%, #bdb6a6 65%, #2e2c34); box-shadow: 0 14px 34px #000c; }
 .mf-card-in { position: relative; overflow: hidden; border-radius: 15px; padding: 12px 14px 14px; text-align: center;
-  background: radial-gradient(110% 70% at 50% 30%, color-mix(in srgb, var(--c2) 70%, #fff 6%) 0%, #0c0c14 85%); }
-.mf-card-in::before { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0.18;
+  background: radial-gradient(110% 70% at 50% 30%, #3a3a46 0%, #15151c 85%); }
+.mf-card-in::before { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0.14;
   background: repeating-linear-gradient(90deg, #fff 0 1px, transparent 1px 22px), repeating-linear-gradient(0deg, #fff 0 1px, transparent 1px 22px); mask: radial-gradient(circle at 50% 35%, #000 0, transparent 70%); }
-.mf-card-top { position: relative; display: flex; justify-content: space-between; font-size: 11px; font-weight: 800; letter-spacing: 0.12em; color: var(--c1); }
-.mf-card-top span:first-child { padding: 0 6px; border: 1.5px solid var(--c1); border-radius: 4px; transform: rotate(-4deg); }
-.mf-card-art { position: relative; height: 146px; display: grid; place-items: center; }
-.mf-card-art .mf-art { height: 100%; width: auto; filter: drop-shadow(0 8px 14px #000a); }
-.mf-card-name { position: relative; font-size: 30px; font-weight: 900; color: #fff; letter-spacing: 0.04em; text-shadow: 0 2px 0 #0009, 0 0 18px color-mix(in srgb, var(--c1) 60%, transparent); }
-.mf-card-team { position: relative; display: inline-block; margin-top: 2px; padding: 1px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; color: #0c0c14; background: var(--c1); }
+.mf-card-top { position: relative; display: flex; justify-content: space-between; font-size: 11px; font-weight: 800; letter-spacing: 0.12em; color: #d8d2c4; }
+.mf-card-top span:first-child { padding: 0 6px; border: 1.5px solid #d8d2c4; border-radius: 4px; transform: rotate(-4deg); }
+.mf-card-art { position: relative; height: 104px; display: grid; place-items: center; }
+.mf-card-art .mf-art { height: 100%; width: auto; filter: grayscale(1) contrast(1.15) brightness(1.05) drop-shadow(0 8px 14px #000a); }
+.mf-card-name { position: relative; font-size: 26px; font-weight: 900; color: #fff; letter-spacing: 0.04em; text-shadow: 0 2px 0 #0009; }
+.mf-card-team { position: relative; display: inline-block; margin-top: 2px; padding: 1px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; color: #15151c; background: #d8d2c4; }
 .mf-card-desc { position: relative; margin-top: 10px; padding: 9px 11px; border-radius: 10px; text-align: left; font-size: 13.5px; line-height: 1.55; color: #e8e8f2; background: #0008; }
-.mf-mates { position: relative; margin-top: 8px; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
-.mf-mates .t { width: 100%; font-size: 12px; color: #ffb0a6; font-weight: 700; }
-.mf-mate { font-size: 15px; font-weight: 800; padding: 3px 12px; border-radius: 999px; color: #ffe0db; background: #5a0a16; border: 1px solid #ff5a4e; }
+.mf-mates { position: relative; margin-top: 8px; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; padding: 8px; border-radius: 10px; background: #0006; border: 1px solid #ffffff1a; }
+.mf-mates .t { width: 100%; font-size: 12px; color: #cfcad8; font-weight: 700; }
+.mf-mate { font-size: 15px; font-weight: 800; padding: 3px 12px; border-radius: 999px; color: #f0ece4; background: #ffffff12; border: 1px solid #d8d2c488; }
 .mf-mate.dead { opacity: 0.6; text-decoration: line-through; }
+.mf-none { font-size: 13px; color: #cfcad8; }
 .mf-card.mf-anim { animation: mfReveal 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: var(--ad, 0ms); }
 .mf-comp { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; align-items: center; }
 .mf-comp > div { width: 100%; text-align: center; }
 
-/* 역할 꼬리표 */
-.mf-rtag { display: inline-flex; align-items: center; gap: 3px; padding: 1px 8px 1px 2px; border-radius: 999px; font-size: 12px; font-weight: 800; white-space: nowrap; color: #ffd8d2; background: #5a0a16cc; border: 1px solid #ff5a4e88; }
-.mf-rtag .mf-art { width: 20px; height: 20px; }
+/* 역할 꼬리표: 공개된 역할(죽은 사람·게임 끝)만 역할 색, 비밀(나·동료)은 무채색 */
+.mf-rtag { display: inline-flex; align-items: center; gap: 3px; padding: 0 8px 0 2px; border-radius: 999px; font-size: 12px; font-weight: 800; white-space: nowrap; color: #ffd8d2; background: #5a0a16cc; border: 1px solid #ff5a4e88; }
+.mf-rtag .mf-art { width: 18px; height: 18px; }
 .mf-rtag.police { color: #d8e6ff; background: #132c6ecc; border-color: #6fa8ff88; }
 .mf-rtag.doctor { color: #d6fbe8; background: #0e4a2ecc; border-color: #5ee0a088; }
 .mf-rtag.citizen { color: #ffeccc; background: #5a3a14cc; border-color: #ffd27a88; }
+.mf-rtag.plain { color: #dcdce6; background: #ffffff12; border-color: #ffffff2e; }
+.mf-rtag.plain .mf-art { filter: grayscale(1) brightness(1.1); }
 
-/* 플레이어 목록 */
-.mf .mplayers { display: grid; gap: 8px; }
-.mf .mp { position: relative; display: flex; flex-wrap: nowrap; align-items: center; gap: 10px; width: 100%; min-height: 58px; padding: 8px 12px 8px 8px; text-align: left; font-size: 16px; font-weight: 500; color: var(--text);
-  border-radius: 14px; border: 1.5px solid var(--mf-line); background: var(--mf-panel); box-shadow: 0 3px 8px #0006; overflow: hidden; }
-.mf .mp .mf-pn { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; }
-.mf .mp .mf-pn b { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
-.mf .mp .mf-pn small { font-size: 11px; font-weight: 600; color: var(--mf-text2); }
-.mf .mp .mstate { margin-left: auto; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
-.mf .mp .mk { font-size: 11.5px; font-weight: 800; padding: 2px 8px; border-radius: 999px; background: #ffffff12; color: var(--mf-text2); white-space: nowrap; }
-.mf .mp .mk.red { background: #8e0f1c88; color: #ffd2cc; }
-.mf .mp .mk.green { background: #0e4a2e99; color: #b8f6d6; }
-.mf .mp .mk.gold { background: #f0b54a33; color: #ffd27a; }
-.mf .mp.me { border-color: color-mix(in srgb, var(--mf-line) 50%, #fff 30%); }
-.mf-ava { position: relative; flex: none; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-size: 17px; font-weight: 900; color: #fff; text-shadow: 0 1px 2px #0009;
+/* 사람 목록: 2줄 격자 */
+.mf .mplayers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.mf .mp { position: relative; display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; width: 100%; min-height: 54px; margin: 0; padding: 6px 8px; text-align: left; font-size: 15px; font-weight: 500; color: var(--text);
+  border-radius: 13px; border: 1.5px solid var(--mf-line); background: var(--mf-panel); box-shadow: 0 3px 8px #0006; overflow: hidden; }
+.mf .mp .mf-pn { flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; }
+.mf .mp .mf-pn b { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; line-height: 1.25; }
+.mf .mp .mf-pn b small { font-size: 11px; font-weight: 600; color: var(--mf-text2); }
+.mf-st { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 5px; max-width: 100%; font-size: 12px; font-weight: 700; color: var(--mf-text2); line-height: 1.35; }
+.mf-st > span:not(.mf-rtag) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.mf .mp.me { border-color: color-mix(in srgb, var(--mf-line) 45%, #fff 35%); }
+.mf-ava { position: relative; flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-size: 15px; font-weight: 900; color: #fff; text-shadow: 0 1px 2px #0009;
   background: radial-gradient(circle at 35% 30%, hsl(var(--h, 30) 70% 66%), hsl(var(--h, 30) 55% 28%)); box-shadow: inset 0 0 0 2px #ffffff26, 0 2px 6px #0008; }
-.mf-ava .dot { position: absolute; right: -1px; bottom: -1px; width: 11px; height: 11px; border: 2px solid #0c0c14; }
-.mf-ava.xl { width: 58px; height: 58px; font-size: 24px; }
-.mf .mp.dead { opacity: 0.55; background: #0c0c12cc; }
+.mf-ava .dot { position: absolute; right: -2px; bottom: -2px; width: 11px; height: 11px; border: 2px solid #0c0c14; }
+.mf-ava.xl { width: 56px; height: 56px; font-size: 24px; }
+.mf .mp.dead { opacity: 0.6; background: #0c0c12cc; border-style: dashed; }
 .mf .mp.dead .mf-ava { filter: grayscale(1); background: #3a3a44; }
-.mf .mp.dead .mf-pn b { text-decoration: line-through; text-decoration-color: #ff5a4e; }
-.mf-dead { position: absolute; right: 10px; top: 50%; transform: translateY(-50%) rotate(-12deg); padding: 0 8px; border: 2px solid #ff5a4ecc; border-radius: 5px; font-size: 13px; font-weight: 900; letter-spacing: 0.15em; color: #ff5a4ecc; pointer-events: none; }
-.mf .mp.dead .mstate { margin-right: 54px; }
-/* 밤에 고르는 칸은 역할과 상관없이 같은 색: 옆 사람이 화면 색만 보고 역할을 알아채지 못하게 */
-.mf .mp.pick { cursor: pointer; border-color: #f0b54a; border-style: dashed; background: color-mix(in srgb, var(--mf-panel) 80%, #f0b54a 12%); }
-.mf .mp.sel { border-style: solid; border-width: 2px; border-color: #fff; box-shadow: 0 0 0 3px #ffffff55, 0 0 18px #f0b54a88; }
-.mf-check { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-weight: 900; color: #1a1206; background: #fff; }
-.mf .mp.accused { border-color: #ff5a4e; box-shadow: 0 0 0 2px #ff5a4e66, 0 0 18px #ff5a4e55; }
+.mf .mp.dead .mf-pn b { text-decoration: line-through; text-decoration-color: #ff5a4ecc; }
+/* 고르는 칸: 밤이든 투표든, 어떤 역할이든 같은 색 */
+.mf .mp.pick { cursor: pointer; border-color: #f0b54a; border-style: dashed; background: color-mix(in srgb, var(--mf-panel) 82%, #f0b54a 12%); }
+.mf .mp.sel { border-style: solid; border-width: 2px; border-color: #fff; box-shadow: 0 0 0 3px #ffffff55, 0 0 16px #f0b54a88; }
+.mf-check { flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-weight: 900; color: #1a1206; background: #fff; }
+.mf .mp.accused { border-color: #ff5a4e; box-shadow: 0 0 0 2px #ff5a4e66, 0 0 16px #ff5a4e55; }
+/* 받은 표 수 */
+.mf-cnt { flex: none; display: flex; align-items: baseline; gap: 1px; padding: 2px 8px; border-radius: 10px; font-size: 18px; font-weight: 900; color: #2a1804; background: linear-gradient(180deg, #ffd27a, #e09a2e); }
+.mf-cnt small { font-size: 11px; font-weight: 800; }
+.mf .mp.accused .mf-cnt { color: #fff; background: linear-gradient(180deg, #ff6b5e, #b81e2c); }
 
 /* 찬반 투표 */
 .mf-accused { display: flex; align-items: center; justify-content: center; gap: 14px; }
 .mf-accused > div { display: grid; }
 .mf-accused small { font-size: 12px; font-weight: 800; color: #ff9a8e; letter-spacing: 0.08em; }
 .mf-accused b { font-size: 24px; font-weight: 900; color: #fff; }
-.mf-accused span:not(.mf-ava) { font-size: 12.5px; color: var(--mf-text2); }
+.mf-accused span:not(.mf-ava) { font-size: 13px; color: var(--mf-text2); }
 .mf-panel.trial { border-color: #ff5a4e88; }
 
 /* 투표 결과 막대 */
@@ -201,56 +203,61 @@ body:has(.mf.tone-end-mafia) { background: radial-gradient(120% 50% at 50% -5%, 
 .mf-split .k { background: linear-gradient(180deg, #ff6b5e, #a01a24); color: #fff; }
 .mf-split .s { background: linear-gradient(180deg, #6ee8a8, #1f8a52); color: #05281a; }
 .mf-who summary { font-size: 13px; color: var(--mf-text2); }
-.mf-who div { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12.5px; padding-top: 4px; }
+.mf-who div { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 13px; padding-top: 4px; }
 
-/* 채팅 */
+/* 채팅: 밤에도 모두 같은 모양 */
 .mf-chat { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-radius: 16px; background: var(--mf-panel); border: 1px solid var(--mf-line); }
-.mf-chat.red { border-color: #ff5a4e88; background: linear-gradient(180deg, #2a0a14e8, #14060ae8); }
-.mf-chat-h { font-size: 12.5px; font-weight: 800; color: var(--mf-text2); }
-.mf .mchat { height: 168px; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; padding: 8px; border-radius: 12px; background: #0006; font-size: 14px; }
+.mf-chat-h { font-size: 13px; font-weight: 800; color: var(--mf-text2); }
+.mf .mchat { height: 150px; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; padding: 8px; border-radius: 12px; background: #0006; font-size: 14px; }
 .mf .mchat .cl { max-width: 82%; align-self: flex-start; display: flex; flex-direction: column; gap: 1px; }
-.mf .mchat .cl b { margin: 4px 0 0 6px; font-size: 11.5px; font-weight: 800; color: hsl(var(--h, 40) 80% 72%); }
+.mf .mchat .cl b { margin: 4px 0 0 6px; font-size: 12px; font-weight: 800; color: hsl(var(--h, 40) 80% 74%); }
 .mf .mchat .cl span { padding: 6px 11px; border-radius: 14px 14px 14px 4px; background: #ffffff1a; color: #f2f2f8; line-height: 1.4; word-break: break-word; }
-.mf .mchat .cl.mafia span { background: #8e0f1c99; }
-.mf .mchat .cl.mafia b { color: #ff9a8e; }
 .mf .mchat .cl.mine { align-self: flex-end; }
 .mf .mchat .cl.mine span { border-radius: 14px 14px 4px 14px; background: linear-gradient(180deg, #ffd27a, #e8a23e); color: #2a1804; }
-.mf .mchat .cl.mafia.mine span { background: linear-gradient(180deg, #ff6b5e, #b81e2c); color: #fff; }
 .mf .mchat .cl.cont { margin-top: -1px; }
+.mf-empty { margin: auto; text-align: center; font-size: 13px; color: var(--mf-text2); opacity: 0.85; }
 .mf .mrow { display: flex; gap: 8px; }
-.mf .mrow input { flex: 1; min-width: 0; border-radius: 999px; padding: 11px 16px; background: #0007; border-color: var(--mf-line); }
+.mf .mrow input { flex: 1; min-width: 0; border-radius: 999px; padding: 11px 16px; background: #0007; border-color: var(--mf-line); font-size: 16px; }
 .mf .mrow button { flex: none; width: auto; min-height: 44px; border-radius: 999px; }
 
-/* 경찰 수첩 / 사건 일지 */
-.mf-note { padding: 12px 14px; border-radius: 14px; color: #1e2a44; background: linear-gradient(180deg, #f2f5fc, #dfe6f5); border-left: 5px solid #2a5ad0; box-shadow: 0 6px 14px #0008; }
+/* 경찰 수첩 (내 역할 시트 안) / 사건 일지 시트 */
+.mf-note { padding: 12px 14px; border-radius: 14px; color: #e6e8f2; background: #ffffff0c; border: 1px solid #ffffff22; border-left: 4px solid #8a93b8; }
 .mf-note-h { font-weight: 900; margin-bottom: 4px; }
-.mf-note-h small { font-weight: 600; font-size: 11px; color: #5a6a8a; margin-left: 4px; }
-.mf-note-r { border-top: 1px solid #b9c6e2; padding-top: 3px; margin-top: 3px; display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 26px; font-size: 13.5px; }
+.mf-note-h small { font-weight: 600; font-size: 11px; color: var(--mf-text2); margin-left: 4px; }
+.mf-note-r { border-top: 1px solid #ffffff1a; padding-top: 3px; margin-top: 3px; display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 28px; font-size: 13.5px; }
 .mf-stampx { flex: none; padding: 0 8px; border: 2px solid; border-radius: 5px; font-size: 12.5px; font-weight: 900; transform: rotate(-4deg); }
-.mf-stampx.bad { color: #b81e2c; border-color: #b81e2c; }
-.mf-stampx.ok { color: #14794a; border-color: #14794a; }
-.mf-log { display: grid; gap: 3px; padding: 10px 12px; border-radius: 14px; font-size: 13px; color: var(--mf-text2); background: #0006; border: 1px solid var(--mf-line); }
-.mf-log-h { font-size: 12px; font-weight: 800; letter-spacing: 0.04em; color: var(--mf-accent); margin-bottom: 2px; }
-.mf-log .new { color: #fff; font-weight: 700; }
+.mf-stampx.bad { color: #ff8a7e; border-color: #ff8a7e; }
+.mf-stampx.ok { color: #8ef0be; border-color: #8ef0be; }
+.mf-log { display: grid; gap: 2px; }
+.mf-log-r { display: flex; gap: 10px; align-items: baseline; padding: 6px 2px; border-bottom: 1px solid #ffffff12; font-size: 14px; }
+.mf-log-r small { flex: none; width: 34px; font-size: 11px; font-weight: 800; color: var(--mf-accent); }
 
 /* 게임 끝 */
 .mf-panel.end.citizen { border-color: #7ef0b499; box-shadow: 0 0 40px #5ee0a02a, 0 12px 28px #0009; }
 .mf-panel.end.mafia { border-color: #ff5a4e99; box-shadow: 0 0 40px #ff5a4e2a, 0 12px 28px #0009; }
-.mf-end-art { height: 104px; display: grid; place-items: center; }
+.mf-end-art { height: 96px; display: grid; place-items: center; }
 .mf-end-art .mf-art { height: 100%; width: auto; filter: drop-shadow(0 8px 16px #000a); }
 .mf-endteams { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .mf-endteams > div { display: flex; flex-wrap: wrap; gap: 4px; align-content: flex-start; padding: 8px; border-radius: 12px; background: #0005; }
 .mf-endteams small { width: 100%; font-size: 12px; font-weight: 800; color: var(--mf-text2); }
-.mf-endp { display: inline-flex; align-items: center; gap: 2px; padding: 1px 8px 1px 2px; border-radius: 999px; font-size: 12.5px; font-weight: 700; background: #ffffff14; }
+.mf-endp { display: inline-flex; align-items: center; gap: 2px; padding: 1px 8px 1px 2px; border-radius: 999px; font-size: 13px; font-weight: 700; background: #ffffff14; }
 .mf-endp .mf-art { width: 20px; height: 20px; }
 .mf-endp.dead { opacity: 0.55; text-decoration: line-through; }
 
 /* 아래 고정 조작 영역 */
-.mf .bdock { background: linear-gradient(to bottom, transparent, var(--mf-dock) 18px); }
+.mf .mf-dock { background: linear-gradient(to bottom, transparent, var(--mf-dock) 16px); gap: 8px; padding-top: 12px; }
+.mf-act { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 16px; background: color-mix(in srgb, var(--mf-dock) 85%, #fff 4%); border: 1px solid #f0b54a44; box-shadow: 0 -6px 20px #0008; }
+.mf-act > p { margin: 0; }
 .mf .sheet { background: linear-gradient(180deg, #181a2e, #0c0d18); border-top: 1px solid #f0b54a55; }
+.mf .sheet h2 { text-align: center; color: var(--mf-accent); }
 
 @keyframes mfReveal { from { opacity: 0; transform: translateY(18px) scale(0.94); filter: brightness(2) blur(2px); } to { opacity: 1; transform: none; filter: none; } }
 @keyframes mfGrow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@media (max-width: 360px) {
+  .mf .mp { gap: 6px; padding: 6px; font-size: 14px; }
+  .mf-ava { width: 30px; height: 30px; font-size: 14px; }
+  .mf-hero-t b { font-size: 19px; }
+}
 @media (prefers-reduced-motion: reduce) {
   .mf-card.mf-anim, .mf-bars.mf-anim .mf-bar i b { animation: none; }
   .mf-prog i b { transition: none; }
