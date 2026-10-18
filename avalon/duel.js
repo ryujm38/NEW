@@ -662,7 +662,8 @@ function viewFor(room, viewerId) {
     boardTokens: room.boardTokens,
     discard: room.discard,
     draft: room.phase === 'draft' ? { pool: room.draft.pool, pickerId: draftPicker(room).id, set: room.draft.set } : null,
-    pend: head ? { type: head.type, playerId: room.players[head.player].id, color: head.color || null, options: head.options } : null,
+    // 대도서관에서 뽑힌 토큰 3개는 고르는 사람만 본다(원작 규칙)
+    pend: head ? { type: head.type, playerId: room.players[head.player].id, color: head.color || null, options: head.type === 'library' && room.players[head.player].id !== viewerId ? null : head.options } : null,
     chooserId: room.phase === 'chooseStart' ? room.players[room.chooser].id : null,
     costs,
     wonderCosts,

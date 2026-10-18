@@ -449,6 +449,8 @@ test('불가사의 효과: 아피아 가도, 키르쿠스(파괴), 대도서관,
   assert.strictEqual(head.type, 'library');
   assert.strictEqual(head.options.length, 3);
   assert.ok(head.options.every((t) => g.room.boxTokens.includes(t)));
+  assert.deepStrictEqual(duel.viewFor(g.room, g.p0.id).pend.options, head.options); // 고르는 사람은 보고
+  assert.strictEqual(duel.viewFor(g.room, g.p1.id).pend.options, null); // 상대는 못 본다
   duel.choose(g.room, g.p0.id, { token: head.options[1] });
   assert.ok(g.p0.tokens.includes(head.options[1]));
   assert.strictEqual(g.room.boxTokens.length, 4);

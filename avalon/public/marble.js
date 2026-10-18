@@ -180,7 +180,10 @@
     const done = fi < 0 ? A.plan.frames.length : fi;
     if (done > A.hopCount) {
       const fr = A.plan.frames[done - 1];
-      if (fr && fr.kind === 'hop') typeof sfx === 'function' && sfx('hop');
+      if (fr && fr.kind === 'hop' && typeof sfx === 'function') {
+        const fast = fr.t1 - fr.t0 < 100;
+        if (!fast || done % 3 === 0) sfx('hop', fast ? 0.6 : 1);
+      }
       A.hopCount = done;
     }
     if (!A.diceShown && e >= A.plan.diceEnd) {
@@ -188,14 +191,14 @@
       if (S.move && S.move.dice && S.move.dice[0] === S.move.dice[1]) typeof sfx === 'function' && sfx('double');
       render();
     }
-    if (!A.keyShown && e >= A.plan.firstEnd && S.lastKey && S.move && S.lastKey.seq === S.move.seq) { A.keyShown = true; typeof sfx === 'function' && sfx('sparkle'); render(); }
+    if (!A.keyShown && e >= A.plan.firstEnd && S.lastKey && S.move && S.lastKey.seq === S.move.seq) { A.keyShown = true; if (typeof sfxPlan === 'function') sfxPlan(marbleKeyPlan(S.lastKey.id)); render(); }
     if (e < A.plan.total) raf = requestAnimationFrame(tick);
     else finishAnim();
   }
   function finishAnim() {
     if (!A.plan) return;
     A.plan = null;
-    if (typeof sfxSeq === 'function') sfxSeq(['land', ...(A.afterSfx || [])].slice(0, 4), 0.25);
+    if (typeof sfxPlan === 'function' && A.before && !document.hidden) sfxPlan(marbleAfter(A.before, S, S.move));
     A.delta = {};
     S.players.forEach((p) => {
       const before = A.prevCash[p.id];
@@ -208,7 +211,9 @@
   function snapshot() {
     const cash = {};
     S.players.forEach((p) => { cash[p.id] = p.cash; });
-    return { cash, log: S.log.slice() };
+    // 효과음 비교용으로 이전 상태의 일부도 남긴다 (sfx.js marbleAfter)
+    const players = S.players.map((p) => ({ id: p.id, name: p.name, cash: p.cash, bankrupt: p.bankrupt }));
+    return { cash, log: S.log.slice(), players, round: S.round, phase: S.phase, me: S.me };
   }
 
   // 새 상태가 올 때마다: 새 움직임이면 재생을 시작한다
@@ -224,7 +229,7 @@
     } else if (seq !== null && seq !== A.seq) {
       const before = A.last || snapshot();
       if (A.plan) finishAnimQuiet();
-      A.afterSfx = marbleAfterSfx(before, mv);
+      A.before = before;
       A.hopCount = 0;
       if (mv.dice) typeof sfx === 'function' && sfx('dice');
       else if (mv.segs.some((x) => x.k === 'fly')) typeof sfx === 'function' && sfx('whoosh');
@@ -237,16 +242,6 @@
   }
   function finishAnimQuiet() { A.plan = null; }
 
-  // 이번 움직임으로 생긴 기록 줄에서 도착 뒤에 낼 소리를 고른다
-  function marbleAfterSfx(before, mv) {
-    if (typeof soundsFromLines !== 'function') return [];
-    const out = soundsFromLines(newLogLines({ log: before.log }, S), LOG_SOUNDS.marble);
-    if (S.turnId === S.me && S.mode === 'roll' && mv.who !== S.me) out.push('turn');
-    return out;
-  }
-  // 움직임이 있는 상태는 위에서 직접 소리를 내므로 공통 규칙은 건너뛴다
-  window.SFX_RULES = window.SFX_RULES || {};
-  window.SFX_RULES.marble = (prev, cur) => !!(cur.move && (!prev.move || prev.move.seq !== cur.move.seq));
 
   // ---- 그리기 ----
   function tileHtml(t, warping) {
