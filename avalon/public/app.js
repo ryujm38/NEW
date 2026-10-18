@@ -23,6 +23,7 @@ let toastTimer = null;
 const ui = {
   name: load(NAME_KEY) || '',
   code: (new URLSearchParams(location.search).get('room') || '').toUpperCase().slice(0, 4),
+  invite: !!new URLSearchParams(location.search).get('room'), // 초대 링크로 들어왔는지
   roleOpen: false,
   historyOpen: false,
   hostOpen: false,
@@ -92,6 +93,7 @@ function connect() {
       ui.needPw = false;
       ui.joinPw = '';
       ui.createPw = '';
+      if (ui.invite) clearInvite();
     } else if (m.t === 'state') {
       const prev = S;
       S = m.state;
@@ -128,6 +130,8 @@ function connect() {
       if (m.need === 'password') {
         ui.needPw = true;
         if (m.code) ui.code = m.code;
+        // 목록에 없는 방(목록이 오래됐거나 초대 링크)이면 초대 카드에서 비밀번호를 받는다
+        if (!ui.rooms || !ui.rooms.some((r) => r.code === ui.code)) ui.invite = true;
       }
       showToast(m.msg);
       if (m.need === 'password') focusLater('joinpw');
@@ -145,6 +149,12 @@ function connect() {
 function send(o) {
   if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(o));
   else showToast('연결 중이에요. 잠시만요…');
+}
+
+// 초대 링크 흔적(?room=)을 지워서 새로고침해도 다시 초대 카드가 뜨지 않게 한다
+function clearInvite() {
+  ui.invite = false;
+  try { history.replaceState(null, '', BASE_PATH); } catch { /* noop */ }
 }
 
 // 누르는 동안은 화면 그리기가 미뤄지므로(render 참고) 입력칸으로 옮기는 것도 그린 뒤로 미룬다
@@ -270,12 +280,31 @@ function renderHome() {
     const s = Math.round((Date.now() - t) / 1000);
     return s < 10 ? '방금' : s < 60 ? `${s}초 전` : `${Math.floor(s / 60)}분 전`;
   };
+  // 비밀번호 칸: 목록에서 고른 비밀번호 방 바로 아래, 또는 초대받은 방 카드 안에 연다
+  const pwBox = () => `<div class="pwbox">
+      <label class="field">방 비밀번호
+        <input type="text" id="joinpw" maxlength="20" autocomplete="off" value="${esc(ui.joinPw)}" placeholder="방장에게 받은 비밀번호" />
+      </label>
+      <div class="row2"><button class="primary" data-act="join">들어가기</button><button class="ghost" data-act="pwcancel">취소</button></div>
+    </div>`;
   // 방 목록: 게임, 방장 이름, 인원, 공개/비밀번호, 게임 중 여부만 보여 준다
-  const roomRow = (r) => `<button class="roomrow" data-act="pickroom" data-code="${esc(r.code)}" data-locked="${r.locked ? 1 : 0}">
-      <span class="ri"><b>${esc(gameName(r.kind) || r.kind)}</b><small>방장 ${esc(r.host)}</small></span>
+  const roomRow = (r) => `<button class="roomrow ${ui.needPw && !ui.invite && ui.code === r.code ? 'picked' : ''}" data-act="pickroom" data-code="${esc(r.code)}" data-locked="${r.locked ? 1 : 0}">
+      <span class="ri"><b>${esc(gameName(r.kind) || r.kind)}</b><small>방장 ${esc(r.host)} · ${esc(r.code)}</small></span>
       <span class="rc"><span>${r.players}${r.max ? `/${r.max}` : ''}명</span>
         <span class="tags">${r.playing ? '<span class="tag play">게임 중</span>' : ''}${r.locked ? '<span class="tag lock">🔒 비밀번호</span>' : '<span class="tag open">공개</span>'}</span></span>
-    </button>`;
+    </button>${ui.needPw && !ui.invite && ui.code === r.code ? pwBox() : ''}`;
+  // 초대 링크(?room=코드)로 들어온 경우에만 맨 위에 보이는 카드
+  const inviteCard = ui.invite && ui.code
+    ? `<div class="card invite">
+    <p><b>초대받은 방</b> · ${esc(ui.code)}</p>
+    <p class="dim small">이름을 적고 들어가기를 누르세요.</p>
+    <label class="field">내 이름 (8자까지)
+      <input type="text" id="name" maxlength="8" autocomplete="off" value="${esc(ui.name)}" placeholder="예: 민수" />
+    </label>
+    ${ui.needPw ? pwBox() : '<button class="primary" data-act="join">들어가기</button>'}
+    <button class="ghost sm" data-act="invitecancel" style="margin-top:8px">초대 무시하고 처음 화면으로</button>
+  </div>`
+    : '';
   const roomBody = ui.rooms === null
     ? `<p class="dim small center">${online ? '방 목록을 불러오는 중…' : '연결되면 방 목록을 불러와요.'}</p>`
     : ui.rooms.length === 0
@@ -283,10 +312,11 @@ function renderHome() {
       : `<div class="roomlist">${ui.rooms.map(roomRow).join('')}</div>`;
   return `
   <h1>🎲 ${APP_NAME}<small>친구들과 폰으로 같이 하는 보드게임</small></h1>
+  ${inviteCard}
   <div class="card">
-    <label class="field">내 이름 (8자까지)
+    ${inviteCard ? '' : `<label class="field">내 이름 (8자까지)
       <input type="text" id="name" maxlength="8" autocomplete="off" value="${esc(ui.name)}" placeholder="예: 민수" />
-    </label>
+    </label>`}
     <p class="field" style="margin-bottom:6px">무슨 게임을 할까요?</p>
     <div class="gamegrid">
       ${gameList.map(([k, label, range]) => gameBtn(k, label, range)).join('')}
@@ -306,17 +336,6 @@ function renderHome() {
     <div class="listhead"><h2>방 목록${ui.roomsAt ? ` <small>${ago(ui.roomsAt)} 기준</small>` : ''}</h2>
       <button class="sm ghost" data-act="roomsrefresh" ${ui.roomsLoading && ui.rooms !== null ? 'disabled' : ''}>${ui.roomsLoading && ui.rooms !== null ? '불러오는 중…' : '↻ 새로고침'}</button></div>
     ${roomBody}
-  </div>
-  <div class="card">
-    <label class="field">방 코드로 들어가기 — 4글자
-      <input type="text" id="code" maxlength="4" autocomplete="off" autocapitalize="characters" value="${esc(ui.code)}" placeholder="ABCD" style="text-transform:uppercase;letter-spacing:6px;text-align:center;font-size:22px" />
-    </label>
-    ${ui.needPw
-      ? `<label class="field">방 비밀번호
-      <input type="text" id="joinpw" maxlength="20" autocomplete="off" value="${esc(ui.joinPw)}" placeholder="방장에게 받은 비밀번호" />
-    </label>`
-      : ''}
-    <button data-act="join">들어가기</button>
   </div>
   <div class="card">${AVALON_RULES_HTML}${MAFIA_RULES_HTML}${UNO_RULES_HTML}${BANG_RULES_HTML}${uiGames().map((g) => g.rules).join('')}</div>`;
 }
@@ -354,7 +373,7 @@ function renderLobby() {
   return `
   <h1>대기실<small>${APP_NAME}:${gameName(S.kind)} · ${count}</small></h1>
   <div class="card">
-    <p class="dim center small">친구들에게 이 코드를 알려주세요</p>
+    <p class="dim center small">친구들은 방 목록에서 이 방을 누르거나 초대 링크로 들어와요</p>
     <div class="code">${esc(S.code)}</div>
     <p class="dim center small">${S.locked ? '🔒 비밀번호 방 · 비밀번호를 아는 사람만 들어올 수 있어요' : '🔓 공개방 · 방 목록에서 누구나 들어올 수 있어요'}</p>
     <button data-act="share">초대 링크 보내기</button>
@@ -616,17 +635,22 @@ $app.addEventListener('click', (e) => {
     case 'join': {
       const name = ui.name.trim();
       if (!name) return showToast('이름을 먼저 입력하세요.');
-      if (ui.code.trim().length !== 4) return showToast('방 코드 4글자를 입력하세요.');
+      if (ui.code.trim().length !== 4) return showToast('들어갈 방을 방 목록에서 고르세요.');
       save(NAME_KEY, name);
       send({ t: 'join', name, code: ui.code.trim(), password: ui.joinPw });
       break;
     }
     case 'setaccess': ui.locked = el.dataset.v === '1'; render(); break;
+    case 'pwcancel': ui.needPw = false; ui.joinPw = ''; render(); break;
+    case 'invitecancel': clearInvite(); ui.code = ''; ui.needPw = false; ui.joinPw = ''; render(); requestRooms(); break;
     case 'roomsrefresh': requestRooms(); render(); break;
     case 'pickroom': {
       // 목록에서 고른 방: 공개방은 바로 들어가고, 비밀번호 방은 아래 비밀번호 칸을 연다
       const name = ui.name.trim();
+      if (ui.invite) clearInvite();
+      if (ui.code !== el.dataset.code) ui.joinPw = '';
       ui.code = el.dataset.code;
+      ui.needPw = false;
       if (!name) {
         focusLater('name');
         return showToast('이름을 먼저 입력하세요.');
@@ -678,7 +702,7 @@ function onPick(id) {
 
 async function shareLink() {
   const url = `${location.origin}${BASE_PATH}?room=${S.code}`;
-  const text = `${APP_NAME}:${gameName(S.kind)} 하자! 방 코드: ${S.code}${S.locked ? ' (비밀번호는 방장에게 물어보세요)' : ''}`;
+  const text = `${APP_NAME}:${gameName(S.kind)} 하자! 링크를 눌러 들어오세요 (방 ${S.code})${S.locked ? ' · 비밀번호는 방장에게 물어보세요' : ''}`;
   try {
     if (navigator.share) {
       await navigator.share({ title: `${APP_NAME}:${gameName(S.kind)}`, text, url });
