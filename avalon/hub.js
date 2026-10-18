@@ -13,6 +13,22 @@ const ENGINES = {
 };
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // I, O 제외: 1/0과 헷갈리지 않게
 const ROOM_TTL_MS = 6 * 60 * 60 * 1000;
+const PW_MAX = 20;
+const LIST_MAX = 50;
+
+// 방 비밀번호: 그대로 저장하지 않고 소금(salt)을 섞은 해시만 둔다. 화면(viewFor)에는 나가지 않는다.
+const cleanPassword = (raw) => String(raw ?? '').trim().slice(0, PW_MAX);
+const hashPassword = (salt, pw) => crypto.createHash('sha256').update(`${salt}:${pw}`).digest('hex');
+function makeLock(pw) {
+  const salt = crypto.randomBytes(8).toString('hex');
+  return { salt, hash: hashPassword(salt, pw) };
+}
+function passwordOk(room, raw) {
+  if (!room.lock) return true;
+  const a = Buffer.from(hashPassword(room.lock.salt, cleanPassword(raw)), 'hex');
+  const b = Buffer.from(room.lock.hash, 'hex');
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
 
 function createHub(opts = {}) {
   const now = opts.now || Date.now;
@@ -42,7 +58,9 @@ function createHub(opts = {}) {
   function broadcast(room) {
     room.lastActive = now();
     for (const [pid, conn] of socketsOf(room)) {
-      send(conn, { t: 'state', state: engineOf(room).viewFor(room, pid) });
+      const state = engineOf(room).viewFor(room, pid);
+      state.locked = !!room.lock; // 대기실에 공개방/비밀번호 방 표시용
+      send(conn, { t: 'state', state });
     }
     onChange(room);
   }
@@ -70,16 +88,49 @@ function createHub(opts = {}) {
     send(conn, { t: 'error', msg });
   }
 
+  // 비밀번호가 필요하거나 틀렸을 때: 화면이 비밀번호 칸을 열 수 있게 need 와 code 를 같이 보낸다
+  function needPassword(conn, room, given) {
+    const msg = cleanPassword(given) ? '비밀번호가 맞지 않아요.' : '비밀번호가 걸린 방이에요. 비밀번호를 입력하세요.';
+    send(conn, { t: 'error', msg, need: 'password', code: room.code });
+  }
+
+  // 방 목록: 접속해 있는 사람이 한 명이라도 있는 방만, 최근에 움직인 순서로. 비밀번호/토큰 같은 건 넣지 않는다.
+  function roomList() {
+    const out = [];
+    for (const room of rooms.values()) {
+      const connected = room.players.filter((p) => p.connected).length;
+      if (connected === 0) continue;
+      const host = room.players.find((p) => p.id === room.hostId) || room.players[0];
+      out.push({
+        code: room.code,
+        kind: room.kind,
+        players: room.players.length,
+        max: engineOf(room).MAX_PLAYERS || null,
+        locked: !!room.lock,
+        host: host ? host.name : '',
+        playing: room.phase !== 'lobby',
+        lastActive: room.lastActive || 0,
+      });
+    }
+    out.sort((a, b) => b.lastActive - a.lastActive);
+    return out.slice(0, LIST_MAX).map(({ lastActive, ...r }) => r);
+  }
+
   function handle(conn, msg) {
     const ctx = conn.ctx;
 
     if (msg.t === 'ping') return send(conn, { t: 'pong' });
 
+    if (msg.t === 'list') return send(conn, { t: 'rooms', rooms: roomList() });
+
     if (msg.t === 'create') {
       const engine = ENGINES[msg.game] || ENGINES.avalon;
+      const pw = cleanPassword(msg.password);
+      if (msg.locked && !pw) return fail(conn, '비밀번호를 입력하세요.');
       const room = engine.createRoom(newCode());
       const r = engine.addPlayer(room, msg.name);
       if (r.error) return fail(conn, r.error);
+      room.lock = pw ? makeLock(pw) : null;
       rooms.set(room.code, room);
       attach(conn, room, r.player);
       return broadcast(room);
@@ -88,6 +139,7 @@ function createHub(opts = {}) {
     if (msg.t === 'join') {
       const room = rooms.get(String(msg.code || '').toUpperCase().trim());
       if (!room) return fail(conn, '그 코드의 방이 없어요.');
+      if (!passwordOk(room, msg.password)) return needPassword(conn, room, msg.password);
       const name = common.cleanName(msg.name);
       if (room.phase !== 'lobby') {
         // 게임 도중 토큰을 잃어버린 사람이 같은 이름으로 다시 들어오는 경우

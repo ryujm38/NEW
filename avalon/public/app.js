@@ -38,6 +38,13 @@ const ui = {
   unoSel: null,
   game: allGames().includes(load(GAME_KEY)) ? load(GAME_KEY) : 'avalon', // 새 방을 만들 때 고른 게임
   toast: '',
+  locked: false, // 방 만들기: 비밀번호 방으로 만들지
+  createPw: '',
+  joinPw: '',
+  needPw: false, // 들어가려는 방이 비밀번호 방이라 비밀번호 칸을 연다
+  rooms: null, // 방 목록 (null = 아직 안 받음)
+  roomsLoading: false,
+  roomsAt: 0,
 };
 let session = loadJson(SESSION_KEY);
 
@@ -70,6 +77,7 @@ function connect() {
     online = true;
     backoff = 500;
     if (session) send({ t: 'resume', code: session.code, token: session.token });
+    else requestRooms();
     // 연결이 살아 있다는 신호(서버가 조용히 끊긴 연결을 정리할 수 있게)
     clearInterval(pingTimer);
     pingTimer = setInterval(() => { if (ws && ws.readyState === WebSocket.OPEN) ws.send('{"t":"ping"}'); }, 25000);
@@ -81,6 +89,9 @@ function connect() {
     if (m.t === 'joined') {
       session = { code: m.code, id: m.id, token: m.token };
       save(SESSION_KEY, JSON.stringify(session));
+      ui.needPw = false;
+      ui.joinPw = '';
+      ui.createPw = '';
     } else if (m.t === 'state') {
       const prev = S;
       S = m.state;
@@ -107,8 +118,19 @@ function connect() {
       ui.mText = '';
       if (m.kicked) showToast('방장이 내보냈어요.');
       render();
+      requestRooms();
+    } else if (m.t === 'rooms') {
+      ui.rooms = Array.isArray(m.rooms) ? m.rooms : [];
+      ui.roomsLoading = false;
+      ui.roomsAt = Date.now();
+      if (!S) render();
     } else if (m.t === 'error') {
+      if (m.need === 'password') {
+        ui.needPw = true;
+        if (m.code) ui.code = m.code;
+      }
       showToast(m.msg);
+      if (m.need === 'password') focusLater('joinpw');
     }
   };
   ws.onclose = () => {
@@ -123,6 +145,21 @@ function connect() {
 function send(o) {
   if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(o));
   else showToast('연결 중이에요. 잠시만요…');
+}
+
+// 누르는 동안은 화면 그리기가 미뤄지므로(render 참고) 입력칸으로 옮기는 것도 그린 뒤로 미룬다
+function focusLater(id) {
+  setTimeout(() => {
+    const el = document.getElementById(id);
+    if (el) { el.focus(); el.scrollIntoView({ block: 'center' }); }
+  }, 150);
+}
+
+// 방 목록은 첫 화면에서만 쓰고, 연결될 때·방에서 나올 때·새로고침을 누를 때 받아 온다
+function requestRooms() {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  ui.roomsLoading = true;
+  ws.send('{"t":"list"}');
 }
 
 // 폰을 잠갔다 켰을 때 바로 다시 붙는다
@@ -229,6 +266,21 @@ function renderHome() {
     ...Object.entries(GAME_UI).map(([k, g]) => [k, g.label, g.range]),
   ];
   const gameBtn = (g, label, sub) => `<button class="gamebtn ${ui.game === g ? 'on' : ''}" data-act="setgame" data-game="${g}"><b>${label}</b><small>${sub}</small></button>`;
+  const ago = (t) => {
+    const s = Math.round((Date.now() - t) / 1000);
+    return s < 10 ? '방금' : s < 60 ? `${s}초 전` : `${Math.floor(s / 60)}분 전`;
+  };
+  // 방 목록: 게임, 방장 이름, 인원, 공개/비밀번호, 게임 중 여부만 보여 준다
+  const roomRow = (r) => `<button class="roomrow" data-act="pickroom" data-code="${esc(r.code)}" data-locked="${r.locked ? 1 : 0}">
+      <span class="ri"><b>${esc(gameName(r.kind) || r.kind)}</b><small>방장 ${esc(r.host)}</small></span>
+      <span class="rc"><span>${r.players}${r.max ? `/${r.max}` : ''}명</span>
+        <span class="tags">${r.playing ? '<span class="tag play">게임 중</span>' : ''}${r.locked ? '<span class="tag lock">🔒 비밀번호</span>' : '<span class="tag open">공개</span>'}</span></span>
+    </button>`;
+  const roomBody = ui.rooms === null
+    ? `<p class="dim small center">${online ? '방 목록을 불러오는 중…' : '연결되면 방 목록을 불러와요.'}</p>`
+    : ui.rooms.length === 0
+      ? '<p class="dim small center">지금 열린 방이 없어요. 위에서 새로 만들어 보세요.</p>'
+      : `<div class="roomlist">${ui.rooms.map(roomRow).join('')}</div>`;
   return `
   <h1>🎲 ${APP_NAME}<small>친구들과 폰으로 같이 하는 보드게임</small></h1>
   <div class="card">
@@ -239,12 +291,31 @@ function renderHome() {
     <div class="gamegrid">
       ${gameList.map(([k, label, range]) => gameBtn(k, label, range)).join('')}
     </div>
-    <button class="primary" data-act="create">${gameName(ui.game)} 방 만들기</button>
+    <div class="seg2" role="group" aria-label="방 공개 설정">
+      <button class="${ui.locked ? '' : 'on'}" data-act="setaccess" data-v="0">🔓 공개방</button>
+      <button class="${ui.locked ? 'on' : ''}" data-act="setaccess" data-v="1">🔒 비밀번호 방</button>
+    </div>
+    ${ui.locked
+      ? `<label class="field">방 비밀번호 (20자까지)
+      <input type="text" id="createpw" maxlength="20" autocomplete="off" value="${esc(ui.createPw)}" placeholder="예: 1234" />
+    </label>`
+      : '<p class="dim small">공개방은 방 목록에서 누구나 눌러서 들어올 수 있어요.</p>'}
+    <button class="primary" data-act="create">${gameName(ui.game)} ${ui.locked ? '비밀번호 ' : ''}방 만들기</button>
   </div>
   <div class="card">
-    <label class="field">친구가 만든 방에 들어가기 — 방 코드 4글자
+    <div class="listhead"><h2>방 목록${ui.roomsAt ? ` <small>${ago(ui.roomsAt)} 기준</small>` : ''}</h2>
+      <button class="sm ghost" data-act="roomsrefresh" ${ui.roomsLoading && ui.rooms !== null ? 'disabled' : ''}>${ui.roomsLoading && ui.rooms !== null ? '불러오는 중…' : '↻ 새로고침'}</button></div>
+    ${roomBody}
+  </div>
+  <div class="card">
+    <label class="field">방 코드로 들어가기 — 4글자
       <input type="text" id="code" maxlength="4" autocomplete="off" autocapitalize="characters" value="${esc(ui.code)}" placeholder="ABCD" style="text-transform:uppercase;letter-spacing:6px;text-align:center;font-size:22px" />
     </label>
+    ${ui.needPw
+      ? `<label class="field">방 비밀번호
+      <input type="text" id="joinpw" maxlength="20" autocomplete="off" value="${esc(ui.joinPw)}" placeholder="방장에게 받은 비밀번호" />
+    </label>`
+      : ''}
     <button data-act="join">들어가기</button>
   </div>
   <div class="card">${AVALON_RULES_HTML}${MAFIA_RULES_HTML}${UNO_RULES_HTML}${BANG_RULES_HTML}${uiGames().map((g) => g.rules).join('')}</div>`;
@@ -285,6 +356,7 @@ function renderLobby() {
   <div class="card">
     <p class="dim center small">친구들에게 이 코드를 알려주세요</p>
     <div class="code">${esc(S.code)}</div>
+    <p class="dim center small">${S.locked ? '🔒 비밀번호 방 · 비밀번호를 아는 사람만 들어올 수 있어요' : '🔓 공개방 · 방 목록에서 누구나 들어올 수 있어요'}</p>
     <button data-act="share">초대 링크 보내기</button>
     <div class="slots">${slots.join('')}</div>
     ${S.kind === 'mafia' ? mafiaLobbyOptions(isHost) : ''}
@@ -512,6 +584,8 @@ function historyHtml() {
 $app.addEventListener('input', (e) => {
   if (e.target.id === 'name') { ui.name = e.target.value; }
   if (e.target.id === 'code') { ui.code = e.target.value.toUpperCase(); }
+  if (e.target.id === 'createpw') { ui.createPw = e.target.value; }
+  if (e.target.id === 'joinpw') { ui.joinPw = e.target.value; }
 });
 
 $app.addEventListener('click', (e) => {
@@ -534,8 +608,9 @@ $app.addEventListener('click', (e) => {
     case 'create': {
       const name = ui.name.trim();
       if (!name) return showToast('이름을 먼저 입력하세요.');
+      if (ui.locked && !ui.createPw.trim()) return showToast('방 비밀번호를 입력하세요.');
       save(NAME_KEY, name);
-      send({ t: 'create', name, game: ui.game });
+      send({ t: 'create', name, game: ui.game, locked: ui.locked, password: ui.locked ? ui.createPw.trim() : '' });
       break;
     }
     case 'join': {
@@ -543,7 +618,27 @@ $app.addEventListener('click', (e) => {
       if (!name) return showToast('이름을 먼저 입력하세요.');
       if (ui.code.trim().length !== 4) return showToast('방 코드 4글자를 입력하세요.');
       save(NAME_KEY, name);
-      send({ t: 'join', name, code: ui.code.trim() });
+      send({ t: 'join', name, code: ui.code.trim(), password: ui.joinPw });
+      break;
+    }
+    case 'setaccess': ui.locked = el.dataset.v === '1'; render(); break;
+    case 'roomsrefresh': requestRooms(); render(); break;
+    case 'pickroom': {
+      // 목록에서 고른 방: 공개방은 바로 들어가고, 비밀번호 방은 아래 비밀번호 칸을 연다
+      const name = ui.name.trim();
+      ui.code = el.dataset.code;
+      if (!name) {
+        focusLater('name');
+        return showToast('이름을 먼저 입력하세요.');
+      }
+      if (el.dataset.locked === '1') {
+        ui.needPw = true;
+        ui.joinPw = '';
+        focusLater('joinpw');
+        return showToast('비밀번호를 입력하고 들어가기를 누르세요.');
+      }
+      save(NAME_KEY, name);
+      send({ t: 'join', name, code: ui.code });
       break;
     }
     case 'share': shareLink(); break;
@@ -583,7 +678,7 @@ function onPick(id) {
 
 async function shareLink() {
   const url = `${location.origin}${BASE_PATH}?room=${S.code}`;
-  const text = `${APP_NAME}:${gameName(S.kind)} 하자! 방 코드: ${S.code}`;
+  const text = `${APP_NAME}:${gameName(S.kind)} 하자! 방 코드: ${S.code}${S.locked ? ' (비밀번호는 방장에게 물어보세요)' : ''}`;
   try {
     if (navigator.share) {
       await navigator.share({ title: `${APP_NAME}:${gameName(S.kind)}`, text, url });
