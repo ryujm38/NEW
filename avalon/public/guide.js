@@ -79,7 +79,10 @@ function guideLobbyHtml(kind) {
   const sound = typeof sfxOn === 'function' ? `<div class="gd-lobby">
     <div><b>🔊 효과음</b><small>주사위·카드·내 차례 알림 소리. 나만 들려요.</small></div>
     <button class="gd-toggle ${sOn ? 'on' : ''}" data-act="sfxToggle" role="switch" aria-checked="${sOn}"><i></i></button>
-  </div>` : '';
+  </div>${sOn && canSpeak() ? `<div class="gd-lobby">
+    <div><b>🗣️ 내 차례 닉네임 불러주기</b><small>내 차례가 오면 "${esc(myName() || '닉네임')} 차례!"라고 말해 줘요.</small></div>
+    <button class="gd-toggle ${voiceOn() ? 'on' : ''}" data-act="voiceToggle" role="switch" aria-checked="${voiceOn()}"><i></i></button>
+  </div>` : ''}` : '';
   if (!GUIDES[kind]) return sound;
   const on = guideOn(kind);
   return sound + `<div class="gd-lobby">

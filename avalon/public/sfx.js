@@ -142,6 +142,7 @@ const BOOST = {
 
 function sfx(name) {
   if (!sfxOn() || !SOUNDS[name]) return;
+  if (name === 'turn') speakMyTurn();
   const c = sfxCtx();
   if (!c || c.state !== 'running') return;
   const now = performance.now();
@@ -155,6 +156,55 @@ function sfx(name) {
   SFX.master = g;
   try { SOUNDS[name](); } catch (e) { console.error('sfx', e); } finally { SFX.master = bus; }
 }
+// ---- 내 차례에 내 닉네임 불러주기: "삼촌 차례!" ----
+// 폰에 들어 있는 음성 읽기(speechSynthesis)를 쓰므로 받는 데이터가 없다. 내 폰에서만 말한다.
+const voiceOn = () => { try { return localStorage.getItem('voice') !== 'off'; } catch { return true; } };
+function setVoice(on) { try { localStorage.setItem('voice', on ? 'on' : 'off'); } catch { /* noop */ } }
+const canSpeak = () => 'speechSynthesis' in window && typeof SpeechSynthesisUtterance === 'function';
+let koVoice = null;
+function pickVoice() {
+  const vs = window.speechSynthesis.getVoices();
+  const ko = vs.filter((v) => /^ko/i.test(v.lang));
+  koVoice = ko.find((v) => /google|yuna|heami|sunhi|injoon|neural/i.test(v.name)) || ko[0] || null;
+}
+if (canSpeak()) {
+  pickVoice();
+  if (window.speechSynthesis.addEventListener) window.speechSynthesis.addEventListener('voiceschanged', pickVoice);
+}
+let lastSpeak = 0;
+function speak(text) {
+  if (!canSpeak() || !sfxOn() || !voiceOn()) return;
+  const now = Date.now();
+  if (now - lastSpeak < 1500) return;
+  lastSpeak = now;
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'ko-KR';
+  if (koVoice) u.voice = koVoice;
+  u.rate = 1.05;
+  u.pitch = 1.1;
+  u.volume = 1;
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(u);
+}
+function myName() {
+  const me = S && S.players && S.players.find((p) => p.id === S.me);
+  return me ? String(me.name).replace(/[^\p{L}\p{N} ]/gu, '').trim() : '';
+}
+// 차례 알림 "띵-동"이 끝날 즈음 이름을 부른다
+function speakMyTurn() {
+  const name = myName();
+  if (name) setTimeout(() => speak(`${name} 차례!`), 520);
+}
+// 아이폰은 처음 한 번은 터치 중에 말을 시켜야 그 뒤로도 말할 수 있다
+let voiceUnlocked = false;
+document.addEventListener('pointerdown', () => {
+  if (voiceUnlocked || !canSpeak()) return;
+  voiceUnlocked = true;
+  const u = new SpeechSynthesisUtterance(' ');
+  u.volume = 0;
+  window.speechSynthesis.speak(u);
+}, { capture: true, passive: true });
+
 // 여러 소리를 조금씩 간격을 두고
 function sfxSeq(names, gap = 0.22) {
   names.forEach((n, i) => setTimeout(() => sfx(n), i * gap * 1000));
@@ -241,6 +291,13 @@ function sfxButtonHtml() {
   return `<button class="sfx-btn" data-act="sfxToggle" aria-label="효과음 ${on ? '끄기' : '켜기'}" title="효과음 ${on ? '끄기' : '켜기'}">${on ? '🔊' : '🔇'}</button>`;
 }
 function sfxClick(act) {
+  if (act === 'voiceToggle') {
+    const on = !voiceOn();
+    setVoice(on);
+    if (on) { voiceUnlocked = true; lastSpeak = 0; speak(`${myName() || '나'} 차례!`); }
+    showToast(on ? '내 차례가 오면 닉네임을 불러 줄게요 🗣️' : '닉네임 불러주기를 껐어요');
+    return true;
+  }
   if (act !== 'sfxToggle') return false;
   const on = !sfxOn();
   setSfx(on);
