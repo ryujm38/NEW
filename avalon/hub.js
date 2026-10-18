@@ -138,7 +138,7 @@ function createHub(opts = {}) {
 
     if (msg.t === 'join') {
       const room = rooms.get(String(msg.code || '').toUpperCase().trim());
-      if (!room) return fail(conn, '그 코드의 방이 없어요.');
+      if (!room) return fail(conn, '그 방이 없어졌어요. 방 목록을 새로고침하세요.');
       if (!passwordOk(room, msg.password)) return needPassword(conn, room, msg.password);
       const name = common.cleanName(msg.name);
       if (room.phase !== 'lobby') {

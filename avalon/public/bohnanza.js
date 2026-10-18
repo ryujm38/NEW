@@ -167,7 +167,7 @@
           ${genericOverButtons(isHost)}</div>` : '';
     const log = S.log.length ? `<div class="ulog">${S.log.slice(-5).reverse().map((l, i) => `<div class="${i === 0 ? 'new' : ''}">${esc(l)}</div>`).join('')}</div>` : '';
     return `
-    <div class="top"><span>방 <b>${esc(S.code)}</b></span><span>보난자 · ${stepText()}</span></div>
+    <div class="top"><span>${roomTag()}</span><span>보난자 · ${stepText()}</span></div>
     <div class="bzinfo">🂠 덱 ${S.deckCount}장 · ${S.deckRuns}/${S.maxRuns}번째 덱${S.discardTop ? ` · 버린 더미 맨 위: ${BEANS[S.discardTop].icon}` : ''}</div>
     ${over}
     ${playersHtml()}

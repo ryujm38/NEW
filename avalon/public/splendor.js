@@ -143,7 +143,7 @@
     const isHost = S.hostId === S.me;
 
     return `
-    <div class="top"><span>방 <b>${esc(S.code)}</b></span><span>스플렌더 · ${S.turnId ? `${pname(S.turnId)}님 차례` : '게임 끝'}</span></div>
+    <div class="top"><span>${roomTag()}</span><span>스플렌더 · ${S.turnId ? `${pname(S.turnId)}님 차례` : '게임 끝'}</span></div>
     ${final}${winner}
     <div class="snrow">${S.nobles.map((n) => nobleHtml(n)).join('')}</div>
     <div class="sboard">${rows}</div>

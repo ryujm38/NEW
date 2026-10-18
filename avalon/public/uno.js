@@ -118,7 +118,7 @@ function renderUno() {
   }
 
   return `
-  <div class="top"><span>방 <b>${esc(S.code)}</b></span><span>우노 · ${S.gameNo}번째 판</span></div>
+  <div class="top"><span>${roomTag()}</span><span>우노 · ${S.gameNo}번째 판</span></div>
   <div class="uplayers">${chips}</div>
   ${center}
   ${status}

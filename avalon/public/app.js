@@ -22,8 +22,7 @@ let S = null; // 서버가 보낸 내 시점의 상태
 let toastTimer = null;
 const ui = {
   name: load(NAME_KEY) || '',
-  code: (new URLSearchParams(location.search).get('room') || '').toUpperCase().slice(0, 4),
-  invite: !!new URLSearchParams(location.search).get('room'), // 초대 링크로 들어왔는지
+  code: '', // 방 목록에서 고른 방
   roleOpen: false,
   historyOpen: false,
   hostOpen: false,
@@ -93,7 +92,6 @@ function connect() {
       ui.needPw = false;
       ui.joinPw = '';
       ui.createPw = '';
-      if (ui.invite) clearInvite();
     } else if (m.t === 'state') {
       const prev = S;
       S = m.state;
@@ -130,11 +128,9 @@ function connect() {
       if (m.need === 'password') {
         ui.needPw = true;
         if (m.code) ui.code = m.code;
-        // 목록에 없는 방(목록이 오래됐거나 초대 링크)이면 초대 카드에서 비밀번호를 받는다
-        if (!ui.rooms || !ui.rooms.some((r) => r.code === ui.code)) ui.invite = true;
       }
       showToast(m.msg);
-      if (m.need === 'password') focusLater('joinpw');
+      if (m.need === 'password') { render(); focusLater('joinpw'); }
     }
   };
   ws.onclose = () => {
@@ -151,10 +147,15 @@ function send(o) {
   else showToast('연결 중이에요. 잠시만요…');
 }
 
-// 초대 링크 흔적(?room=)을 지워서 새로고침해도 다시 초대 카드가 뜨지 않게 한다
-function clearInvite() {
-  ui.invite = false;
+// 예전 초대 링크(?room=)로 열어도 주소만 정리하고 방 목록 화면을 보여 준다
+if (location.search) {
   try { history.replaceState(null, '', BASE_PATH); } catch { /* noop */ }
+}
+
+// 게임 화면 맨 위에 방 코드 대신 방장 이름을 보여 준다
+function roomTag() {
+  const host = S && S.players && S.players.find((p) => p.id === S.hostId);
+  return host ? `방장 <b>${esc(host.name)}</b>` : '';
 }
 
 // 누르는 동안은 화면 그리기가 미뤄지므로(render 참고) 입력칸으로 옮기는 것도 그린 뒤로 미룬다
@@ -280,7 +281,7 @@ function renderHome() {
     const s = Math.round((Date.now() - t) / 1000);
     return s < 10 ? '방금' : s < 60 ? `${s}초 전` : `${Math.floor(s / 60)}분 전`;
   };
-  // 비밀번호 칸: 목록에서 고른 비밀번호 방 바로 아래, 또는 초대받은 방 카드 안에 연다
+  // 비밀번호 칸: 목록에서 고른 비밀번호 방 바로 아래에 연다
   const pwBox = () => `<div class="pwbox">
       <label class="field">방 비밀번호
         <input type="text" id="joinpw" maxlength="20" autocomplete="off" value="${esc(ui.joinPw)}" placeholder="방장에게 받은 비밀번호" />
@@ -288,23 +289,11 @@ function renderHome() {
       <div class="row2"><button class="primary" data-act="join">들어가기</button><button class="ghost" data-act="pwcancel">취소</button></div>
     </div>`;
   // 방 목록: 게임, 방장 이름, 인원, 공개/비밀번호, 게임 중 여부만 보여 준다
-  const roomRow = (r) => `<button class="roomrow ${ui.needPw && !ui.invite && ui.code === r.code ? 'picked' : ''}" data-act="pickroom" data-code="${esc(r.code)}" data-locked="${r.locked ? 1 : 0}">
-      <span class="ri"><b>${esc(gameName(r.kind) || r.kind)}</b><small>방장 ${esc(r.host)} · ${esc(r.code)}</small></span>
+  const roomRow = (r) => `<button class="roomrow ${ui.needPw && ui.code === r.code ? 'picked' : ''}" data-act="pickroom" data-code="${esc(r.code)}" data-locked="${r.locked ? 1 : 0}">
+      <span class="ri"><b>${esc(gameName(r.kind) || r.kind)}</b><small>방장 ${esc(r.host)}</small></span>
       <span class="rc"><span>${r.players}${r.max ? `/${r.max}` : ''}명</span>
         <span class="tags">${r.playing ? '<span class="tag play">게임 중</span>' : ''}${r.locked ? '<span class="tag lock">🔒 비밀번호</span>' : '<span class="tag open">공개</span>'}</span></span>
-    </button>${ui.needPw && !ui.invite && ui.code === r.code ? pwBox() : ''}`;
-  // 초대 링크(?room=코드)로 들어온 경우에만 맨 위에 보이는 카드
-  const inviteCard = ui.invite && ui.code
-    ? `<div class="card invite">
-    <p><b>초대받은 방</b> · ${esc(ui.code)}</p>
-    <p class="dim small">이름을 적고 들어가기를 누르세요.</p>
-    <label class="field">내 이름 (8자까지)
-      <input type="text" id="name" maxlength="8" autocomplete="off" value="${esc(ui.name)}" placeholder="예: 민수" />
-    </label>
-    ${ui.needPw ? pwBox() : '<button class="primary" data-act="join">들어가기</button>'}
-    <button class="ghost sm" data-act="invitecancel" style="margin-top:8px">초대 무시하고 처음 화면으로</button>
-  </div>`
-    : '';
+    </button>${ui.needPw && ui.code === r.code ? pwBox() : ''}`;
   const roomBody = ui.rooms === null
     ? `<p class="dim small center">${online ? '방 목록을 불러오는 중…' : '연결되면 방 목록을 불러와요.'}</p>`
     : ui.rooms.length === 0
@@ -312,11 +301,10 @@ function renderHome() {
       : `<div class="roomlist">${ui.rooms.map(roomRow).join('')}</div>`;
   return `
   <h1>🎲 ${APP_NAME}<small>친구들과 폰으로 같이 하는 보드게임</small></h1>
-  ${inviteCard}
   <div class="card">
-    ${inviteCard ? '' : `<label class="field">내 이름 (8자까지)
+    <label class="field">내 이름 (8자까지)
       <input type="text" id="name" maxlength="8" autocomplete="off" value="${esc(ui.name)}" placeholder="예: 민수" />
-    </label>`}
+    </label>
     <p class="field" style="margin-bottom:6px">무슨 게임을 할까요?</p>
     <div class="gamegrid">
       ${gameList.map(([k, label, range]) => gameBtn(k, label, range)).join('')}
@@ -373,10 +361,8 @@ function renderLobby() {
   return `
   <h1>대기실<small>${APP_NAME}:${gameName(S.kind)} · ${count}</small></h1>
   <div class="card">
-    <p class="dim center small">친구들은 방 목록에서 이 방을 누르거나 초대 링크로 들어와요</p>
-    <div class="code">${esc(S.code)}</div>
+    <p class="dim center small">친구들은 방 목록에서 이 방을 눌러 들어와요</p>
     <p class="dim center small">${S.locked ? '🔒 비밀번호 방 · 비밀번호를 아는 사람만 들어올 수 있어요' : '🔓 공개방 · 방 목록에서 누구나 들어올 수 있어요'}</p>
-    <button data-act="share">초대 링크 보내기</button>
     <div class="slots">${slots.join('')}</div>
     ${S.kind === 'mafia' ? mafiaLobbyOptions(isHost) : ''}
     ${GAME_UI[S.kind] && GAME_UI[S.kind].lobbyOptions ? GAME_UI[S.kind].lobbyOptions(isHost) : ''}
@@ -530,7 +516,7 @@ function renderGame() {
 
   const title = { roles: '역할 확인', propose: '원정대 구성', vote: '투표', voteResult: '투표 결과', quest: '원정', questResult: '원정 결과', assassin: '암살', over: '게임 끝' }[phase];
   return `
-  <div class="top"><span>방 <b>${esc(S.code)}</b></span><span>${S.round + 1 > 5 ? 5 : S.round + 1}라운드 · ${title}</span></div>
+  <div class="top"><span>${roomTag()}</span><span>${S.round + 1 > 5 ? 5 : S.round + 1}라운드 · ${title}</span></div>
   ${phase === 'roles' ? '' : renderTrack()}
   ${panel}
   ${cards}
@@ -602,7 +588,6 @@ function historyHtml() {
 
 $app.addEventListener('input', (e) => {
   if (e.target.id === 'name') { ui.name = e.target.value; }
-  if (e.target.id === 'code') { ui.code = e.target.value.toUpperCase(); }
   if (e.target.id === 'createpw') { ui.createPw = e.target.value; }
   if (e.target.id === 'joinpw') { ui.joinPw = e.target.value; }
 });
@@ -642,12 +627,10 @@ $app.addEventListener('click', (e) => {
     }
     case 'setaccess': ui.locked = el.dataset.v === '1'; render(); break;
     case 'pwcancel': ui.needPw = false; ui.joinPw = ''; render(); break;
-    case 'invitecancel': clearInvite(); ui.code = ''; ui.needPw = false; ui.joinPw = ''; render(); requestRooms(); break;
     case 'roomsrefresh': requestRooms(); render(); break;
     case 'pickroom': {
       // 목록에서 고른 방: 공개방은 바로 들어가고, 비밀번호 방은 아래 비밀번호 칸을 연다
       const name = ui.name.trim();
-      if (ui.invite) clearInvite();
       if (ui.code !== el.dataset.code) ui.joinPw = '';
       ui.code = el.dataset.code;
       ui.needPw = false;
@@ -665,7 +648,6 @@ $app.addEventListener('click', (e) => {
       send({ t: 'join', name, code: ui.code });
       break;
     }
-    case 'share': shareLink(); break;
     case 'kick': send({ t: 'kick', target: el.dataset.id }); break;
     case 'leave':
       send({ t: 'leave' });
@@ -697,25 +679,6 @@ function onPick(id) {
   } else if (S.phase === 'assassin' && S.roleInfo && S.roleInfo.key === 'assassin') {
     const p = byId(id);
     if (window.confirm(`${p.name}님이 멀린이라고 지목할까요?`)) send({ t: 'assassinate', target: id });
-  }
-}
-
-async function shareLink() {
-  const url = `${location.origin}${BASE_PATH}?room=${S.code}`;
-  const text = `${APP_NAME}:${gameName(S.kind)} 하자! 링크를 눌러 들어오세요 (방 ${S.code})${S.locked ? ' · 비밀번호는 방장에게 물어보세요' : ''}`;
-  try {
-    if (navigator.share) {
-      await navigator.share({ title: `${APP_NAME}:${gameName(S.kind)}`, text, url });
-      return;
-    }
-  } catch (err) {
-    if (err && err.name === 'AbortError') return;
-  }
-  try {
-    await navigator.clipboard.writeText(`${text}\n${url}`);
-    showToast('초대 링크를 복사했어요.');
-  } catch {
-    showToast(url);
   }
 }
 

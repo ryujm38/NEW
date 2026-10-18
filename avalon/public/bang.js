@@ -113,7 +113,7 @@ function renderBang() {
     </div>`;
 
   return `
-  <div class="top"><span>방 <b>${esc(S.code)}</b></span><span>뱅! · ${S.gameNo}번째 판</span></div>
+  <div class="top"><span>${roomTag()}</span><span>뱅! · ${S.gameNo}번째 판</span></div>
   ${status}
   <div class="bplayers">${rows}</div>
   ${pile}

@@ -124,7 +124,7 @@ function renderMafia() {
   const title = { roles: '역할 확인', night: `🌙 ${S.day}번째 밤`, day: `☀️ ${S.day}일차 낮`, vote: `🗳 ${S.day}일차 투표`, trial: `⚖️ ${S.day}일차 찬반 투표`, voteResult: '투표 결과', over: '게임 끝' }[phase];
 
   return `
-  <div class="top"><span>방 <b>${esc(S.code)}</b></span><span>마피아 · ${title}</span></div>
+  <div class="top"><span>${roomTag()}</span><span>마피아 · ${title}</span></div>
   ${mfRoleBanner(me)}
   ${mfPanel(me, isHost)}
   <div class="mplayers">${rows}</div>

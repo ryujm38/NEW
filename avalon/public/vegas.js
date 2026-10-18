@@ -82,7 +82,7 @@
           ${genericOverButtons(isHost)}</div>` : '';
     const log = S.log.length ? `<div class="ulog">${S.log.slice(-5).reverse().map((l, i) => `<div class="${i === 0 ? 'new' : ''}">${esc(l)}</div>`).join('')}</div>` : '';
     return `
-    <div class="top"><span>방 <b>${esc(S.code)}</b></span><span>라스베가스 · ${S.round}/${S.rounds}라운드</span></div>
+    <div class="top"><span>${roomTag()}</span><span>라스베가스 · ${S.round}/${S.rounds}라운드</span></div>
     ${over}
     ${S.phase === 'roundEnd' || S.phase === 'over' ? resultsHtml() : ''}
     <div class="vboard">${S.casinos.map((c) => casinoHtml(c, pickable)).join('')}</div>

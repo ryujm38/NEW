@@ -161,7 +161,7 @@
     const over = S.phase === 'over'
       ? `<div class="card panel"><h2>게임 끝</h2><p class="big ok">🏆 ${S.winnerIds.map(pname).join(', ')} 승리!</p>${genericOverButtons(isHost)}</div>` : '';
     return `
-    <div class="top"><span>방 <b>${esc(S.code)}</b></span><span>부루마블</span></div>
+    <div class="top"><span>${roomTag()}</span><span>부루마블</span></div>
     ${over}
     ${board}
     ${playersHtml()}

@@ -226,7 +226,7 @@
       ${S.boardTokens.length ? `<div class="dboard small"><span class="dim">진보 토큰</span>${S.boardTokens.map((t) => `<button class="dtok" data-act="dlInfo" data-kind="token" data-id="${t}">${TOKENS[t].icon} ${esc(TOKENS[t].name)}</button>`).join('')}</div>` : ''}
       ${S.slots.some((x) => !x.taken) ? `<div class="small dim center">${S.age}시대 · 버린 카드 ${S.discard.length}장</div>${pyramidHtml()}` : ''}` : '';
     return `
-    <div class="top"><span>방 <b>${esc(S.code)}</b></span><span>세븐 원더스 듀얼${S.age ? ` · ${S.age}시대` : ''}</span></div>
+    <div class="top"><span>${roomTag()}</span><span>세븐 원더스 듀얼${S.age ? ` · ${S.age}시대` : ''}</span></div>
     ${S.phase === 'over' ? overHtml() : ''}
     ${S.phase === 'draft' ? draftHtml() : ''}
     <div class="dpls">${playerBar(a)}${playerBar(b)}</div>
