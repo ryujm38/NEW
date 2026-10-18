@@ -380,3 +380,6 @@ body:has(.lb) .toast { bottom: calc(96px + env(safe-area-inset-bottom)); }
 @media (prefers-reduced-motion: reduce) {
   .hm *, .lb *, body:has(.hm) .banner::before, body:has(.lb) .banner::before { animation: none !important; transition: none !important; }
 }
+
+/* 틀린 비밀번호 안내 (입력칸 바로 아래) */
+.hm .hm-pwerr { margin: 6px 2px 10px; font-size: 14px; font-weight: 700; color: #ff8a80; }

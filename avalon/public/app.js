@@ -17,6 +17,9 @@ const uiGames = () => Object.values(GAME_UI);
 
 let ws = null;
 let online = false;
+let everOnline = false; // 한 번이라도 연결됐는지
+const loadedAt = Date.now();
+setTimeout(() => { if (!online) render(); }, 2100); // 2초가 지나도 연결이 안 되면 안내를 띄운다
 let backoff = 500;
 let S = null; // 서버가 보낸 내 시점의 상태
 let toastTimer = null;
@@ -75,6 +78,7 @@ function connect() {
   ws = new WebSocket(`${location.protocol === 'https:' ? 'wss://' : 'ws://'}${location.host}${BASE_PATH}ws`);
   ws.onopen = () => {
     online = true;
+    everOnline = true;
     backoff = 500;
     if (session) send({ t: 'resume', code: session.code, token: session.token });
     else requestRooms();
@@ -129,6 +133,7 @@ function connect() {
       if (m.need === 'password') {
         ui.needPw = true;
         if (m.code) ui.code = m.code;
+        ui.pwError = ui.joinPw ? m.msg : ''; // 입력해서 틀린 경우에만 칸 아래에 표시
       }
       showToast(m.msg);
       if (m.need === 'password') { render(); focusLater('joinpw'); }
@@ -247,7 +252,8 @@ function render() {
     renderQueued = true;
     return;
   }
-  const banner = online ? '' : '<div class="banner">연결이 끊겼어요. 다시 연결하는 중…</div>';
+  const showOffline = !online && (everOnline || Date.now() - loadedAt > 2000);
+  const banner = showOffline ? `<div class="banner">${everOnline ? '연결이 끊겼어요. 다시 연결하는 중…' : '서버에 연결하는 중이에요…'}</div>` : '';
   let html;
   if (!S) html = renderHome();
   else if (S.phase === 'lobby') html = renderLobby();
@@ -376,6 +382,7 @@ function renderHome() {
       <label class="field">🔒 방 비밀번호
         <input type="text" id="joinpw" maxlength="20" autocomplete="off" value="${esc(ui.joinPw)}" placeholder="방장에게 받은 비밀번호" />
       </label>
+      ${ui.pwError ? `<p class="hm-pwerr" role="alert">⚠️ ${esc(ui.pwError)}</p>` : ''}
       <div class="row2"><button class="primary" data-act="join">들어가기</button><button class="ghost" data-act="pwcancel">취소</button></div>
     </div>`;
   // 방 목록 한 줄: 문장 | 게임·방장·상태 꼬리표 | 큰 인원 숫자
@@ -960,7 +967,7 @@ function historyHtml() {
 $app.addEventListener('input', (e) => {
   if (e.target.id === 'name') { ui.name = e.target.value; }
   if (e.target.id === 'createpw') { ui.createPw = e.target.value; }
-  if (e.target.id === 'joinpw') { ui.joinPw = e.target.value; }
+  if (e.target.id === 'joinpw') { ui.joinPw = e.target.value; ui.pwError = ''; }
 });
 
 $app.addEventListener('click', (e) => {
@@ -998,12 +1005,13 @@ $app.addEventListener('click', (e) => {
       break;
     }
     case 'setaccess': ui.locked = el.dataset.v === '1'; render(); break;
-    case 'pwcancel': ui.needPw = false; ui.joinPw = ''; render(); break;
+    case 'pwcancel': ui.needPw = false; ui.joinPw = ''; ui.pwError = ''; render(); break;
     case 'roomsrefresh': requestRooms(); render(); break;
     case 'pickroom': {
       // 목록에서 고른 방: 공개방은 바로 들어가고, 비밀번호 방은 아래 비밀번호 칸을 연다
       const name = ui.name.trim();
       if (ui.code !== el.dataset.code) ui.joinPw = '';
+      ui.pwError = '';
       ui.code = el.dataset.code;
       ui.needPw = false;
       if (!name) {
