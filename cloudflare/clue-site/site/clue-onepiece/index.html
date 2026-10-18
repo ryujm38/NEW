@@ -1,0 +1,1292 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0e2a47">
+<meta name="color-scheme" content="light dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="김정임류보드게임">
+<meta name="description" content="김정임류보드게임 - 클루 원피스 에디션 추리 노트">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>
+<title>클루:원피스 추리 노트 | 김정임류보드게임</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* 레이아웃: 위 헤더 / 가운데 노트(스티키 표) / 아래 탭바. 바다 해도 느낌의 네이비 + 밀짚모자 노랑 */
+:root{
+  --bg:#edf2f5; --surface:#ffffff; --surface2:#e2eaf0; --ink:#10243a; --muted:#5b6d7e; --line:#cddae3;
+  --navy:#0e2a47; --on-navy:#f2f7fb; --gold:#e8a500; --gold-ink:#7a5600; --red:#cf3a2e; --green:#1f8a52;
+  --yes-bg:#cfeadb; --yes-bg2:#e4f4ea; --yes:#176b3f; --no:#8b9aa8; --blue:#1f6fa8; --warn-bg:#fdecd0; --warn-ink:#7a4a00;
+  --mine:#eaf3fa; --env:#fff6dc; --pool:#eef0f4; --shadow:0 -6px 24px rgba(14,42,71,.18);
+  --sel:#0e2a47; --on-sel:#f2f7fb; --heat:85%; --no-faint:#c0cad3;
+  --font:'Noto Sans KR',system-ui,-apple-system,'Malgun Gothic',sans-serif;
+  --display:'Black Han Sans','Noto Sans KR','Malgun Gothic',sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0b1722; --surface:#122333; --surface2:#1a3047; --ink:#e6eef5; --muted:#92a6b8; --line:#26425b;
+  --navy:#08131f; --on-navy:#e9f1f8; --gold:#f2b92a; --gold-ink:#f2c658; --red:#ef6256; --green:#4cc088;
+  --yes-bg:#1d4a35; --yes-bg2:#173828; --yes:#7fe0ae; --no:#5f7488; --blue:#5aaee8; --warn-bg:#3a2c12; --warn-ink:#f5cf86;
+  --mine:#16293b; --env:#2c2610; --pool:#182836; --shadow:0 -6px 24px rgba(0,0,0,.5);
+  --sel:#5aaee8; --on-sel:#06121d; --heat:45%; --no-faint:#3b4f61; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0b1722; --surface:#122333; --surface2:#1a3047; --ink:#e6eef5; --muted:#92a6b8; --line:#26425b;
+  --navy:#08131f; --on-navy:#e9f1f8; --gold:#f2b92a; --gold-ink:#f2c658; --red:#ef6256; --green:#4cc088;
+  --yes-bg:#1d4a35; --yes-bg2:#173828; --yes:#7fe0ae; --no:#5f7488; --blue:#5aaee8; --warn-bg:#3a2c12; --warn-ink:#f5cf86;
+  --mine:#16293b; --env:#2c2610; --pool:#182836; --shadow:0 -6px 24px rgba(0,0,0,.5);
+  --sel:#5aaee8; --on-sel:#06121d; --heat:45%; --no-faint:#3b4f61; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.45;-webkit-text-size-adjust:100%}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;-webkit-tap-highlight-color:transparent}
+:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.app{height:100%;display:flex;flex-direction:column;position:relative;max-width:900px;margin:0 auto;background:var(--bg)}
+.top{background:var(--navy);color:var(--on-navy);padding:10px 16px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.top h1{font:400 20px/1.2 var(--display);margin:0;letter-spacing:.02em}
+.top .sub{font-size:12px;opacity:.75}
+.top a.brand{display:flex;align-items:baseline;gap:6px;color:inherit;text-decoration:none;padding:7px 10px 7px 6px;margin:-7px 0 -7px -6px;border-radius:8px}
+.top a.brand:active{background:rgba(255,255,255,.14)}
+.top a.brand .chev{opacity:.7;font-size:20px;line-height:1}
+.top .status{margin-left:auto;font-size:12px;font-weight:700;color:var(--gold);font-variant-numeric:tabular-nums}
+.top .status.bad{color:#ffb3a9}
+main{flex:1;min-height:0;overflow:auto}
+main.notemain{display:flex;flex-direction:column;overflow:hidden}
+.pad{padding:16px 16px 96px;display:flex;flex-direction:column;gap:14px}
+h2{font:400 22px/1.2 var(--display);margin:0}
+h3{font-size:15px;margin:0 0 8px}
+.lead,.muted{color:var(--muted);margin:0;font-size:13px}
+.banner{padding:8px 16px;font-size:13px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.banner.ok{background:var(--yes-bg);color:var(--yes);font-weight:700}
+.banner.warn{background:var(--warn-bg);color:var(--warn-ink)}
+.banner.install{background:var(--surface2);color:var(--ink);justify-content:space-between;gap:10px;border-bottom:1px solid var(--line);flex-wrap:nowrap;padding-top:6px;padding-bottom:6px}
+.banner.install>span:first-child{flex:1;min-width:0;font-size:12.5px;line-height:1.35}
+.banner.install .btn{padding:7px 12px;font-size:13px;white-space:nowrap}
+.banner.install .acts{display:flex;gap:6px}
+.legend{padding:5px 16px;font-size:11px;color:var(--muted);display:flex;gap:4px 12px;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--line);background:var(--bg)}
+.legend b{color:var(--ink)}
+.legend .bar3{display:inline-block;width:3px;height:11px;background:var(--gold);vertical-align:-1px;margin-right:3px}
+.vil{margin-left:auto;display:inline-flex;align-items:center;gap:4px;color:var(--ink)}
+.vil button{width:34px;height:34px;border-radius:8px;border:1px solid var(--line);background:var(--surface);padding:0;font-size:14px;line-height:1}
+.vil b{min-width:34px;text-align:center;font-variant-numeric:tabular-nums}
+.vil.danger b{color:var(--red)}
+.gridwrap{flex:1;min-height:0;overflow:auto;background:var(--surface);padding-bottom:84px}
+table.grid{border-collapse:separate;border-spacing:0;min-width:100%}
+.grid th,.grid td{border-bottom:1px solid var(--line);border-right:1px solid var(--line);padding:0}
+.grid thead th{position:sticky;top:0;z-index:3;background:var(--surface2);height:46px;font-size:11px;font-weight:700;min-width:38px;max-width:38px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 2px}
+.grid thead th small{display:block;font-weight:400;color:var(--muted);font-size:10px}
+.grid thead th.me{background:var(--blue);color:var(--on-sel)}
+.grid thead th.me small{color:var(--on-sel);opacity:.8}
+.grid thead th.envh{background:var(--gold);color:#2b1d00;left:86px;z-index:4}
+.grid thead th.envh small{color:#4a3300}
+.grid thead th.corner{left:0;z-index:5;min-width:86px;max-width:86px;text-align:left;padding:0 8px;color:var(--muted)}
+.grid .cname{position:sticky;left:0;z-index:2;background:var(--surface);text-align:left;min-width:86px;max-width:86px;padding:0 8px;font-weight:500;font-size:12.5px;line-height:1.2;white-space:normal;word-break:keep-all;overflow:hidden}
+.grid .cname.cand{box-shadow:inset 3px 0 0 var(--gold)}
+.grid .cname.sure{box-shadow:inset 3px 0 0 var(--green);font-weight:700}
+.grid .cname.out{color:var(--no)}
+.grid .cathead th{position:sticky;left:0;z-index:2;text-align:left;background:var(--navy);color:var(--on-navy);font-size:12px;padding:5px 0;letter-spacing:.04em}
+.grid .cathead th .catlab{position:sticky;left:10px;display:inline-block;opacity:1;margin-left:0}
+.grid .cathead th span{opacity:.7;font-weight:400;margin-left:6px}
+.grid .cathead th span.rem{opacity:1;color:var(--gold);font-weight:700}
+.cell{width:38px;min-width:38px;height:38px;text-align:center;font-size:12px;font-variant-numeric:tabular-nums;cursor:pointer;user-select:none;-webkit-user-select:none;color:var(--muted);background:var(--surface)}
+.cell.mine{background:var(--mine);position:relative}
+.seen{position:absolute;top:2px;right:2px;min-width:14px;height:14px;padding:0 3px;border-radius:7px;background:var(--blue);color:var(--on-sel);font:700 9px/14px var(--font);font-style:normal;text-align:center;font-variant-numeric:tabular-nums}
+.seen.sl{position:static;display:inline-block;vertical-align:1px}
+.chip.mc{display:flex;flex-direction:column;align-items:flex-start;gap:1px;text-align:left;border-radius:12px;padding:9px 14px}
+.chip.mc .seeninfo{font-size:12px;font-weight:400;opacity:.85}
+.chip.mc .seeninfo.hot{font-weight:700;opacity:1}
+.cell.poolc{background:var(--pool)}
+.cell.envc{background:var(--env);border-left:2px solid var(--gold);position:sticky;left:86px;z-index:2}
+.cell.pct{background:color-mix(in srgb,var(--gold) calc(var(--p) * var(--heat)),var(--surface));color:var(--ink);font-weight:500}
+.cell.pct.envc{background:color-mix(in srgb,var(--gold) calc(var(--p) * var(--heat)),var(--env))}
+.cell.pct.poolc{background:color-mix(in srgb,var(--gold) calc(var(--p) * var(--heat)),var(--pool))}
+.cell.yes{background:var(--yes-bg);color:var(--yes);font-weight:700;font-size:17px}
+.cell.yes.inf{background:var(--yes-bg2)}
+.cell.no{color:var(--no);font-size:14px}
+.cell.no.inf{color:var(--no-faint)}
+.cell.man{box-shadow:inset 0 0 0 2px var(--blue)}
+.fab{position:absolute;right:16px;bottom:76px;z-index:20;background:var(--red);color:#fff;border:0;border-radius:999px;padding:13px 20px;font-weight:700;font-size:15px;box-shadow:0 6px 18px rgba(0,0,0,.3)}
+.fab:active{transform:scale(.97)}
+.tabs{display:flex;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px);box-shadow:var(--shadow)}
+.tab{flex:1;background:none;border:0;padding:8px 4px 7px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;color:var(--muted);min-height:52px}
+.tab svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tab.on{color:var(--blue);font-weight:700}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px}
+.prow{display:flex;gap:6px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+.prow:last-child{border-bottom:0}
+.prow input.pname{flex:1;min-width:0;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--bg)}
+.meradio{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink);white-space:nowrap;min-height:40px;padding:0 6px}
+.meradio input{width:20px;height:20px;margin:0}
+.metag{font-size:11px;font-weight:700;background:var(--blue);color:var(--on-sel);border-radius:6px;padding:2px 6px}
+.ibtn{width:36px;height:36px;border-radius:8px;border:1px solid var(--line);background:var(--surface);font-size:15px;line-height:1;padding:0}
+.ibtn:disabled{opacity:.3;cursor:default}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:11px 16px;font-weight:700}
+.btn.primary{background:var(--sel);color:var(--on-sel);border-color:var(--sel)}
+.btn.danger{background:var(--red);color:#fff;border-color:var(--red)}
+.btn:disabled{opacity:.4;cursor:default}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 12px;font-size:13px}
+.chip.on{background:var(--sel);color:var(--on-sel);border-color:var(--sel);font-weight:700}
+.chip.me::after{content:'나';font-size:10px;margin-left:5px;background:var(--blue);color:var(--on-sel);border-radius:5px;padding:0 4px}
+.chip.hand.on{background:var(--blue);border-color:var(--blue);color:var(--on-sel)}
+.chip.pool.on{background:var(--gold);border-color:var(--gold);color:#2b1d00}
+.chip.fixed{background:var(--surface2);border-style:dashed;color:var(--muted);cursor:default}
+.chip:disabled{opacity:.35;cursor:default}
+.pair{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px}
+.pair .or{font-size:11px;color:var(--muted)}
+.catlabel{font-size:12px;font-weight:700;color:var(--muted);margin:10px 0 6px;letter-spacing:.04em}
+.count{font-variant-numeric:tabular-nums;font-weight:700}
+.count.bad{color:var(--red)}
+.count.good{color:var(--green)}
+.hint{font-size:12px;color:var(--warn-ink);background:var(--warn-bg);border-radius:8px;padding:8px 10px;margin:8px 0 0}
+.hint.info{background:var(--surface2);color:var(--ink)}
+.tag{display:inline-block;font-size:12px;font-weight:700;border-radius:6px;padding:2px 7px;margin:1px 3px 1px 0}
+.tag.t0{background:#d9e8f7;color:#154a78}
+.tag.t1{background:#fbe6b4;color:#6c4a00}
+.tag.t2{background:#d4eedd;color:#17613a}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .tag.t0{background:#1c3b57;color:#a9d2f5}:root:not([data-theme="light"]) .tag.t1{background:#4a3a10;color:#f6d98c}:root:not([data-theme="light"]) .tag.t2{background:#1a4430;color:#a2e3bf}}
+:root[data-theme="dark"] .tag.t0{background:#1c3b57;color:#a9d2f5}:root[data-theme="dark"] .tag.t1{background:#4a3a10;color:#f6d98c}:root[data-theme="dark"] .tag.t2{background:#1a4430;color:#a2e3bf}
+.ev{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:6px}
+.ev header{display:flex;align-items:center;gap:8px}
+.ev .n{font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+.ev .res{font-size:13px}
+.ev .del{margin-left:auto}
+.bar{display:grid;grid-template-columns:minmax(70px,110px) 1fr 44px;gap:8px;align-items:center;padding:3px 0}
+.bar .track{height:12px;background:var(--surface2);border-radius:6px;overflow:hidden}
+.bar .track i{display:block;height:100%;background:var(--gold);border-radius:6px}
+.bar.sure .track i{background:var(--green)}
+.bar b{text-align:right;font-variant-numeric:tabular-nums;font-size:13px}
+.bar .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sheetwrap{position:absolute;inset:0;z-index:50;display:flex;flex-direction:column;justify-content:flex-end}
+.backdrop{position:absolute;inset:0;background:rgba(5,15,25,.55)}
+.panel{position:relative;background:var(--bg);border-radius:16px 16px 0 0;max-height:92%;display:flex;flex-direction:column;box-shadow:var(--shadow)}
+.pbody{overflow:auto;padding:16px;display:flex;flex-direction:column;gap:12px;min-height:0}
+.actions{padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line);background:var(--bg);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.seg{display:flex;background:var(--surface2);border-radius:10px;padding:3px}
+.seg button{flex:1;border:0;background:none;border-radius:8px;padding:8px 4px;font-weight:700;color:var(--muted)}
+.seg button.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.15),inset 0 0 0 2px var(--blue)}
+.sels{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+@media (max-width:420px){.sels{grid-template-columns:1fr}}
+.sel{display:flex;flex-direction:column;gap:3px;font-size:12px;font-weight:700;color:var(--muted)}
+.sel select{border:1px solid var(--line);border-radius:8px;padding:9px;background:var(--surface);color:var(--ink);font-weight:400;font-size:14px;min-width:0}
+.field{display:flex;flex-direction:column;gap:6px}
+.field>.lb{font-size:12px;font-weight:700;color:var(--muted)}
+.preview{background:var(--surface);border:1px dashed var(--line);border-radius:10px;padding:10px;font-size:13px}
+.err{color:var(--red);font-size:13px;font-weight:700}
+.actions .err{flex-basis:100%}
+.chip.off{text-decoration:line-through}
+.clue{padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}
+.clue:last-child{border-bottom:0}
+.pcard{padding:6px 0;border-bottom:1px solid var(--line);font-size:13px}
+.pcard:last-child{border-bottom:0}
+.rules{margin:0;padding-left:18px;font-size:13px;color:var(--muted)}
+.rules li{margin:4px 0}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+
+<div class="app" id="app">
+  <header class="top">
+    <a class="brand" href="/" aria-label="김정임류보드게임 홈으로"><span class="chev" aria-hidden="true">‹</span><h1>김정임류보드게임</h1></a><span class="sub">클루:원피스 추리 노트</span><span class="status" id="status"></span>
+  </header>
+  <div class="banner install" id="installbar" hidden></div>
+  <div class="banner warn" id="savewarn" hidden>이 브라우저에서는 저장이 안 돼요. 비공개(시크릿) 모드이거나 저장이 막혀 있어요. 새로고침하면 기록이 사라져요.</div>
+  <main id="main"></main>
+  <button class="fab" id="fab" data-act="open-sheet" hidden>＋ 기록하기</button>
+  <nav class="tabs" id="tabs" hidden></nav>
+  <div id="sheet"></div>
+</div>
+
+<script>
+'use strict';
+/*ENGINE-START*/
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+
+// 질문 한 번의 흐름: 질문자 다음 사람부터 시계 방향으로 보여줄 때까지 모두 '패스'
+function askFlow(N,ev){
+  const passers=[];
+  for(let k=1;k<N;k++){const p=(ev.asker+k)%N; if(p===ev.shower)break; passers.push(p);}
+  return {passers};
+}
+
+// 한글판 카드 분배: 동료 6 + 보물 6 + 섬 9 = 21장, 봉투 3장을 빼면 18장.
+// per = 한 명당 장수, pool = 남는 카드 수, revealed = 그중 앞면으로 공개되는 장수
+// (2인: 소문 카드 5장은 뒷면으로 옆에 두고 1장만 공개)
+function dealRules(N,dealt){
+  if(dealt===18){
+    const per={2:6,3:6,4:4,5:3,6:3}[N];
+    if(per!==undefined){const pool=18-N*per;return {per,pool,revealed:N===2?1:pool};}
+  }
+  const per=Math.floor(dealt/N),pool=dealt-N*per;
+  return {per,pool,revealed:pool};
+}
+
+// 현재 기록을 제약조건으로 변환. 소유자 인덱스: 0..N-1 = 플레이어, N = 봉투(정답), N+1 = 남는 카드
+function buildProblem(st,skip){
+  const N=st.players.length,E=N,X=N+1,O=N+2;
+  const flat=[],cat=[];
+  st.names.forEach((arr,k)=>arr.forEach(n=>{flat.push(n);cat.push(k);}));
+  const C=flat.length;
+  const allowed=Array.from({length:C},()=>new Array(O).fill(true));
+  const clauses=[];
+  const sizes=st.players.map(p=>p.size);
+  const P=st.pool||0;
+  const setHas=(c,o)=>{for(let k=0;k<O;k++)if(k!==o)allowed[c][k]=false;};
+  const setNot=(c,o)=>{allowed[c][o]=false;};
+  st.hand.forEach(c=>setHas(c,st.me));
+  (st.revealed||[]).forEach(c=>setHas(c,X));
+  for(const key of Object.keys(st.manual)){
+    const [c,o]=key.split('|').map(Number);
+    if(st.manual[key])setHas(c,o);else setNot(c,o);
+  }
+  st.events.forEach((ev,i)=>{
+    if(i===skip)return;
+    if(ev.type==='ask'){
+      askFlow(N,ev).passers.forEach(p=>ev.cards.forEach(c=>setNot(c,p)));
+      if(ev.shower!=null){
+        if(ev.shown!=null)setHas(ev.shown,ev.shower);
+        else clauses.push({kind:'any',p:ev.shower,cards:ev.cards,ev:i});
+      }
+    }else if(ev.type==='acc'){
+      clauses.push({kind:'notAllEnv',cards:ev.cards,ev:i});
+    }else if(ev.type==='know'){
+      setHas(ev.card,ev.owner);
+    }
+  });
+  return {N,E,X,O,C,cat,flat,allowed,clauses,sizes,P};
+}
+
+// 카드 배분 탐색(DFS). onLeaf(own)이 true를 돌려주면 거기서 멈춘다. fixed={c,o}면 그 카드를 그 소유자로 고정
+function search(prob,fixed,nodeLimit,onLeaf,rngS,deadline){
+  const {N,O,C,cat,clauses,sizes,P}=prob,E=N,X=N+1;
+  const dom=prob.allowed.map(r=>r.slice());
+  if(fixed){for(let k=0;k<O;k++)dom[fixed.c][k]=(k===fixed.o)&&dom[fixed.c][k];}
+  const own=new Array(C).fill(-1),cnt=new Array(N).fill(0),envCnt=[0,0,0];
+  let poolCnt=0,nodes=0,limited=false,stopped=false;
+  const canOwner=(c,o)=>dom[c][o]&&(o<N?cnt[o]<sizes[o]:(o===E?envCnt[cat[c]]<1:poolCnt<P));
+  const place=(c,o,d)=>{own[c]=d>0?o:-1;if(o<N)cnt[o]+=d;else if(o===E)envCnt[cat[c]]+=d;else poolCnt+=d;};
+  const byP=[];for(let o=0;o<N;o++)byP[o]=[];
+  for(const cl of clauses)if(cl.kind==='any')byP[cl.p].push(cl);
+  function matchOK(){
+    // 남은 자리(플레이어별 빈 장수, 봉투 종류별 1자리, 남는 카드 자리)에 아직 주인 없는 카드를 하나씩 배정할 수 있는지(필요조건)
+    const slots=[];
+    for(let p=0;p<N;p++)for(let i=0;i<sizes[p]-cnt[p];i++)slots.push({o:p,k:-1});
+    for(let k=0;k<3;k++)if(envCnt[k]===0)slots.push({o:E,k});
+    for(let i=0;i<P-poolCnt;i++)slots.push({o:X,k:-1});
+    const cards=[];for(let c=0;c<C;c++)if(own[c]<0)cards.push(c);
+    if(cards.length>slots.length)return false;
+    const matchSlot=new Array(slots.length).fill(-1);
+    const fits=(c,s)=>{const sl=slots[s];return dom[c][sl.o]&&(sl.o!==E||cat[c]===sl.k);};
+    const tryC=(c,seen)=>{
+      for(let s=0;s<slots.length;s++){
+        if(seen[s]||!fits(c,s))continue;
+        seen[s]=true;
+        if(matchSlot[s]<0||tryC(matchSlot[s],seen)){matchSlot[s]=c;return true;}
+      }
+      return false;
+    };
+    for(const c of cards){if(!tryC(c,new Array(slots.length).fill(false)))return false;}
+    return true;
+  }
+  function hitOK(){
+    for(let p=0;p<N;p++){
+      const need=sizes[p]-cnt[p];
+      if(need<=0||byP[p].length<2)continue;
+      const sets=[];
+      for(const cl of byP[p]){
+        let sat=false;const s=[];
+        for(const c of cl.cards){if(own[c]===p){sat=true;break;}if(own[c]<0&&dom[c][p])s.push(c);}
+        if(!sat)sets.push(s);
+      }
+      if(sets.length<=need)continue;
+      const hit=(left,k)=>{
+        let i=0;while(i<left.length&&left[i]===null)i++;
+        if(i===left.length)return true;
+        if(k===0)return false;
+        for(const c of left[i]){
+          const nl=left.map(s=>s!==null&&s.indexOf(c)>=0?null:s);
+          if(hit(nl,k-1))return true;
+        }
+        return false;
+      };
+      if(!hit(sets,need))return false;
+    }
+    return true;
+  }
+  function consistent(){
+    for(let o=0;o<N;o++){
+      const need=sizes[o]-cnt[o];
+      if(need<=0)continue;
+      let avail=0;
+      for(let c=0;c<C;c++)if(own[c]<0&&dom[c][o])avail++;
+      if(avail<need)return false;
+    }
+    if(P-poolCnt>0){
+      let avail=0;
+      for(let c=0;c<C;c++)if(own[c]<0&&dom[c][X])avail++;
+      if(avail<P-poolCnt)return false;
+    }
+    for(let k=0;k<3;k++){
+      if(envCnt[k]===0){
+        let a=false;
+        for(let c=0;c<C;c++)if(cat[c]===k&&own[c]<0&&dom[c][E]){a=true;break;}
+        if(!a)return false;
+      }
+    }
+    if(!hitOK())return false;
+    if(nodes===0&&!matchOK())return false;
+    for(const cl of clauses){
+      let ok=false;
+      if(cl.kind==='any'){
+        for(const c of cl.cards){
+          if(own[c]===cl.p){ok=true;break;}
+          if(own[c]<0&&canOwner(c,cl.p)){ok=true;break;}
+        }
+      }else{
+        for(const c of cl.cards){
+          if(own[c]>=0){if(own[c]!==E){ok=true;break;}}
+          else{for(let o=0;o<O;o++)if(o!==E&&canOwner(c,o)){ok=true;break;} if(ok)break;}
+        }
+      }
+      if(!ok)return false;
+    }
+    return true;
+  }
+  function dfs(){
+    if(++nodes>nodeLimit||(deadline&&(nodes&1023)===0&&Date.now()>deadline)){limited=true;return false;}
+    let best=-1,bestN=99;
+    for(let c=0;c<C;c++){
+      if(own[c]>=0)continue;
+      let n=0;
+      for(let o=0;o<O;o++)if(canOwner(c,o))n++;
+      if(n===0)return false;
+      if(n<bestN||(rngS&&n===bestN&&rngS()<0.3)){bestN=n;best=c;}
+    }
+    if(best<0){if(onLeaf(own)){stopped=true;return true;}return false;}
+    const c=best;
+    const ord=[];for(let o=0;o<O;o++)ord.push(o);
+    if(rngS)for(let i=O-1;i>0;i--){const j=(rngS()*(i+1))|0;const t=ord[i];ord[i]=ord[j];ord[j]=t;}
+    for(const o of ord){
+      if(!canOwner(c,o))continue;
+      place(c,o,1);
+      if(consistent()&&dfs())return true;
+      place(c,o,-1);
+      if(limited)return false;
+    }
+    return false;
+  }
+  if(!consistent())return {status:'unsat'};
+  dfs();
+  if(stopped)return {status:'sat'};
+  return {status:limited?'limit':'unsat'};
+}
+// 모순 없이 카드를 나눌 수 있는지 확인하고, 되면 하나의 배분을 돌려준다
+function solve(prob,fixed,nodeLimit){
+  let found=null;
+  const r=search(prob,fixed,nodeLimit,own=>{found=own.slice();return true;});
+  return found?{status:'sat',own:found}:{status:r.status};
+}
+// 처음 한 번은 순서대로, 막히면 순서를 섞어 다시 시도한다. 끝까지 다 훑어서 없다고 나온 경우만 '불가능'으로 믿는다
+function solveRestart(prob,fixed,tries,limit,seed,fallback){
+  for(let t=0;t<tries;t++){
+    let found=null;
+    const rr=search(prob,fixed,limit,own=>{found=own.slice();return true;},t===0?null:mulberry32(seed+t*7919));
+    if(found)return {status:'sat',own:found};
+    if(rr.status==='unsat')return {status:'unsat'};
+  }
+  return solve(prob,fixed,fallback);
+}
+// 가능한 배분이 적으면 전부 세어 정확한 확률을 낸다. 너무 많으면 null
+function enumerateAll(prob,maxModels,nodeLimit,budgetMs){
+  const {O,C}=prob;
+  const counts=Array.from({length:C},()=>new Array(O).fill(0));
+  let total=0,aborted=false;
+  const r=search(prob,null,nodeLimit,own=>{
+    if(++total>maxModels){aborted=true;return true;}
+    for(let c=0;c<C;c++)counts[c][own[c]]++;
+    return false;
+  },null,budgetMs?Date.now()+budgetMs:0);
+  if(aborted||r.status==='limit')return null;
+  return {counts,samples:total};
+}
+
+// 배분이 너무 많을 때: 카드 3~5장을 골라 가능한 재배분 중 하나를 균등하게 다시 뽑는 방식으로 무작위 표본을 모은다
+function sampleModels(prob,start,steps,burn,thin,rng){
+  const {N,O,C,cat,clauses,allowed}=prob,E=N;
+  const own=start.slice();
+  const counts=Array.from({length:C},()=>new Array(O).fill(0));
+  let samples=0;
+  const clausesOK=()=>{
+    for(const cl of clauses){
+      let ok=false;
+      if(cl.kind==='any'){for(const c of cl.cards)if(own[c]===cl.p){ok=true;break;}}
+      else{for(const c of cl.cards)if(own[c]!==E){ok=true;break;}}
+      if(!ok)return false;
+    }
+    return true;
+  };
+  const KS=[3,4,4,5];
+  for(let it=0;it<burn+steps;it++){
+    const k=Math.min(KS[(rng()*KS.length)|0],C);
+    const blk=[];
+    while(blk.length<k){const c=(rng()*C)|0;if(blk.indexOf(c)<0)blk.push(c);}
+    const rem=new Array(O).fill(0);
+    for(const c of blk)rem[own[c]]++;
+    const envFixed=[0,0,0];
+    for(let c=0;c<C;c++)if(own[c]===E&&blk.indexOf(c)<0)envFixed[cat[c]]++;
+    const opts=[],cur=new Array(k);
+    (function rec(i){
+      if(i===k){
+        const ev=envFixed.slice();
+        for(let j=0;j<k;j++)if(cur[j]===E){if(++ev[cat[blk[j]]]>1)return;}
+        const save=blk.map(c=>own[c]);
+        for(let j=0;j<k;j++)own[blk[j]]=cur[j];
+        const ok=clausesOK();
+        for(let j=0;j<k;j++)own[blk[j]]=save[j];
+        if(ok)opts.push(cur.slice());
+        return;
+      }
+      const c=blk[i];
+      for(let o=0;o<O;o++){
+        if(rem[o]>0&&allowed[c][o]){rem[o]--;cur[i]=o;rec(i+1);rem[o]++;}
+      }
+    })(0);
+    if(opts.length){const pick=opts[(rng()*opts.length)|0];for(let j=0;j<k;j++)own[blk[j]]=pick[j];}
+    if(it>=burn&&(it-burn)%thin===0){samples++;for(let c=0;c<C;c++)counts[c][own[c]]++;}
+  }
+  return {counts,samples};
+}
+
+// 어느 기록 하나(또는 수동 표시 하나)를 빼면 모순이 풀리는지 찾는다
+function findCulprits(st){
+  const events=[],manual=[];
+  for(let i=0;i<st.events.length;i++){
+    const r=solveRestart(buildProblem(st,i),null,6,5000,31,30000);
+    if(r.status==='sat')events.push(i);
+  }
+  for(const key of Object.keys(st.manual)){
+    const m2=Object.assign({},st.manual);delete m2[key];
+    const r=solveRestart(buildProblem(Object.assign({},st,{manual:m2}),-1),null,6,5000,37,30000);
+    if(r.status==='sat')manual.push(key);
+  }
+  return {events,manual};
+}
+
+function analyze(st,opts){
+  opts=opts||{};
+  const prob=buildProblem(st,-1);
+  const res={prob,ok:false,error:null};
+  const need=prob.C-3,sum=prob.sizes.reduce((a,b)=>a+b,0)+prob.P;
+  if(sum!==need){res.error='sizes';res.sum=sum;res.need=need;return res;}
+  const r=solveRestart(prob,null,30,5000,1234,200000);
+  if(r.status==='limit'){res.error='limit';return res;}
+  if(r.status==='unsat'){res.error='contradiction';const cu=findCulprits(st);res.culprits=cu.events;res.manualCulprits=cu.manual;return res;}
+  const N=prob.N,C=prob.C,O=prob.O;
+  let ex=opts.forceSample?null:enumerateAll(prob,60000,200000);
+  if(!ex&&!opts.forceSample&&st.events.length>=5)ex=enumerateAll(prob,400000,2000000,150);
+  const exact=!!ex;
+  const {counts,samples}=ex||sampleModels(prob,r.own,80000,4000,8,mulberry32(7919));
+  const poss=[],pr=[],owner=[];
+  for(let c=0;c<C;c++){
+    poss[c]=[];pr[c]=[];
+    let n=0,last=-1;
+    for(let o=0;o<O;o++){
+      let p=false;
+      if(prob.allowed[c][o]){
+        if(counts[c][o]>0)p=true;
+        else if(!exact)p=solveRestart(prob,{c,o},2,4000,977,20000).status!=='unsat';
+      }
+      poss[c][o]=p;
+      pr[c][o]=samples?counts[c][o]/samples:0;
+      if(p){n++;last=o;}
+    }
+    owner[c]=n===1?last:-1;
+  }
+  const clues=[];
+  for(const cl of prob.clauses){
+    if(cl.kind==='any'){
+      const cands=cl.cards.filter(c=>poss[c][cl.p]);
+      const settled=cl.cards.some(c=>owner[c]===cl.p);
+      if(!settled&&cands.length>1)clues.push({kind:'any',p:cl.p,cands,ev:cl.ev});
+    }else if(cl.cards.every(c=>poss[c][N])){
+      clues.push({kind:'notAllEnv',cards:cl.cards,ev:cl.ev});
+    }
+  }
+  Object.assign(res,{ok:true,poss,pr,owner,clues,samples,exact});
+  return res;
+}
+/*ENGINE-END*/
+
+/* ───────── 상태 ───────── */
+const KEY='clue-op-note-v2';
+const CATS=[{label:'인물',q:'누가'},{label:'보물',q:'무엇을'},{label:'섬',q:'어디에'}];
+// 한글판: 색이 같은 짝 중 한 명만 쓰고, 루피·조로·상디는 항상 쓴다
+const PAIRS=[['나미','우솝'],['초파','브룩'],['프랑키','로빈']];
+const TREASURES=['보물상자','쌍안경','목걸이','해적 금화','고기','검'];
+const ISLANDS=['와노쿠니','드럼성','어인섬','홀케이크 아일랜드','마린 포드','드레스로자','아마존 릴리','워터 세븐','펑크 하자드'];
+const PAIR_SLOT=[2,4,5]; // 인물 카드 목록에서 짝 선택이 들어가는 자리
+function crewList(p){
+  return ['루피','조로',p[0]>=0?PAIRS[0][p[0]]:'나미/우솝','상디',p[1]>=0?PAIRS[1][p[1]]:'초파/브룩',p[2]>=0?PAIRS[2][p[2]]:'프랑키/로빈'];
+}
+const MAX_PLAYERS=6,MIN_PLAYERS=2,VILLAIN_MAX=8;
+const TABS=[
+  {k:'note',l:'노트',svg:'<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16M4 15h16M10 4v16"/>'},
+  {k:'deduce',l:'추리',svg:'<circle cx="12" cy="12" r="8"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>'},
+  {k:'log',l:'기록',svg:'<path d="M6 5h12M6 10h12M6 15h8M6 20h5"/>'},
+  {k:'settings',l:'설정',svg:'<circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/>'}
+];
+const clone=o=>JSON.parse(JSON.stringify(o));
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+
+function newState(){
+  const pick=[-1,-1,-1];
+  return {v:2,started:false,players:[{name:'나',size:0},{name:'친구1',size:0}],me:0,hand:[],revealed:[],pool:0,
+    crewPick:pick,names:[crewList(pick),TREASURES.slice(),ISLANDS.slice()],events:[],manual:{},villain:0,nextId:1};
+}
+// 저장된 데이터를 믿지 않고 하나씩 검사한다. 이상하면 새 게임으로 시작한다. (카드 이름은 항상 기본값으로 복원)
+function sane(j){
+  try{
+    if(!j||j.v!==2)return null;
+    if(!Array.isArray(j.players)||j.players.length<MIN_PLAYERS||j.players.length>MAX_PLAYERS)return null;
+    if(!j.players.every(p=>p&&typeof p.name==='string'))return null;
+    const N=j.players.length;
+    if(!Number.isInteger(j.me)||j.me<0||j.me>=N)return null;
+    if(!Array.isArray(j.crewPick)||j.crewPick.length!==3||!j.crewPick.every(v=>v===-1||v===0||v===1))return null;
+    j.names=[crewList(j.crewPick),TREASURES.slice(),ISLANDS.slice()];
+    const C=21,okIdx=x=>Number.isInteger(x)&&x>=0&&x<C;
+    if(!Array.isArray(j.hand)||!j.hand.every(okIdx)||!Array.isArray(j.revealed)||!j.revealed.every(okIdx))return null;
+    j.hand=[...new Set(j.hand)];j.revealed=[...new Set(j.revealed)];
+    const man={};
+    if(j.manual&&typeof j.manual==='object')for(const k of Object.keys(j.manual)){
+      const m=/^(\d+)\|(\d+)$/.exec(k);
+      if(m&&+m[1]<C&&+m[2]<=N+1&&+m[2]!==j.me&&(j.manual[k]===0||j.manual[k]===1))man[k]=j.manual[k];
+    }
+    j.manual=man;
+    j.villain=Number.isInteger(j.villain)?Math.max(0,Math.min(VILLAIN_MAX,j.villain)):0;
+    j.nextId=Number.isInteger(j.nextId)?j.nextId:1;
+    const okEv=ev=>{
+      if(!ev||typeof ev!=='object')return false;
+      const pl=x=>Number.isInteger(x)&&x>=0&&x<N;
+      if(ev.type==='know')return okIdx(ev.card)&&Number.isInteger(ev.owner)&&ev.owner>=0&&ev.owner<=N+1;
+      if(!pl(ev.asker)||!Array.isArray(ev.cards)||ev.cards.length!==3||!ev.cards.every(okIdx))return false;
+      if(ev.type==='acc')return true;
+      if(ev.type!=='ask')return false;
+      if(ev.shower!=null&&(!pl(ev.shower)||ev.shower===ev.asker))return false;
+      if(ev.shown!=null&&!okIdx(ev.shown))return false;
+      if(ev.mine!=null&&!okIdx(ev.mine))return false;
+      return true;
+    };
+    j.events=Array.isArray(j.events)?j.events.filter(okEv):[];
+    j.started=!!j.started;
+    if(j.started&&!j.crewPick.every(v=>v>=0))return null;
+    if(!j.started)j.events=[];
+    j.pool=Number.isInteger(j.pool)?j.pool:0;
+    return j;
+  }catch(e){return null;}
+}
+function load(){
+  let raw=null;
+  try{raw=localStorage.getItem(KEY);const j=sane(JSON.parse(raw));if(j)return j;}catch(e){}
+  if(raw){try{localStorage.setItem(KEY+'-backup',raw);}catch(e){}}
+  return newState();
+}
+let saveFailed=false;
+function save(){try{localStorage.setItem(KEY,JSON.stringify(st));saveFailed=false;}catch(e){saveFailed=true;}}
+
+let st=load(),A=null,CARDS=[];
+const ui={tab:'note',sheet:null,cell:null,confirm:null,editHand:false,lastKey:''};
+
+function flatCards(){const out=[];st.names.forEach((arr,k)=>arr.forEach((n,i)=>out.push({cat:k,idx:i,name:n})));return out;}
+function cardIdx(cat,i){let c=0;for(let k=0;k<cat;k++)c+=st.names[k].length;return c+i;}
+const dealt=()=>st.names.reduce((s,a)=>s+a.length,0)-3;
+const rules=()=>dealRules(st.players.length,dealt());
+function syncSizes(){
+  const N=st.players.length,r=dealRules(N,dealt());
+  st.players.forEach(p=>p.size=r.per);
+  st.pool=r.pool;
+  if(st.hand.length>r.per)st.hand=st.hand.slice(0,r.per);
+  if(st.revealed.length>r.revealed)st.revealed=st.revealed.slice(0,r.revealed);
+}
+function directOwner(P,c){let n=0,last=-1;for(let o=0;o<P.O;o++)if(P.allowed[c][o]){n++;last=o;}return n===1?last:-1;}
+const crewDone=()=>st.crewPick.every(v=>v>=0);
+
+function refresh(){
+  CARDS=flatCards();
+  A=st.started?analyze(st):null;
+  save();
+  render();
+}
+
+/* ───────── 화면 ───────── */
+function render(){CARDS=flatCards();$('#savewarn').hidden=!saveFailed;renderInstall();renderHeader();renderMain();renderTabs();renderSheet();}
+const short=n=>[...String(n)].slice(0,3).join('');
+function headLabels(){
+  const base=st.players.map(p=>short(p.name));
+  return base.map((b,i)=>(base.indexOf(b)!==i||base.lastIndexOf(b)!==i)?(i+1)+'.'+[...String(st.players[i].name)].slice(0,2).join(''):b);
+}
+
+function renderHeader(){
+  const el=$('#status');
+  if(!st.started||!A){el.textContent='';return;}
+  if(!A.ok){el.textContent='⚠ 기록 확인';el.className='status bad';return;}
+  el.className='status';
+  const N=st.players.length;
+  const left=[0,1,2].map(k=>CARDS.filter((cd,c)=>cd.cat===k&&A.poss[c][N]).length);
+  el.textContent=`정답 후보 ${left.join(' · ')}`;
+}
+function renderTabs(){
+  const el=$('#tabs'),fab=$('#fab');
+  el.hidden=!st.started;
+  fab.hidden=!(st.started&&(ui.tab==='note'||ui.tab==='log'));
+  if(!st.started)return;
+  el.innerHTML=TABS.map(t=>`<button class="tab ${ui.tab===t.k?'on':''}" data-act="tab" data-k="${t.k}"><svg viewBox="0 0 24 24" aria-hidden="true">${t.svg}</svg>${t.l}</button>`).join('');
+}
+function renderMain(){
+  const m=$('#main');
+  const key=(st.started?ui.tab:'setup');
+  const gw=m.querySelector('.gridwrap');
+  const gx=gw?gw.scrollLeft:0,gy=gw?gw.scrollTop:0,mt=m.scrollTop;
+  let html;
+  if(!st.started)html=viewSetup(true);
+  else if(ui.tab==='note')html=viewNote();
+  else if(ui.tab==='deduce')html=viewDeduce();
+  else if(ui.tab==='log')html=viewLog();
+  else html=viewSetup(false);
+  m.className=(st.started&&ui.tab==='note')?'notemain':'';
+  m.innerHTML=html;
+  if(ui.lastKey===key){
+    const g2=m.querySelector('.gridwrap');
+    if(g2){g2.scrollLeft=gx;g2.scrollTop=gy;}
+    m.scrollTop=mt;
+  }
+  ui.lastKey=key;
+}
+
+/* 노트 표 */
+function shownEvents(c){return st.events.map((ev,i)=>({ev,i})).filter(x=>x.ev.type==='ask'&&x.ev.mine===c&&x.ev.asker!==st.me);}
+function seenCount(c){return new Set(shownEvents(c).map(x=>x.ev.asker)).size;}
+function cellHtml(c,o){
+  const N=st.players.length,P=A.prob;
+  let cls='',txt='',style='';
+  if(A.ok){
+    if(!A.poss[c][o]){cls='no'+(P.allowed[c][o]?' inf':'');txt='✕';}
+    else if(A.owner[c]===o){cls='yes'+(directOwner(P,c)===o?'':' inf');txt=(o===N)?'★':'✓';}
+    else{
+      const p=A.pr[c][o];
+      txt=p>=0.995?'99':(p<0.005?'<1':String(Math.round(p*100)));
+      style=` style="--p:${p.toFixed(2)}"`;cls='pct';
+    }
+  }else{
+    const d=directOwner(P,c);
+    if(d===o){cls='yes';txt=(o===N)?'★':'✓';}
+    else if(!P.allowed[c][o]){cls='no';txt='✕';}
+  }
+  if(st.manual[c+'|'+o]!==undefined)cls+=' man';
+  if(o===st.me)cls+=' mine';
+  if(o===N)cls+=' envc';
+  if(o===N+1)cls+=' poolc';
+  let badge='';
+  if(o===st.me&&st.hand.includes(c)){const n=seenCount(c);if(n)badge=`<i class="seen" title="이 카드를 본 사람 수">${n}</i>`;}
+  return `<td class="cell ${cls}" data-act="cell" data-c="${c}" data-o="${o}"${style}>${txt}${badge}</td>`;
+}
+function viewNote(){
+  const N=st.players.length,hasPool=st.pool>0;
+  let banner='';
+  const remain=[0,0,0];
+  if(!A.ok)banner=`<div class="banner warn">${errText()}</div>`;
+  else{
+    CARDS.forEach((cd,c)=>{if(A.poss[c][N])remain[cd.cat]++;});
+    if(remain.every(n=>n===1)){
+      const names=[0,1,2].map(k=>CARDS.find((cd,c)=>cd.cat===k&&A.poss[c][N]).name);
+      banner=`<div class="banner ok">정답 확정! ${names.map(esc).join(' · ')} — 고발하세요</div>`;
+    }
+  }
+  const rr=rules();
+  if(!banner&&(st.hand.length!==rr.per||st.revealed.length!==rr.revealed)){
+    banner=`<div class="banner warn">내 카드나 공개 카드 수가 맞지 않아요 (내 카드 ${st.hand.length}/${rr.per}장, 공개 ${st.revealed.length}/${rr.revealed}장). 설정 탭에서 확인해주세요.</div>`;
+  }
+  const HL=headLabels();
+  const head=st.players.map((p,i)=>`<th class="${i===st.me?'me':''}" title="${esc(p.name)}">${esc(HL[i])}<small>${p.size}장</small></th>`).join('');
+  const poolHead=hasPool?`<th title="남는 카드">남는<small>카드 ${st.pool}</small></th>`:'';
+  const cols=N+2+(hasPool?1:0);
+  let rows='',c=0;
+  st.names.forEach((arr,k)=>{
+    rows+=`<tr class="cathead"><th colspan="${cols}"><span class="catlab">${CATS[k].label}<span>${CATS[k].q}</span>${A.ok?`<span class="rem">· 후보 ${remain[k]}</span>`:''}</span></th></tr>`;
+    arr.forEach(name=>{
+      let rc='';
+      if(A.ok)rc=A.poss[c][N]?(remain[k]===1?' sure':' cand'):' out';
+      rows+=`<tr><th class="cname${rc}" title="${esc(name)}">${esc(name)}</th>`;
+      rows+=cellHtml(c,N);
+      for(let o=0;o<N;o++)rows+=cellHtml(c,o);
+      if(hasPool)rows+=cellHtml(c,N+1);
+      rows+='</tr>';c++;
+    });
+  });
+  const v=st.villain;
+  const vil=`<span class="vil ${v>=VILLAIN_MAX-1?'danger':''}" title="악당 카드가 공개된 횟수. 8번째가 나오면 모두 패배"><span>악당</span><button data-act="vil" data-d="-1" aria-label="악당 카드 줄이기">−</button><b>${v}/${VILLAIN_MAX}</b><button data-act="vil" data-d="1" aria-label="악당 카드 늘리기">＋</button></span>`;
+  return `${banner}<div class="legend"><span><b>✓</b> 보유</span><span><b>✕</b> 없음</span><span><b>숫자</b> 가능성 %</span><span><b>★</b> 정답</span><span><i class="bar3"></i>정답 후보</span><span>칸을 누르면 직접 표시(확실할 때만)</span>${st.events.some(e=>e.type==='ask'&&e.mine!=null)?'<span><i class="seen sl">2</i> 내 카드를 본 사람 수</span>':''}${vil}</div>
+  <div class="gridwrap"><table class="grid"><thead><tr><th class="corner">카드</th><th class="envh">정답<small>봉투</small></th>${head}${poolHead}</tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+function errText(){
+  if(!A)return '';
+  if(A.error==='sizes')return `카드 수 설정이 맞지 않아요. 설정 탭에서 내 카드와 공개 카드를 확인해주세요. (${A.sum}장 / ${A.need}장)`;
+  if(A.error==='limit')return '계산이 너무 오래 걸려 중단했어요. 기록이나 직접 표시, 내 카드 중에 틀린 게 있을 때도 이렇게 보일 수 있어요. 최근에 입력한 것부터 확인해 주세요.';
+  let s='입력한 정보가 서로 맞지 않아요.';
+  const ev=A.culprits||[],mk=A.manualCulprits||[];
+  if(ev.length||mk.length){
+    const parts=[];
+    if(ev.length)parts.push(`기록 ${ev.map(i=>'#'+(i+1)).join(', ')}`);
+    if(mk.length)parts.push(`직접 표시한 칸 (${mk.map(manualLabel).join(', ')})`);
+    s+=` ${parts.join(' 또는 ')} 중 하나를 지우면 풀려요.`;
+  }else if(st.events.length>=2)s+=' 기록이나 직접 표시가 두 군데 이상 틀렸을 수 있어요. 최근 입력부터 하나씩 지워보세요. 내 카드와 공개 카드도 확인해주세요.';
+  else s+=' 내 카드, 공개 카드, 직접 표시를 확인해주세요.';
+  return s;
+}
+
+function ownerName(o){const N=st.players.length;return o<N?st.players[o].name:(o===N?'정답 봉투':'남는 카드');}
+function manualLabel(key){const [c,o]=key.split('|').map(Number);return `${esc(CARDS[c]?CARDS[c].name:c)} · ${esc(ownerName(o))}`;}
+
+/* 추리 탭 */
+function pctText(p){return p>=0.995?'99%':(p<0.005?'<1%':Math.round(p*100)+'%');}
+function viewDeduce(){
+  if(!A.ok)return `<div class="pad"><h2>추리</h2><div class="banner warn" style="border-radius:10px">${errText()}</div></div>`;
+  const N=st.players.length;
+  let h='<div class="pad"><h2>추리</h2><p class="lead">기록에서 알 수 있는 카드 배분을 모두 따져서, 어느 배분이든 똑같이 나올 수 있다고 보고 계산한 값이에요. 상대의 질문 습관은 반영하지 않아요. 숫자는 정답일 가능성이에요.'+(A.exact?'':' (경우가 많아서 시뮬레이션으로 추정한 값이에요)')+'</p>';
+  CATS.forEach((cat,k)=>{
+    const all=CARDS.map((cd,c)=>({cd,c})).filter(x=>x.cd.cat===k);
+    const list=all.filter(x=>A.poss[x.c][N]).map(x=>({...x,p:A.pr[x.c][N]})).sort((a,b)=>b.p-a.p);
+    const sure=list.length===1;
+    h+=`<section class="card"><h3>${cat.label} 정답 후보 <span class="muted">${sure?'확정':list.length+'장 남음'}</span></h3>`;
+    list.forEach(x=>{
+      h+=`<div class="bar ${sure?'sure':''}"><span class="nm">${esc(x.cd.name)}</span><div class="track"><i style="width:${Math.max(2,Math.round(x.p*100))}%"></i></div><b>${sure?'확정':pctText(x.p)}</b></div>`;
+    });
+    h+=`<p class="muted" style="margin-top:6px">${all.length-list.length}장 제외됨</p></section>`;
+  });
+  if(A.clues.length){
+    h+='<section class="card"><h3>남은 단서</h3>';
+    A.clues.forEach(cl=>{
+      if(cl.kind==='any')h+=`<div class="clue"><b>${esc(st.players[cl.p].name)}</b>은(는) ${cl.cands.map(c=>`<span class="tag t${CARDS[c].cat}">${esc(CARDS[c].name)}</span>`).join('')} 중 최소 한 장을 갖고 있어요 <span class="muted">(기록 #${cl.ev+1})</span></div>`;
+      else h+=`<div class="clue">${cl.cards.map(c=>`<span class="tag t${CARDS[c].cat}">${esc(CARDS[c].name)}</span>`).join('')} 세 장이 동시에 정답은 아니에요 <span class="muted">(기록 #${cl.ev+1})</span></div>`;
+    });
+    h+='</section>';
+  }
+  h+='<section class="card"><h3>플레이어별 확인된 카드</h3>';
+  st.players.forEach((p,i)=>{
+    const known=CARDS.map((cd,c)=>({cd,c})).filter(x=>A.owner[x.c]===i);
+    h+=`<div class="pcard"><b>${esc(p.name)}</b> <span class="muted">${known.length} / ${p.size}장 확인</span><br>${known.length?known.map(x=>`<span class="tag t${x.cd.cat}">${esc(x.cd.name)}</span>`).join(''):'<span class="muted">아직 없어요</span>'}</div>`;
+  });
+  if(st.pool>0){
+    const known=CARDS.map((cd,c)=>({cd,c})).filter(x=>A.owner[x.c]===N+1);
+    h+=`<div class="pcard"><b>남는 카드</b> <span class="muted">${known.length} / ${st.pool}장 확인</span><br>${known.length?known.map(x=>`<span class="tag t${x.cd.cat}">${esc(x.cd.name)}</span>`).join(''):'<span class="muted">아직 없어요</span>'}</div>`;
+  }
+  h+='</section>';
+  const shownTo=st.players.map(()=>[]);
+  st.events.forEach((ev,i)=>{
+    if(ev.type==='ask'&&ev.mine!=null&&ev.asker!==st.me){const a=shownTo[ev.asker];if(!a.some(x=>x.c===ev.mine))a.push({c:ev.mine,ev:i});}
+  });
+  h+='<section class="card"><h3>내가 보여준 카드</h3><p class="muted" style="margin:0 0 6px">누가 내 어떤 카드를 봤는지예요. 본 카드는 그 사람이 내 카드로 알고 있어요.</p>';
+  st.players.forEach((p,i)=>{
+    if(i===st.me)return;
+    const list=shownTo[i];
+    h+=`<div class="pcard"><b>${esc(p.name)}</b><br>${list.length?list.map(x=>`<span class="tag t${CARDS[x.c].cat}">${esc(CARDS[x.c].name)}</span>`).join(''):'<span class="muted">아직 없어요</span>'}</div>`;
+  });
+  h+='</section></div>';
+  return h;
+}
+
+/* 기록 탭 */
+function ownerLabel(o){
+  const N=st.players.length;
+  if(o<N)return `<b>${esc(st.players[o].name)}</b>`;
+  return o===N?'<b>정답 봉투</b>':'<b>남는 카드</b>';
+}
+function evHtml(ev,i,del){
+  const N=st.players.length;
+  const nm=p=>`<b>${esc(st.players[p].name)}</b>`;
+  const tag=c=>`<span class="tag t${CARDS[c].cat}">${esc(CARDS[c].name)}</span>`;
+  let title,body,res='';
+  if(ev.type==='know'){
+    title='카드 확인';
+    body=tag(ev.card);
+    res=`이 카드는 ${ownerLabel(ev.owner)}에 있어요.`;
+  }else{
+    body=ev.cards.map(tag).join('');
+    if(ev.type==='acc'){
+      title=`${nm(ev.asker)}의 고발`;
+      res='고발했지만 <b>틀렸어요</b>. 이 세 장이 모두 봉투에 있지는 않아요.';
+    }else{
+      title=`${nm(ev.asker)}의 질문`;
+      const parts=[],pa=askFlow(N,ev).passers;
+      if(pa.length)parts.push('패스: '+pa.map(nm).join(', '));
+      if(ev.shower==null)parts.push('아무도 보여주지 못했어요');
+      else parts.push('보여준 사람: '+nm(ev.shower)+(ev.shown!=null?` → ${tag(ev.shown)}`:(ev.mine!=null?` → ${tag(ev.mine)} (내가 보여줬어요)`:' (카드는 몰라요)')));
+      res=parts.join(' · ');
+    }
+  }
+  const head=`<header>${i!=null?`<span class="n">#${i+1}</span>`:''}<span>${title}</span>${del?`<button class="btn del" style="padding:5px 10px;font-size:12px;${ui.confirm==='ev'+i?'background:var(--red);color:#fff;border-color:var(--red)':''}" data-act="ev-del" data-i="${i}">${ui.confirm==='ev'+i?'정말 삭제':'삭제'}</button>`:''}</header>`;
+  return `${head}<div>${body}</div><div class="res">${res}</div>`;
+}
+function viewLog(){
+  let h='<div class="pad"><h2>기록</h2>';
+  if(!st.events.length)h+='<p class="lead">아직 기록이 없어요. 아래 “＋ 기록하기” 버튼으로 누가 무엇을 물었는지, 누가 카드를 보여줬는지 적어주세요.</p>';
+  else h+='<p class="lead">잘못 적었다면 삭제하고 다시 입력하세요. 추리 결과는 바로 다시 계산돼요.</p>';
+  for(let i=st.events.length-1;i>=0;i--)h+=`<article class="ev">${evHtml(st.events[i],i,true)}</article>`;
+  return h+'</div>';
+}
+
+/* 설정 / 새 게임 */
+function chipBtn(cls,act,c,on,label,disabled){
+  return `<button class="chip ${cls} ${on?'on':''}" data-act="${act}" data-c="${c}" ${disabled?'disabled':''}>${esc(label)}</button>`;
+}
+function nameProblem(){
+  const names=st.players.map(p=>p.name.trim());
+  if(names.some(n=>!n))return '이름이 비어 있는 플레이어가 있어요';
+  if(new Set(names).size!==names.length)return '같은 이름이 있어요. 서로 다르게 적어주세요';
+  return '';
+}
+function uniqueFriend(){
+  const used=new Set(st.players.map(p=>p.name.trim()));
+  for(let k=1;k<30;k++){const n='친구'+k;if(!used.has(n))return n;}
+  return '친구'+(Date.now()%1000);
+}
+function refreshSetupHints(){
+  const np=nameProblem();
+  const hint=$('#namehint');if(hint){hint.textContent=np;hint.hidden=!np;}
+  if(st.started)return;
+  const r=rules(),btn=$('#startbtn'),why=$('#startwhy');
+  const msg=!crewDone()?'쓰는 동료를 골라주세요':(np||(st.hand.length!==r.per?`내 카드 ${r.per}장을 골라주세요`:(st.revealed.length!==r.revealed?`공개된 카드 ${r.revealed}장을 골라주세요`:'')));
+  if(btn)btn.disabled=!!msg;
+  if(why){why.textContent=msg;why.hidden=!msg;}
+}
+const eliminatedSet=()=>new Set(st.events.filter(e=>e.type==='acc').map(e=>e.asker));
+const cardTags=list=>list.slice().sort((a,b)=>a-b).map(c=>`<span class="tag t${CARDS[c].cat}">${esc(CARDS[c].name)}</span>`).join('')||'<span class="muted">없음</span>';
+function viewSetup(structural){
+  const N=st.players.length,r=rules();
+  const crewOk=crewDone();
+  const handOk=st.hand.length===r.per,revOk=st.revealed.length===r.revealed;
+  const editable=structural||ui.editHand;
+  const np=nameProblem();
+  let h='<div class="pad">';
+  h+=structural?'<h2>새 게임</h2><p class="lead">위에서부터 차례로 채워주세요. 이 노트는 내 폰에만 저장돼요. 같이 하는 친구들도 각자 폰으로 열어서 따로 쓰면 돼요.</p>':'<h2>설정</h2>';
+
+  // 1) 쓰는 동료
+  h+='<section class="card"><h3>1. 게임에 쓰는 동료</h3>';
+  if(structural){
+    h+='<p class="muted">색이 같은 짝 중 한 명만 쓰고, 안 쓰는 동료의 카드와 말은 뺍니다. 실제로 꺼낸 쪽을 눌러주세요.</p>';
+    h+='<div class="chips" style="margin-top:8px"><span class="chip fixed">루피</span><span class="chip fixed">조로</span><span class="chip fixed">상디</span></div>';
+    PAIRS.forEach((pr,i)=>{
+      h+=`<div class="pair">${pr.map((n,v)=>`<button class="chip ${st.crewPick[i]===v?'on':''}" data-act="crew" data-i="${i}" data-v="${v}">${esc(n)}</button>`).join('<span class="or">또는</span>')}</div>`;
+    });
+  }else{
+    h+=`<p class="muted">${st.names[0].map(esc).join(', ')}<br>동료를 바꾸려면 아래에서 새 게임을 시작하세요.</p>`;
+  }
+  h+='</section>';
+
+  // 2) 플레이어
+  h+='<section class="card"><h3>2. 플레이어</h3>';
+  if(structural)h+='<p class="muted" style="margin-bottom:4px">말판의 시계 방향(턴 순서)대로 적고, 내 이름 옆의 “나”를 눌러주세요.</p>';
+  st.players.forEach((p,i)=>{
+    const isMe=i===st.me;
+    h+='<div class="prow">';
+    h+=structural?`<label class="meradio"><input type="radio" name="me" data-act="set-me" data-i="${i}" ${isMe?'checked':''}>나</label>`:(isMe?'<span class="metag">나</span>':'');
+    h+=`<input class="pname" data-input="pname" data-i="${i}" data-prev="${esc(p.name)}" value="${esc(p.name)}" maxlength="10" aria-label="플레이어 ${i+1} 이름">`;
+    if(structural){
+      h+=`<button class="ibtn" data-act="p-up" data-i="${i}" ${i===0?'disabled':''} aria-label="위로">▲</button><button class="ibtn" data-act="p-down" data-i="${i}" ${i===N-1?'disabled':''} aria-label="아래로">▼</button><button class="ibtn" data-act="p-del" data-i="${i}" ${N<=MIN_PLAYERS?'disabled':''} aria-label="삭제">✕</button>`;
+    }
+    h+='</div>';
+  });
+  if(structural)h+=`<div class="row" style="margin-top:10px"><button class="btn" data-act="p-add" ${N>=MAX_PLAYERS?'disabled':''}>＋ 플레이어 추가 (${N}/${MAX_PLAYERS})</button></div>`;
+  h+=`<p class="hint" id="namehint" ${np?'':'hidden'}>${np}</p>`;
+  h+=`<p class="hint info">${N}명이면 한 명당 <b>${r.per}장</b>${r.pool?`, 남는 카드 <b>${r.pool}장</b>`:', 남는 카드 없음'}${N===2?' (소문 카드 5장은 옆에 뒤집어 두고, 1장만 공개)':(r.pool?' (앞면으로 공개)':'')}`+(N===2?'<br>2인 게임에서는 모험 카드를 쓰지 않아요.':'')+'</p></section>';
+
+  // 3) 내 카드
+  h+=`<section class="card"><h3>3. 내 카드 <span class="count ${handOk?'good':'bad'}">${st.hand.length} / ${r.per}장</span></h3>`;
+  if(editable){
+    h+=`<p class="muted">내가 받은 카드를 눌러주세요.${structural?'':' 잘못 골랐을 때만 고치세요. 바꾸면 추리 결과가 모두 달라져요.'}</p>`;
+    const full=st.hand.length>=r.per;
+    CATS.forEach((cat,k)=>{
+      h+=`<div class="catlabel">${cat.label}</div><div class="chips">`;
+      st.names[k].forEach((n,i)=>{
+        const c=cardIdx(k,i),on=st.hand.includes(c);
+        const off=(k===0&&PAIR_SLOT.includes(i)&&st.crewPick[PAIR_SLOT.indexOf(i)]<0)||st.revealed.includes(c)||(!on&&full);
+        h+=chipBtn('hand','hand',c,on,n,off);
+      });
+      h+='</div>';
+    });
+    if(structural&&full)h+='<p class="muted" style="margin-top:8px">다 골랐어요. 바꾸려면 고른 카드를 눌러 해제하세요.</p>';
+  }else{
+    h+=`<div>${cardTags(st.hand)}</div>`;
+  }
+  h+='</section>';
+
+  // 4) 공개 카드
+  if(r.revealed>0){
+    h+=`<section class="card"><h3>4. 공개된 카드 <span class="count ${revOk?'good':'bad'}">${st.revealed.length} / ${r.revealed}장</span></h3>`;
+    if(editable){
+      h+=`<p class="muted">나눠주고 남아서 앞면으로 놓인 카드예요. 이 카드는 정답이 아니에요.${N===2?' 뒤집어 둔 소문 카드 5장은 아직 모르는 카드라서 고르지 않아요.':''}</p>`;
+      const full=st.revealed.length>=r.revealed;
+      CATS.forEach((cat,k)=>{
+        h+=`<div class="catlabel">${cat.label}</div><div class="chips">`;
+        st.names[k].forEach((n,i)=>{
+          const c=cardIdx(k,i),on=st.revealed.includes(c);
+          const off=(k===0&&PAIR_SLOT.includes(i)&&st.crewPick[PAIR_SLOT.indexOf(i)]<0)||st.hand.includes(c)||(!on&&full);
+          h+=chipBtn('pool','rev',c,on,n,off);
+        });
+        h+='</div>';
+      });
+    }else{
+      h+=`<div>${cardTags(st.revealed)}</div>`;
+    }
+    h+='</section>';
+  }
+  if(!structural){
+    h+=ui.editHand
+      ?`<button class="btn primary" data-act="edit-hand-done" ${handOk&&revOk?'':'disabled'}>수정 끝</button>${handOk&&revOk?'':`<p class="muted">내 카드 ${r.per}장${r.revealed?`, 공개 카드 ${r.revealed}장`:''}을 맞춰야 끝낼 수 있어요.</p>`}`
+      :'<button class="btn" data-act="edit-hand">내 카드·공개 카드 수정</button>';
+  }
+
+  if(structural){
+    const why=!crewOk?'쓰는 동료를 골라주세요':(np||(!handOk?`내 카드 ${r.per}장을 골라주세요`:(!revOk?`공개된 카드 ${r.revealed}장을 골라주세요`:'')));
+    h+=`<button class="btn primary" id="startbtn" data-act="start" ${why?'disabled':''} style="padding:14px">게임 시작</button><p class="muted" id="startwhy" style="text-align:center" ${why?'':'hidden'}>${why}</p>`;
+  }else{
+    h+='<section class="card"><h3>알아두세요</h3><ul class="rules"><li>장비·모험·사건 카드나 소문 카드로 어떤 카드의 주인을 알게 되면 “＋ 기록하기”의 <b>카드 확인</b>으로 적어주세요.</li><li>2인 게임에서 소문 카드를 몰래 봤다면 카드 확인에서 “남는 카드”를 고르세요.</li><li>질문 순서는 질문자 왼쪽부터 시계 방향이에요. 보여준 사람 앞 순서는 자동으로 “없음” 처리돼요.</li><li>노트 칸을 누르면 ✓(갖고 있음)·✕(없음)을 직접 표시할 수 있어요. 확실할 때만 쓰세요. 틀리면 추리가 모순돼요.</li></ul></section>';
+    if(hasManifest()&&!isStandalone())h+='<button class="btn" data-act="install-show">앱 설치 안내 다시 보기</button>';
+    const mc=Object.keys(st.manual).length;
+    if(mc){
+      h+=ui.confirm==='manclear'
+        ?`<div class="card"><p style="margin:0 0 10px;font-weight:700">직접 표시한 ${mc}칸을 모두 지울까요?</p><div class="row"><button class="btn" data-act="reset-cancel">취소</button><button class="btn danger" data-act="manual-clear">모두 지우기</button></div></div>`
+        :`<button class="btn" data-act="manual-clear-ask">직접 표시한 칸 모두 지우기 (${mc}칸)</button>`;
+    }
+    h+=ui.confirm==='reset'
+      ?'<div class="card"><p style="margin:0 0 10px;font-weight:700">모든 기록이 지워져요. 플레이어 이름은 남겨둬요.</p><div class="row"><button class="btn" data-act="reset-cancel">취소</button><button class="btn danger" data-act="reset-do">새 게임 시작</button></div></div>'
+      :'<button class="btn" data-act="reset-ask">새 게임 (기록 초기화)</button>';
+  }
+  return h+'</div>';
+}
+
+/* 기록 입력 시트 */
+function openSheet(){
+  const N=st.players.length,elim=eliminatedSet();
+  const last=[...st.events].reverse().find(e=>e.type==='ask'||e.type==='acc');
+  let asker=last?(last.asker+1)%N:st.me;
+  for(let k=0;k<N&&elim.has(asker);k++)asker=(asker+1)%N;
+  ui.cell=null;
+  ui.sheet={type:'ask',asker,cards:[-1,-1,-1],shower:undefined,shown:undefined,owner:undefined,card:-1,error:'',forcedSig:''};
+  renderSheet();
+}
+// 노트에서 주인이 확정된 카드는 선택 목록에 가진 사람을 같이 보여준다 (예: 루피 (나), 드레스로자 (공개), 상디 (친구1))
+function ownerTag(c){
+  if(!A||!A.prob)return '';
+  const N=st.players.length;
+  const o=A.ok?A.owner[c]:directOwner(A.prob,c);
+  if(o===undefined||o<0)return '';
+  if(o<N)return o===st.me?'나':st.players[o].name;
+  if(o===N)return '정답';
+  return st.revealed.includes(c)?'공개':'남는 카드';
+}
+function ownerSuffix(c){const t=ownerTag(c);return t?' ('+esc(t)+')':'';}
+function cardSelect(attrs,cur){
+  return `<select ${attrs}><option value="-1" ${cur===-1?'selected':''}>선택</option>${CATS.map((cat,k)=>`<optgroup label="${cat.label}">${st.names[k].map((n,i)=>{const c=cardIdx(k,i);return `<option value="${c}" ${cur===c?'selected':''}>${esc(n)}${ownerSuffix(c)}</option>`;}).join('')}</optgroup>`).join('')}</select>`;
+}
+function renderCell(el){
+  const {c,o}=ui.cell,N=st.players.length,key=c+'|'+o,cur=st.manual[key];
+  if(ui.cell.info){
+    const seen=shownEvents(c);
+    el.innerHTML=`<div class="sheetwrap"><div class="backdrop" data-act="cell-close"></div><div class="panel"><div class="pbody">
+    <div><span class="tag t${CARDS[c].cat}">${esc(CARDS[c].name)}</span> → <b>내 카드</b></div>
+    ${seen.length?`<p class="muted" style="margin:0">이 카드를 본 사람</p>${seen.map(x=>`<div class="clue"><b>${esc(st.players[x.ev.asker].name)}</b> <span class="muted">(기록 #${x.i+1})</span></div>`).join('')}`:'<p class="muted" style="margin:0">아직 아무에게도 보여주지 않았어요.</p>'}
+    </div><div class="actions"><button class="btn" data-act="cell-close">닫기</button></div></div></div>`;
+    return;
+  }
+  const nm=ownerName(o);
+  let info='';
+  if(A&&A.ok){
+    if(!A.poss[c][o])info='지금 계산으로는 <b>가능하지 않은</b> 칸이에요.';
+    else if(A.owner[c]===o)info='지금 계산으로는 <b>확정</b>이에요.';
+    else info=`지금 계산으로는 가능성 <b>${pctText(A.pr[c][o])}</b> 이에요.`;
+  }
+  const yes=o===N?'정답 봉투에 있어요 (정답)':(o===N+1?'남는 카드에 있어요':`${esc(nm)}: 갖고 있어요`);
+  const no=o===N?'정답이 아니에요':(o===N+1?'남는 카드에 없어요':`${esc(nm)}: 안 갖고 있어요`);
+  el.innerHTML=`<div class="sheetwrap"><div class="backdrop" data-act="cell-close"></div><div class="panel"><div class="pbody">
+    <div><span class="tag t${CARDS[c].cat}">${esc(CARDS[c].name)}</span> → <b>${esc(nm)}</b></div>
+    <p class="muted" style="margin:0">${info} 직접 표시는 확실할 때만 하세요. 틀리면 추리가 모순돼요.</p>
+    <div class="chips" style="flex-direction:column;align-items:stretch">
+      <button class="chip ${cur===1?'on':''}" data-act="cell-set" data-v="1">✓ ${yes}</button>
+      <button class="chip ${cur===0?'on':''}" data-act="cell-set" data-v="0">✕ ${no}</button>
+      ${cur!==undefined?'<button class="chip" data-act="cell-set" data-v="clear">표시 지우기</button>':''}
+    </div></div><div class="actions"><button class="btn" data-act="cell-close">닫기</button></div></div></div>`;
+}
+function renderSheet(){
+  const el=$('#sheet'),s=ui.sheet;
+  if(ui.cell){renderCell(el);return;}
+  if(!s){el.innerHTML='';return;}
+  const prev=el.querySelector('.pbody'),sy=prev?prev.scrollTop:0;
+  const N=st.players.length,elim=eliminatedSet();
+  const order=[];for(let k=1;k<N;k++)order.push((s.asker+k)%N);
+  const ask=s.type==='ask',know=s.type==='know';
+  let h='<div class="sheetwrap"><div class="backdrop" data-act="sheet-close"></div><div class="panel"><div class="pbody">';
+  h+=`<div class="seg"><button class="${ask?'on':''}" data-act="sheet-type" data-t="ask">질문</button><button class="${know?'on':''}" data-act="sheet-type" data-t="know">카드 확인</button><button class="${s.type==='acc'?'on':''}" data-act="sheet-type" data-t="acc">고발 실패</button></div>`;
+  if(know){
+    h+=`<p class="muted" style="margin:0">장비·모험·사건 카드나 소문 카드로 어떤 카드의 주인을 알게 됐을 때 적어요.</p>`;
+    h+=`<label class="sel"><span>어떤 카드인가요?</span>${cardSelect('data-sel="knowcard"',s.card)}</label>`;
+    const owners=[];
+    st.players.forEach((p,i)=>{if(i!==st.me)owners.push({v:i,l:p.name});});
+    owners.push({v:N,l:'정답 봉투'});
+    if(st.pool>0)owners.push({v:N+1,l:'남는 카드'});
+    h+=`<div class="field"><span class="lb">누가 갖고 있나요?</span><div class="chips">${owners.map(o=>`<button class="chip ${s.owner===o.v?'on':''}" data-act="sheet-owner" data-v="${o.v}">${esc(o.l)}</button>`).join('')}</div></div>`;
+  }else{
+    h+=`<div class="field"><span class="lb">${ask?'누가 질문했나요?':'누가 고발했나요?'} <span style="font-weight:400">(고발에 실패한 사람은 더 못 해요)</span></span><div class="chips">${st.players.map((p,i)=>`<button class="chip ${i===st.me?'me':''} ${s.asker===i?'on':''} ${elim.has(i)?'off':''}" data-act="sheet-asker" data-i="${i}" ${elim.has(i)?'disabled':''}>${esc(p.name)}</button>`).join('')}</div></div>`;
+    h+='<div class="sels">'+CATS.map((cat,k)=>`<label class="sel"><span>${cat.label}</span><select data-sel="card" data-k="${k}"><option value="-1" ${s.cards[k]===-1?'selected':''}>선택</option>${st.names[k].map((n,i)=>{const c=cardIdx(k,i);return `<option value="${c}" ${s.cards[k]===c?'selected':''}>${esc(n)}${ownerSuffix(c)}</option>`;}).join('')}</select></label>`).join('')+'</div>';
+    if(ask){
+      h+=`<div class="field"><span class="lb">누가 카드를 보여줬나요? (질문한 사람 다음 순서부터)</span><div class="chips"><button class="chip ${s.shower===null?'on':''}" data-act="sheet-shower" data-v="none">아무도 없음</button>${order.map(i=>`<button class="chip ${i===st.me?'me':''} ${s.shower===i?'on':''}" data-act="sheet-shower" data-v="${i}">${esc(st.players[i].name)}</button>`).join('')}</div><span class="muted">보여준 사람 앞 순서의 사람들은 자동으로 “없음(패스)” 처리돼요.</span></div>`;
+      if(s.asker!==st.me&&s.shower===st.me){
+        if(!s.cards.every(c=>c>=0))h+='<span class="muted">카드 세 장을 모두 고르면 내가 보여준 카드를 고를 수 있어요.</span>';
+        else{
+          const ch=mineChoices(s);
+          if(ch.length)h+=`<div class="field"><span class="lb">내가 보여준 카드 (내 카드 중에서)</span>${mineSummary(s)}<div class="chips" style="flex-direction:column;align-items:stretch">${ch.map(c=>mineChip(c,s)).join('')}</div></div>`;
+          else h+='<p class="hint">이 세 장 중에 내가 가진 카드가 없어요. 내가 보여줄 수 없는 카드예요. 고른 카드나 “누가 보여줬나요”를 확인해주세요.</p>';
+        }
+      }
+      if(s.asker===st.me&&s.shower!==undefined&&s.shower!==null&&s.cards.every(c=>c>=0)){
+        h+=`<div class="field"><span class="lb">내가 본 카드 (못 봤으면 “모름”)</span><div class="chips">${s.cards.map(c=>`<button class="chip ${s.shown===c?'on':''}" data-act="sheet-shown" data-c="${c}">${esc(CARDS[c].name)}</button>`).join('')}<button class="chip ${s.shown===null?'on':''}" data-act="sheet-shown" data-c="none">모름</button></div></div>`;
+      }
+    }
+  }
+  const ev=draftEvent();
+  if(ev)h+=`<div class="preview">${evHtml(ev,null,false)}</div>`;
+  h+=`</div><div class="actions">${s.error?`<div class="err">${esc(s.error)}</div>`:''}<button class="btn" data-act="sheet-close">취소</button>${(ask&&s.asker===st.me&&A&&A.ok)?'<button class="btn" data-act="sheet-recommend">추천 카드 채우기</button>':''}<button class="btn primary" style="margin-left:auto" data-act="sheet-save">저장</button></div>`;
+  h+='</div></div>';
+  el.innerHTML=h;
+  const np=el.querySelector('.pbody');if(np)np.scrollTop=sy;
+}
+// 내 카드를 누구에게 보여줬는지: 카드 이름 아래에 본 사람을 적고, 지금 질문한 사람이 이미 본 카드는 강조한다
+function mineSummary(s){
+  const cards=[...new Set(st.events.filter(e=>e.type==='ask'&&e.mine!=null&&e.asker===s.asker).map(e=>e.mine))];
+  return `<span class="muted">${esc(st.players[s.asker].name)}에게 지금까지 보여준 카드: ${cards.length?cards.map(c=>esc(CARDS[c].name)).join(', '):'없음'}</span>`;
+}
+function mineChip(c,s){
+  const viewers=[...new Set(shownEvents(c).map(x=>x.ev.asker))];
+  const asker=st.players[s.asker];
+  let info;
+  if(!viewers.length)info='<span class="seeninfo">아직 아무에게도 안 보여줬어요</span>';
+  else{
+    const already=viewers.includes(s.asker);
+    info=(already?`<span class="seeninfo hot">이미 ${esc(asker.name)}에게 보여줬어요</span>`:'')
+      +`<span class="seeninfo">본 사람: ${viewers.map(p=>esc(st.players[p].name)).join(', ')}</span>`;
+  }
+  return `<button class="chip mc ${s.mine===c?'on':''}" data-act="sheet-mine" data-c="${c}"><b>${esc(CARDS[c].name)}</b>${info}</button>`;
+}
+function mineChoices(s){return s.cards.filter(c=>c>=0&&st.hand.includes(c));}
+function autoMine(){
+  const s=ui.sheet;if(!s)return;
+  if(s.type==='ask'&&s.asker!==st.me&&s.shower===st.me){
+    const ch=mineChoices(s);
+    s.mine=ch.length===1?ch[0]:(ch.includes(s.mine)?s.mine:undefined);
+  }else s.mine=undefined;
+}
+function sheetMissing(){
+  const s=ui.sheet;
+  if(s.type==='know'){
+    if(s.card<0)return '어떤 카드인지 골라주세요.';
+    if(s.owner===undefined)return '누가 갖고 있는지 골라주세요.';
+    return '';
+  }
+  if(s.cards.some(c=>c<0))return '인물·보물·섬 카드를 모두 골라주세요.';
+  if(s.type==='ask'){
+    if(s.shower===undefined)return '누가 카드를 보여줬는지 골라주세요.';
+    if(s.asker===st.me&&s.shower!==null&&s.shown===undefined)return '내가 본 카드를 골라주세요. 못 봤으면 “모름”을 누르세요.';
+    if(s.asker!==st.me&&s.shower===st.me){
+      if(!mineChoices(s).length)return '이 세 장 중에 내가 가진 카드가 없어서, 내가 보여줬다고 기록할 수 없어요.';
+      if(s.mine===undefined)return '내가 보여준 카드를 골라주세요.';
+    }
+  }
+  return '';
+}
+function draftEvent(){
+  const s=ui.sheet;if(!s||sheetMissing())return null;
+  if(s.type==='know')return {type:'know',owner:s.owner,card:s.card};
+  if(s.type==='acc')return {type:'acc',asker:s.asker,cards:s.cards.slice()};
+  return {type:'ask',asker:s.asker,cards:s.cards.slice(),shower:s.shower,shown:(s.asker===st.me&&s.shower!=null)?s.shown:null,mine:(s.asker!==st.me&&s.shower===st.me)?s.mine:null};
+}
+
+/* ───────── 이벤트 ───────── */
+function removePlayer(i){
+  st.players.splice(i,1);
+  if(i<st.me)st.me--;else if(i===st.me)st.me=0;
+}
+function toggleIn(list,c,limit){
+  const k=list.indexOf(c);
+  if(k>=0){list.splice(k,1);return;}
+  if(list.length<limit)list.push(c);
+}
+document.addEventListener('click',e=>{
+  const t=e.target.closest('[data-act]');if(!t)return;
+  const a=t.dataset.act;
+  if(a!=='ev-del'&&a!=='reset-ask'&&a!=='manual-clear-ask')ui.confirm=null;
+  const i=+t.dataset.i,c=+t.dataset.c;
+  switch(a){
+    case 'tab':ui.tab=t.dataset.k;ui.lastKey='';render();break;
+    case 'cell':{
+      const o=+t.dataset.o;
+      if(o===st.me){if(st.hand.includes(c)){ui.sheet=null;ui.cell={c,o,info:true};renderSheet();}break;}
+      ui.sheet=null;ui.cell={c,o};renderSheet();break;
+    }
+    case 'cell-close':ui.cell=null;renderSheet();break;
+    case 'cell-set':{
+      const {c:cc,o}=ui.cell,key=cc+'|'+o,v=t.dataset.v;
+      if(v==='clear')delete st.manual[key];else st.manual[key]=+v;
+      ui.cell=null;refresh();break;
+    }
+    case 'install':{
+      const d=deferredInstall;if(!d)break;
+      deferredInstall=null;
+      d.prompt();
+      Promise.resolve(d.userChoice).then(()=>renderInstall(),()=>renderInstall());
+      renderInstall();break;
+    }
+    case 'install-close':installDismissed=true;try{localStorage.setItem('clue-install-dismissed','1');}catch(e){}renderInstall();break;
+    case 'install-show':installDismissed=false;try{localStorage.removeItem('clue-install-dismissed');}catch(e){}installHintLate=true;renderInstall();break;
+    case 'vil':st.villain=Math.max(0,Math.min(VILLAIN_MAX,st.villain+(+t.dataset.d)));save();render();break;
+    case 'open-sheet':openSheet();break;
+    case 'sheet-close':ui.sheet=null;renderSheet();break;
+    case 'sheet-type':ui.sheet.type=t.dataset.t;ui.sheet.error='';renderSheet();break;
+    case 'sheet-asker':ui.sheet.asker=i;if(ui.sheet.shower===i)ui.sheet.shower=undefined;ui.sheet.error='';autoMine();renderSheet();break;
+    case 'sheet-owner':ui.sheet.owner=+t.dataset.v;ui.sheet.error='';renderSheet();break;
+    case 'sheet-shower':ui.sheet.shower=t.dataset.v==='none'?null:+t.dataset.v;ui.sheet.shown=undefined;ui.sheet.error='';autoMine();renderSheet();break;
+    case 'sheet-shown':ui.sheet.shown=t.dataset.c==='none'?null:c;ui.sheet.error='';renderSheet();break;
+    case 'sheet-recommend':{
+      const N=st.players.length;
+      ui.sheet.cards=[0,1,2].map(k=>{
+        let best=-1,bp=-1;
+        CARDS.forEach((cd,cc)=>{if(cd.cat!==k)return;const p=A.pr[cc][N];if(p>bp){bp=p;best=cc;}});
+        return best;
+      });
+      ui.sheet.shown=undefined;ui.sheet.error='';autoMine();renderSheet();break;
+    }
+    case 'sheet-mine':ui.sheet.mine=c;ui.sheet.error='';renderSheet();break;
+    case 'sheet-save':{
+      const s=ui.sheet,miss=sheetMissing();
+      if(miss){s.error=miss;renderSheet();break;}
+      const ev=draftEvent();
+      if(ev.type==='ask'&&ev.shower===ev.asker){s.error='질문한 사람이 직접 보여줄 수는 없어요.';renderSheet();break;}
+      if(ev.type==='know'&&st.hand.includes(ev.card)){s.error='그 카드는 내가 갖고 있어요.';renderSheet();break;}
+      // 앞에서 알게 된 정보와 맞지 않는 기록이면 한 번 더 확인한다
+      const sig=JSON.stringify(ev);
+      if(A&&A.ok&&s.forcedSig!==sig){
+        const pr=buildProblem(Object.assign({},st,{events:st.events.concat([ev])}),-1);
+        if(solveRestart(pr,null,10,5000,99,50000).status==='unsat'){
+          s.forcedSig=sig;
+          s.error='이 기록을 넣으면 지금까지 알게 된 정보와 맞지 않아요. 입력이 맞는지 확인하고, 그래도 맞다면 저장을 한 번 더 눌러주세요.';
+          renderSheet();break;
+        }
+      }
+      ev.id=st.nextId++;
+      st.events.push(ev);ui.sheet=null;refresh();break;
+    }
+    case 'ev-del':
+      if(ui.confirm==='ev'+i){st.events.splice(i,1);ui.confirm=null;refresh();}
+      else{ui.confirm='ev'+i;render();}
+      break;
+    case 'crew':{
+      const v=+t.dataset.v;
+      if(st.crewPick[i]===v)break;
+      st.crewPick[i]=v;
+      st.names[0]=crewList(st.crewPick);
+      const slot=PAIR_SLOT[i];
+      st.hand=st.hand.filter(x=>x!==slot);
+      st.revealed=st.revealed.filter(x=>x!==slot);
+      refresh();break;
+    }
+    case 'set-me':st.me=i;refresh();break;
+    case 'p-add':
+      if(st.players.length<MAX_PLAYERS){st.players.push({name:uniqueFriend(),size:0});syncSizes();refresh();}
+      break;
+    case 'p-del':
+      if(st.players.length>MIN_PLAYERS){removePlayer(i);syncSizes();refresh();}
+      break;
+    case 'p-up':case 'p-down':{
+      const j=a==='p-up'?i-1:i+1;
+      if(j<0||j>=st.players.length)break;
+      [st.players[i],st.players[j]]=[st.players[j],st.players[i]];
+      if(st.me===i)st.me=j;else if(st.me===j)st.me=i;
+      refresh();break;
+    }
+    case 'hand':toggleIn(st.hand,c,rules().per);refresh();break;
+    case 'rev':toggleIn(st.revealed,c,rules().revealed);refresh();break;
+    case 'edit-hand':ui.editHand=true;render();break;
+    case 'edit-hand-done':{const rr=rules();if(st.hand.length===rr.per&&st.revealed.length===rr.revealed){ui.editHand=false;refresh();}break;}
+    case 'start':{
+      const r=rules();
+      if(crewDone()&&!nameProblem()&&st.hand.length===r.per&&st.revealed.length===r.revealed){st.started=true;ui.tab='note';ui.lastKey='';refresh();}
+      break;
+    }
+    case 'manual-clear-ask':ui.confirm='manclear';render();break;
+    case 'manual-clear':st.manual={};ui.confirm=null;refresh();break;
+    case 'reset-ask':ui.confirm='reset';render();break;
+    case 'reset-cancel':ui.confirm=null;render();break;
+    case 'reset-do':{
+      const keepPlayers=st.players.map(p=>({name:p.name,size:0})),keepMe=st.me;
+      st=newState();st.players=keepPlayers;st.me=keepMe;
+      ui.confirm=null;ui.sheet=null;ui.cell=null;ui.editHand=false;ui.tab='note';ui.lastKey='';syncSizes();refresh();break;
+    }
+  }
+});
+document.addEventListener('input',e=>{
+  const t=e.target,w=t.dataset&&t.dataset.input;
+  if(w==='pname'){st.players[+t.dataset.i].name=t.value;save();refreshSetupHints();}
+});
+document.addEventListener('change',e=>{
+  const t=e.target;
+  if(t.dataset&&t.dataset.input==='pname'&&st.started){
+    const i=+t.dataset.i;
+    if(nameProblem()){
+      st.players[i].name=t.dataset.prev||('플레이어'+(i+1));t.value=st.players[i].name;save();refreshSetupHints();
+      const h=$('#namehint');if(h){h.textContent='빈 이름이거나 다른 사람과 같은 이름이라 원래대로 돌렸어요.';h.hidden=false;}
+    }else{t.dataset.prev=t.value;save();render();}
+    return;
+  }
+  if(!t.dataset||!ui.sheet)return;
+  if(t.dataset.sel==='card'){ui.sheet.cards[+t.dataset.k]=+t.value;ui.sheet.shown=undefined;ui.sheet.error='';autoMine();renderSheet();}
+  else if(t.dataset.sel==='knowcard'){ui.sheet.card=+t.value;ui.sheet.error='';renderSheet();}
+});
+
+/* 앱 설치 안내: 독립 사이트(manifest가 있을 때)에서만 보인다 */
+let deferredInstall=null,installDismissed=false,installHintLate=false;
+try{installDismissed=localStorage.getItem('clue-install-dismissed')==='1';}catch(e){}
+const hasManifest=()=>!!document.querySelector('link[rel="manifest"]');
+const isStandalone=()=>{try{return matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;}catch(e){return false;}};
+const isIOS=()=>/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const isAndroid=()=>/android/i.test(navigator.userAgent);
+function renderInstall(){
+  const el=$('#installbar');if(!el)return;
+  let msg='',btn='';
+  if(hasManifest()&&!isStandalone()&&!installDismissed&&(!st.started||ui.tab==='settings')){
+    if(deferredInstall){msg='앱으로 설치하면 홈 화면에서 바로 열려요.';btn='<button class="btn primary" data-act="install">설치</button>';}
+    else if(isIOS())msg='아이폰은 아래쪽 공유 버튼을 누르고 “홈 화면에 추가”를 고르면 앱처럼 설치돼요.';
+    else if(isAndroid()&&installHintLate)msg='브라우저 메뉴(⋮)에서 “앱 설치” 또는 “홈 화면에 추가”를 고르면 앱처럼 설치돼요.';
+  }
+  if(!msg){el.hidden=true;el.innerHTML='';return;}
+  el.innerHTML='<span>'+msg+'</span><span class="acts">'+btn+'<button class="btn" data-act="install-close">닫기</button></span>';
+  el.hidden=false;
+}
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e;renderInstall();});
+window.addEventListener('appinstalled',()=>{deferredInstall=null;renderInstall();});
+setTimeout(()=>{installHintLate=true;renderInstall();},4000);
+
+syncSizes();
+refresh();
+</script>
+
+<script>if('serviceWorker'in navigator&&/^https?:$/.test(location.protocol)){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));}</script>
+</body>
+</html>
