@@ -646,6 +646,54 @@ SFX_GAME.splendor = (p, c, out, ctx) => {
   return null;
 };
 
+// 클루 (보여 준 카드가 무엇인지는 소리로 절대 구분하지 않는다: 누구에게 보여 줬는지는 모두 아는 정보)
+const CLUE_LINES = [
+  [/^🔍 .*님의 질문:/, ['paper', 'tick']],
+  [/^🙅 .*보여 줄 카드가 없어요\.$/, 'deflate'],
+  [/^🃏 .*카드 1장을 몰래 보여 줬어요\.$/, 'card'],
+  [/^😮 아무도 카드를 보여 주지 못했어요!$/, 'mystic'],
+  [/^❌ .*님의 고발: .* → 틀렸어요!/, ['drumroll', 'fail']],
+  [/^💤 .*질문 없이 차례를 넘겼어요\.$/, 'skip'],
+];
+SFX_GAME.clue = (p, c, out, ctx) => {
+  const t = byLines(ctx.lines, CLUE_LINES, out, { my: ctx.my, soft: true });
+  // 내가 카드를 보여 줄 차례 (보여 줄 사람은 모두 아는 정보)
+  if (c.mode === 'respond' && p.mode !== 'respond') out.push(['knock', t + 0.2]);
+  return null;
+};
+SFX_GAME.clueOver = (p, c, out) => { out.push(['drumroll', 0]); };
+
+// 다빈치 코드 (뽑은 타일·놓는 시간처럼 나만 아는 정보로는 소리를 내지 않는다)
+const DAVINCI_LINES = [
+  [/^🔢 타일을 \d+개씩 나눠 가졌어요/, 'shuffle'],
+  [/^🎯 .* — 맞았어요!/, 'flipGood'],
+  [/^❌ .* — 틀렸어요\./, 'flipBad'],
+  [/^✋ .*그만 맞히기로 했어요/, 'swoosh'],
+  [/^📢 .*(공개해서 놓았어요|자기 타일 하나를 공개했어요)/, 'flip'],
+  [/^🤫 .*숨겨서 놓았어요\./, 'tick'],
+  [/^💀 .*탈락!$/, 'crumble'],
+  [/타일을 1개 뽑았어요/, 'draw'],
+];
+SFX_GAME.davinci = (p, c, out, ctx) => { byLines(ctx.lines, DAVINCI_LINES, out, { my: ctx.my, soft: true }); return null; };
+SFX_GAME.davinciOver = (p, c, out) => { out.push(['flipGood', 0]); };
+
+// 더 크루 (협동. 손패 내용으로는 소리를 바꾸지 않고, 낸 카드·딴 트릭처럼 공개된 것만)
+const CREW_LINES = [
+  [/^🎉 임무 \d+ 성공!/, 'win'],
+  [/^💥 임무 \d+ 실패/, 'lose'],
+  [/^🚀 임무 \d+ /, 'whoosh'],
+  [/^✅ 과제 완료/, 'success'],
+  [/^🏆 .*트릭을 가져갔어요 \(로켓/, ['bang', 'chips']],
+  [/^🏆 .*트릭을 가져갔어요/, 'chips'],
+  [/^📡 .*님이 통신했어요/, 'radio'],
+  [/^📡 사령관이 /, 'crown'],
+  [/^🧑‍🚀 사령관이/, 'crown'],
+  [/^📋 /, 'paper'],
+  [/^🃏 .*님: /, 'card'],
+];
+SFX_GAME.crew = (p, c, out, ctx) => { byLines(ctx.lines, CREW_LINES, out, { my: ctx.my, soft: true }); return null; };
+SFX_GAME.crewOver = (p, c, out) => { out.push(['fanfare', 0]); };
+
 // 보난자 (손패 내용으로는 소리를 바꾸지 않는다)
 const BOHN_LINES = [
   [/🤝 .*거래했어요/, 'handshake'],

@@ -345,6 +345,18 @@ const HM_GAME = {
   duel: { c: '#e2b46a', d: '#3a250d', art: `<path d="M9 17.5L24 9l15 8.5Z" fill="#f3e7cb"/><circle cx="24" cy="14.5" r="1.6" fill="#a97b32"/><rect x="9.5" y="18.5" width="29" height="3" fill="#f3e7cb"/>
     <g fill="#f3e7cb"><rect x="12" y="22.5" width="3.6" height="12"/><rect x="19" y="22.5" width="3.6" height="12"/><rect x="25.4" y="22.5" width="3.6" height="12"/><rect x="32.4" y="22.5" width="3.6" height="12"/></g>
     <rect x="9" y="35" width="30" height="3.2" fill="#f3e7cb"/><rect x="6.5" y="38.6" width="35" height="3" rx="1" fill="#dcc79a"/>` },
+  // 클루: 돋보기와 보물 지도
+  clue: { c: '#f2c66d', d: '#3b2410', art: `<rect x="7" y="9" width="27" height="31" rx="3" fill="#f3e2b8"/><path d="M11 17h14M11 22h10M11 27h12" stroke="#b08a52" stroke-width="1.6" stroke-linecap="round"/>
+    <path d="M24 31l3-3m-3 0l3 3" stroke="#c0392b" stroke-width="1.8" stroke-linecap="round"/>
+    <circle cx="31" cy="27" r="7.5" fill="#bde3ff55" stroke="#f2c66d" stroke-width="3"/><path d="M36.5 32.5l5 5" stroke="#9a6a24" stroke-width="4" stroke-linecap="round"/>` },
+  // 다빈치 코드: 검정·흰색 숫자 타일
+  davinci: { c: '#5ce0c6', d: '#0b3a35', art: `<rect x="7" y="12" width="15" height="24" rx="3" fill="#1b1f2e" stroke="#5ce0c6" stroke-width="1.4"/><text x="14.5" y="29" text-anchor="middle" font-size="12" font-weight="900" fill="#f2f4fb">7</text>
+    <rect x="26" y="12" width="15" height="24" rx="3" fill="#f2f4fb" stroke="#5ce0c6" stroke-width="1.4"/><text x="33.5" y="29" text-anchor="middle" font-size="12" font-weight="900" fill="#1b1f2e">?</text>
+    <path d="M7 39h34" stroke="#8a5a2b" stroke-width="3" stroke-linecap="round"/>` },
+  // 더 크루: 로켓과 별
+  crew: { c: '#8fb4ff', d: '#101a44', art: `<circle cx="10" cy="11" r="1.2" fill="#fff"/><circle cx="39" cy="15" r="1" fill="#fff"/><circle cx="35" cy="38" r="1.2" fill="#fff"/>
+    <path d="M24 6c6 5 8 12 7 20l-7 6-7-6c-1-8 1-15 7-20Z" fill="#eef2ff"/><circle cx="24" cy="17" r="3.2" fill="#8fb4ff"/>
+    <path d="M17 26l-5 6 6-1M31 26l5 6-6-1" fill="#ff6b78"/><path d="M21 33l3 8 3-8Z" fill="#ffb84d"/>` },
 };
 const HM_DICE = `<rect x="10" y="10" width="28" height="28" rx="6" fill="#f2f4fb"/><circle cx="17" cy="17" r="2.6" fill="#1b1f2e"/><circle cx="24" cy="24" r="2.6" fill="#1b1f2e"/><circle cx="31" cy="31" r="2.6" fill="#1b1f2e"/>`;
 const hmGame = (kind) => HM_GAME[kind] || { c: '#c9cee6', d: '#262a3c', art: HM_DICE };

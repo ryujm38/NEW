@@ -10,6 +10,7 @@ const common = require('./common');
 const ENGINES = {
   avalon: require('./game'), uno: require('./uno'), bang: require('./bang'), mafia: require('./mafia'), splendor: require('./splendor'),
   marble: require('./marble'), bohnanza: require('./bohnanza'), vegas: require('./vegas'), duel: require('./duel'),
+  clue: require('./clue'), davinci: require('./davinci'), crew: require('./crew'),
 };
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // I, O 제외: 1/0과 헷갈리지 않게
 const ROOM_TTL_MS = 6 * 60 * 60 * 1000;
