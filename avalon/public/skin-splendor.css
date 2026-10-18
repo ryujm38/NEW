@@ -1,1 +1,191 @@
-/* splendor 화면 꾸미기 */
+/* splendor 화면 꾸미기 — 르네상스 보석상의 벨벳 탁자. 모든 규칙은 .spx(스플렌더 화면) 안에서만 쓴다. */
+body:has(.spx) { background: #120c18; }
+.spx {
+  --sp-gold: #e8c77c; --sp-gold2: #b88a3a; --sp-ink: #f6eedd; --sp-dim: #b9a9c6; --sp-panel: #24182e; --sp-line: #4b3658;
+  --sp-bronze: #c58b52; --sp-silver: #d9dfea; --sp-goldf: #f2cb63;
+  margin: 0 -16px -16px; padding: 0 16px 16px; min-height: 100dvh;
+  display: flex; flex-direction: column; gap: 12px; color: var(--sp-ink);
+  background:
+    radial-gradient(circle at 20% 20%, #ffffff07 1.5px, transparent 2.5px) 0 0 / 24px 24px,
+    radial-gradient(circle at 70% 70%, #e8c77c08 1.5px, transparent 2.5px) 0 0 / 24px 24px,
+    radial-gradient(130% 55% at 50% 0%, #43264f 0%, #241630 48%, #140d1a 100%);
+}
+.spx:first-child { margin-top: -16px; padding-top: 16px; }
+.spx .top { color: var(--sp-dim); }
+.spx .top b { color: var(--sp-gold); }
+.spx .dim { color: var(--sp-dim); }
+
+/* 섹션 머리 */
+.sp-sec { display: grid; gap: 6px; }
+.sp-cap { font-size: 13px; font-weight: 800; color: var(--sp-gold); letter-spacing: 0.02em; display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.sp-cap small { font-weight: 500; color: var(--sp-dim); font-size: 11.5px; letter-spacing: 0; }
+
+/* ---- 보석 ---- */
+.spgem { display: block; width: 100%; height: 100%; filter: drop-shadow(0 1px 1.5px #0009); }
+.spgem.sm { width: 26px; height: 26px; }
+.spchip { display: block; width: 100%; height: 100%; filter: drop-shadow(0 3px 4px #000a); }
+
+/* 비용 동그라미(보석 색 원 + 숫자) */
+.sp-pip { display: inline-grid; place-items: center; width: 19px; height: 19px; border-radius: 50%; font-size: 12px; font-weight: 900; line-height: 1; color: #fff;
+  text-shadow: 0 1px 1px #000, 0 0 2px #000; border: 1px solid #0008; box-shadow: inset 0 1px 1px #fff7, 0 1px 2px #0008; flex: none; font-variant-numeric: tabular-nums; }
+.sp-pip.sm { width: 22px; height: 22px; font-size: 12.5px; }
+.sp-pip.zero { opacity: 0.28; }
+.sp-pip.c-w { background: radial-gradient(circle at 35% 30%, #fff, #d9e1ee 50%, #8a97b0); color: #1d2333; text-shadow: 0 0 2px #fff; }
+.sp-pip.c-u { background: radial-gradient(circle at 35% 30%, #a9cbff, #2e6be6 50%, #0f2f7a); }
+.sp-pip.c-g { background: radial-gradient(circle at 35% 30%, #9ff5c8, #18a463 50%, #06512f); }
+.sp-pip.c-r { background: radial-gradient(circle at 35% 30%, #ffb0bc, #e22d4b 50%, #6e0b1d); }
+.sp-pip.c-k { background: radial-gradient(circle at 35% 30%, #a99dc0, #40394f 50%, #0d0b12); }
+.sp-pip.c-y { background: radial-gradient(circle at 35% 30%, #fff3c0, #f3c24d 50%, #8a5a0c); color: #3a2600; text-shadow: 0 0 2px #fff8; }
+
+/* 보너스(카드) 막대: 카드 모양 사각형 */
+.sp-bar { display: inline-grid; place-items: center; min-width: 20px; height: 24px; padding: 0 3px; border-radius: 4px; font-size: 12.5px; font-weight: 900; color: #fff;
+  text-shadow: 0 1px 1px #000; border: 1px solid #0009; box-shadow: inset 0 1px 0 #fff5, 0 1px 2px #0008; font-variant-numeric: tabular-nums; }
+.sp-bar.c-w { background: linear-gradient(160deg, #f4f7fc, #9aa7bf); color: #1d2333; text-shadow: none; }
+.sp-bar.c-u { background: linear-gradient(160deg, #4f8bf5, #133585); }
+.sp-bar.c-g { background: linear-gradient(160deg, #2dc07c, #075232); }
+.sp-bar.c-r { background: linear-gradient(160deg, #f04a64, #6e0b1d); }
+.sp-bar.c-k { background: linear-gradient(160deg, #5c5370, #121018); }
+.sp-bar.zero { opacity: 0.28; }
+.sp-bar.ghost { background: transparent; border-color: transparent; box-shadow: none; color: var(--sp-gold); opacity: 0.6; }
+.sp-bar.met { outline: 2px solid #7dffb6; outline-offset: 1px; }
+
+/* ---- 귀족 ---- */
+.spnobles { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+.spn { width: 64px; min-height: 0; padding: 5px 3px 4px; border-radius: 8px; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  color: #3b2410; font-weight: 800; position: relative; overflow: hidden;
+  background: radial-gradient(circle at 50% 0%, #fff6d6, #f0d999 45%, #c99a4c 100%);
+  border: 2px solid #8a5a1e; box-shadow: inset 0 0 0 2px #fff4c966, 0 4px 10px #0009; }
+.spn::before { content: ''; position: absolute; inset: 3px; border: 1px dashed #8a5a1e66; border-radius: 5px; pointer-events: none; }
+.spn-top { display: flex; align-items: center; gap: 3px; }
+.spn-top b { font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, 'Times New Roman', serif; font-size: 18px; line-height: 1; color: #5a2e07; text-shadow: 0 1px 0 #fff8; }
+.spn-crown { width: 22px; height: 15px; }
+.spn-req { display: flex; gap: 2px; flex-wrap: wrap; justify-content: center; }
+.spn-req .sp-bar { min-width: 16px; height: 18px; font-size: 11px; padding: 0 2px; }
+.spn small { font-size: 9px; line-height: 1.1; font-weight: 700; color: #5d3d17; text-align: center; word-break: keep-all; }
+button.spn { cursor: pointer; width: 84px; padding: 8px 4px; border-color: var(--sp-goldf); box-shadow: 0 0 0 3px #f2cb6355, 0 6px 14px #000a; }
+.spnobles.pick { gap: 10px; }
+
+/* ---- 카드 판 ---- */
+.spboard { display: grid; gap: 7px; padding: 8px; margin: 0 -6px; border-radius: 14px; background: #0000002e; box-shadow: inset 0 0 0 1px #e8c77c22, inset 0 2px 12px #0008; }
+.sprow { display: grid; grid-template-columns: 38px repeat(4, minmax(0, 1fr)); gap: 5px; align-items: stretch; }
+.sprow.res { grid-template-columns: repeat(3, minmax(0, 88px)); justify-content: start; }
+
+.spc { position: relative; height: 104px; min-height: 0; width: 100%; padding: 0; border-radius: 9px; overflow: hidden; cursor: pointer; text-align: left;
+  display: flex; flex-direction: column; justify-content: flex-start; color: #fff; font-weight: 700;
+  --c1: #555; --c2: #222; --fr: var(--sp-bronze);
+  background:
+    repeating-linear-gradient(135deg, #ffffff08 0 2px, transparent 2px 7px),
+    linear-gradient(165deg, var(--c1), var(--c2));
+  border: 2px solid var(--fr); box-shadow: inset 0 0 0 1px #0007, 0 3px 8px #000a; transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.spc.t1 { --fr: var(--sp-bronze); } .spc.t2 { --fr: var(--sp-silver); } .spc.t3 { --fr: var(--sp-goldf); }
+.spc.b-w { --c1: #c3cddf; --c2: #5a6681; }
+.spc.b-u { --c1: #3168d6; --c2: #0f2358; }
+.spc.b-g { --c1: #16995d; --c2: #053521; }
+.spc.b-r { --c1: #cf2742; --c2: #4c0614; }
+.spc.b-k { --c1: #534a65; --c2: #120f18; }
+div.spc.empty { border: 2px dashed #ffffff22; background: transparent; box-shadow: none; cursor: default; }
+.spc-art { position: absolute; right: -14px; bottom: 4px; width: 62px; height: 62px; opacity: 0.22; transform: rotate(-14deg); pointer-events: none; }
+.spc-head { position: relative; display: flex; justify-content: space-between; align-items: center; padding: 3px 4px 3px 6px; background: linear-gradient(to bottom, #ffffff3a, #ffffff12); border-bottom: 1px solid #ffffff2a; min-height: 31px; }
+.spc-pts { font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, 'Times New Roman', serif; font-size: 23px; line-height: 1; color: #fff; text-shadow: 0 1px 0 #000, 0 0 6px #0009; }
+.spc-bonus { width: 24px; height: 24px; }
+.spc-cost { position: absolute; left: 4px; bottom: 4px; display: flex; flex-direction: column-reverse; flex-wrap: wrap; align-content: flex-start; gap: 2px; height: 66px; }
+.spc-tier { position: absolute; right: 5px; bottom: 3px; font-style: normal; font-size: 10px; font-weight: 800; color: var(--fr); text-shadow: 0 1px 1px #000; opacity: 0.9; }
+.spc-ok { position: absolute; right: 4px; top: 35px; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 11px; font-weight: 900;
+  background: #31d17f; color: #04301a; box-shadow: 0 0 0 2px #04301a, 0 0 8px #31d17faa; }
+.spc.ok { border-color: #ffe08a; box-shadow: 0 0 0 2px #ffd25e, 0 0 14px #ffd25e88, 0 3px 8px #000a; }
+.spc.ok::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(115deg, transparent 30%, #ffffff3d 45%, transparent 60%); background-size: 260% 100%; animation: spsheen 2.8s ease-in-out infinite; }
+@keyframes spsheen { 0% { background-position: 130% 0; } 60%, 100% { background-position: -130% 0; } }
+.spc.sel { transform: translateY(-5px) scale(1.03); border-color: #fff; box-shadow: 0 0 0 3px #fff, 0 10px 18px #000c; z-index: 2; }
+.sp-free { font-size: 11px; color: #fff; text-shadow: 0 1px 1px #000; }
+
+/* 덱(뒷면) */
+.spdeck { height: 104px; min-height: 0; width: 100%; padding: 0; border-radius: 9px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  --fr: var(--sp-bronze); color: var(--fr); border: 2px solid var(--fr);
+  background:
+    radial-gradient(circle at 50% 42%, #ffffff1a 0 9px, transparent 10px),
+    repeating-linear-gradient(45deg, #ffffff0c 0 3px, transparent 3px 8px),
+    linear-gradient(180deg, #2e1f3a, #160e1d);
+  box-shadow: inset 0 0 0 2px #0008, 3px 3px 0 -1px #0009; }
+.spdeck.t2 { --fr: var(--sp-silver); } .spdeck.t3 { --fr: var(--sp-goldf); }
+.spdeck b { font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, 'Times New Roman', serif; font-size: 20px; line-height: 1; text-shadow: 0 1px 2px #000; }
+.spdeck small { font-size: 10px; font-weight: 700; color: var(--sp-dim); }
+.spdeck.sel { border-color: #fff; box-shadow: 0 0 0 3px #fff, 0 8px 16px #000c; }
+.spdeck:disabled { opacity: 0.8; }
+.spdeck.empty { opacity: 0.35; box-shadow: none; }
+
+/* ---- 은행 ---- */
+.spbank { display: flex; justify-content: space-between; gap: 4px; padding: 7px 6px; border-radius: 14px; background: #00000030; box-shadow: inset 0 0 0 1px #e8c77c1c; }
+.spbank.give { justify-content: center; flex-wrap: wrap; gap: 10px; background: none; box-shadow: none; padding-top: 4px; }
+.sptok { position: relative; flex: 0 1 50px; width: 50px; height: 50px; min-height: 0; padding: 0; border: 0; border-radius: 50%; background: transparent; transition: transform 0.15s ease; }
+.sptok-n { position: absolute; right: -3px; bottom: -3px; min-width: 21px; height: 21px; padding: 0 4px; border-radius: 99px; display: grid; place-items: center;
+  font-size: 12.5px; font-weight: 900; background: #140d1a; color: #fff; border: 1.5px solid var(--sp-gold2); font-variant-numeric: tabular-nums; }
+.sptok i { position: absolute; left: -4px; top: -4px; font-style: normal; font-size: 12px; font-weight: 900; padding: 1px 6px; border-radius: 99px; background: #ffe08a; color: #3a2600; box-shadow: 0 2px 4px #0009; }
+.sptok i.minus { background: #ff8a8a; color: #3a0000; }
+.sptok.sel { transform: translateY(-5px); }
+.sptok.sel .spchip { filter: drop-shadow(0 0 6px #fff) drop-shadow(0 4px 4px #000a); }
+.sptok:disabled { opacity: 1; }
+.sptok:disabled .spchip { filter: brightness(0.82) drop-shadow(0 2px 3px #000a); }
+.sptok.zero .spchip { filter: grayscale(1) brightness(0.45); }
+
+/* ---- 플레이어 보드 ---- */
+.spplayers { display: grid; gap: 8px; }
+.spb { display: grid; gap: 6px; padding: 8px 10px; border-radius: 12px; background: linear-gradient(180deg, #2b1d36, #1c1324); border: 1.5px solid var(--sp-line); box-shadow: 0 3px 10px #0007; }
+.spb.me { border-color: #8d72a8; background: linear-gradient(180deg, #33224a, #1f1529); }
+.spb.turn { border-color: var(--sp-gold); box-shadow: 0 0 0 2px #e8c77c44, 0 3px 10px #0007; }
+.spb.win { border-color: #7dffb6; }
+.spb-h { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.spb-nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.spb-turn { font-size: 11px; font-weight: 800; padding: 1px 7px; border-radius: 99px; background: var(--sp-gold); color: #2e1d00; flex: none; }
+.spb-turn.win { background: #7dffb6; color: #053321; }
+.spb-pts { margin-left: auto; display: flex; align-items: baseline; gap: 3px; font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, 'Times New Roman', serif; font-size: 22px; font-weight: 800; color: var(--sp-gold); line-height: 1; flex: none; }
+.spb-pts small { font-family: inherit; font-size: 10px; color: var(--sp-dim); font-weight: 600; }
+.spb-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; }
+.spb-col { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 4px 0; border-radius: 8px; background: #0000002a; }
+.spb-col .sp-bar { min-width: 26px; }
+.spb-col .sp-pip { width: 22px; height: 22px; font-size: 12.5px; }
+.spb-f { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 11.5px; color: var(--sp-dim); }
+.spb-f b { color: var(--sp-ink); }
+.spb-f b.full { color: #ff9a9a; }
+
+/* ---- 조작 영역 ---- */
+.spx .bdock.sp-dock { background: linear-gradient(to bottom, transparent, #170f1e 18px); gap: 8px; }
+.spx .bdock button { min-height: 48px; }
+.spx .bdock button.primary { background: linear-gradient(180deg, #f6d98c, #d6a640); border-color: #f6d98c; color: #2c1a00; box-shadow: 0 3px 10px #0008; }
+.spx .bdock button:not(.primary):not(.spn):not(.sptok) { background: #2c1f38; border-color: #5a4270; }
+.spx .bdock button.ghost:not(.primary) { background: transparent; }
+.spx .bdock .row > .sp-x { flex: 0 0 28%; }
+.spx .bdock .sp-x.wide { min-height: 42px; padding: 8px; font-size: 15px; }
+.sp-sum { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 8px 10px; border-radius: 12px; background: #2a1d35; border: 1px solid var(--sp-line); }
+.sp-sum-l { font-size: 13px; font-weight: 800; color: var(--sp-gold); }
+.sp-sum-l.bad { color: #ff9a9a; }
+.sp-sum-g { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.sp-sum small { width: 100%; font-size: 12px; color: var(--sp-dim); }
+.sp-hint { font-size: 14px; color: var(--sp-dim); margin: 0; }
+.sp-wait { margin: 0; color: var(--sp-dim); }
+.sp-hour { display: inline-block; animation: sphour 2s ease-in-out infinite; }
+@keyframes sphour { 0%, 40% { transform: rotate(0); } 50%, 90% { transform: rotate(180deg); } 100% { transform: rotate(360deg); } }
+
+/* 기록·배너·결과 */
+.spx .ulog.sp-log { background: #0000003a; color: var(--sp-dim); border: 1px solid #ffffff10; font-size: 12.5px; }
+.spx .ulog.sp-log .new { color: var(--sp-ink); }
+.spx .banner.sp-final { background: linear-gradient(90deg, #5a3a0e, #7a4f12, #5a3a0e); color: #ffe7a8; font-weight: 700; border: 1px solid #e8c77c66; }
+.spx .card { background: var(--sp-panel); border-color: var(--sp-line); }
+.sp-over h2 { color: var(--sp-gold); justify-content: center; }
+.sp-ranks { display: grid; gap: 6px; }
+.sp-rank { display: grid; grid-template-columns: 34px 1fr auto; column-gap: 8px; align-items: center; padding: 7px 10px; border-radius: 10px; background: #0000003a; }
+.sp-rank > span { grid-row: 1 / span 2; font-weight: 800; color: var(--sp-dim); text-align: center; }
+.sp-rank b { grid-column: 2; }
+.sp-rank small { grid-column: 2; font-size: 11.5px; color: var(--sp-dim); }
+.sp-rank em { grid-column: 3; grid-row: 1 / span 2; font-style: normal; font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, 'Times New Roman', serif; font-size: 22px; font-weight: 800; color: var(--sp-gold); }
+.sp-rank.win { background: linear-gradient(90deg, #3d2c0c, #2a1d35); box-shadow: inset 0 0 0 1px #e8c77c66; }
+
+@media (max-width: 360px) {
+  .sprow { grid-template-columns: 32px repeat(4, minmax(0, 1fr)); gap: 4px; }
+  .spc, .spdeck { height: 98px; }
+  .sp-pip { width: 17px; height: 17px; font-size: 11px; }
+  .sptok { width: 44px; height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spc, .sptok { transition: none; }
+  .spc.ok::after, .sp-hour { animation: none; }
+}

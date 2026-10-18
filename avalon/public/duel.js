@@ -1,9 +1,9 @@
 'use strict';
 // 세븐 원더스 듀얼 화면. app.js의 전역(S, ui, send, esc, showToast, render, genericHostMenu ...)과 duel-data.js의
-// DUEL_DATA를 쓰고 GAME_UI에 등록한다.
+// DUEL_DATA를 쓰고 GAME_UI에 등록한다. 그림(카드·불가사의·군사 트랙)은 skin-duel.css와 이 파일의 SVG로 새로 그린 것이다.
 (function () {
   window.GAME_UI = window.GAME_UI || {};
-  const { RES, COLORS, SYMS, CHAINS, TOKENS, CARD, WONDER, resText, cardDesc } = DUEL_DATA;
+  const { RES, RES_NAME, COLORS, SYMS, CHAINS, TOKENS, CARD, WONDER, resText, cardDesc } = DUEL_DATA;
 
   const RULES = `
 <details><summary>세븐 원더스 듀얼 규칙 간단 설명</summary>
@@ -18,6 +18,15 @@
 <li>카드 73장·불가사의 12개·진보 토큰 10개는 원작 구성을 따라 만들었어요(한국어 이름은 직접 옮긴 거라 정식 번역과 다를 수 있어요).</li>
 </ul></details>`;
 
+  const ROMAN = { 1: 'Ⅰ', 2: 'Ⅱ', 3: 'Ⅲ' };
+  // 불가사의마다 새로 정한 상징과 배경 색조(화면용)
+  const WART = {
+    0: ['🔺', 38], 1: ['📚', 28], 2: ['🌿', 110], 3: ['🏟️', 12], 4: ['🗿', 200], 5: ['🗼', 190],
+    6: ['⚓', 215], 7: ['🛣️', 30], 8: ['⚱️', 280], 9: ['🏛️', 48], 10: ['⚡', 255], 11: ['🦁', 40],
+  };
+  const COLOR_ORDER = ['brown', 'grey', 'blue', 'green', 'yellow', 'red', 'purple'];
+  const RK = ['W', 'C', 'S', 'G', 'P'];
+
   const st = () => {
     if (!ui.dl) ui.dl = { focus: null, wpick: false };
     return ui.dl;
@@ -28,130 +37,199 @@
   const pname = (id) => (player(id) ? esc(player(id).name) : '?');
   const giverOf = (sym) => Object.values(CARD).find((c) => c.gives === sym);
   const takerOf = (sym) => Object.values(CARD).filter((c) => c.from === sym).map((c) => c.name);
+  const coinSvg = '<svg class="dl-coin" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="#e9b949" stroke="#7a5212" stroke-width="1.4"/><circle cx="10" cy="10" r="6" fill="none" stroke="#7a5212" stroke-opacity=".55" stroke-width="1"/><path d="M4.5 7.5 A6 6 0 0 1 11 4" stroke="#fff" stroke-opacity=".7" stroke-width="1.4" fill="none" stroke-linecap="round"/></svg>';
+  const coins = (n) => `<span class="dl-coins">${coinSvg}<b>${n}</b></span>`;
 
   function cardIcon(c) {
     if (c.res) return Object.entries(c.res).map(([k, n]) => RES[k].repeat(n)).join('');
-    if (c.choice) return c.choice.map((k) => RES[k]).join('');
-    if (c.trade) return `🔁${c.trade.map((k) => RES[k]).join('')}`;
+    if (c.choice) return c.choice.map((k) => RES[k]).join('/');
+    if (c.trade) return `${c.trade.map((k) => RES[k]).join('')}<small>1</small>`;
     if (c.color === 'purple') return '👑';
-    if (c.shields) return '⚔️'.repeat(c.shields);
+    if (c.shields) return '🛡️'.repeat(c.shields);
     if (c.sym) return SYMS[c.sym].icon;
-    if (c.per) return '🪙✨';
-    if (c.coins) return `🪙${c.coins}`;
-    if (c.color === 'blue') return `⭐${c.vp}`;
+    if (c.per) return `🪙<small>+</small>`;
+    if (c.coins) return `🪙<small>${c.coins}</small>`;
+    if (c.color === 'blue') return `<b class="dl-vp">${c.vp}</b>`;
     return '❔';
   }
 
+  // 공개된 카드로 계산하는 생산량(화면 안내용)
+  function prodOf(p) {
+    const fixed = { W: 0, C: 0, S: 0, G: 0, P: 0 };
+    const choice = [];
+    const trade = new Set();
+    p.cards.forEach((id) => {
+      const c = CARD[id];
+      if ((c.color === 'brown' || c.color === 'grey') && c.res) Object.entries(c.res).forEach(([k, n]) => { fixed[k] += n; });
+      if (c.choice) choice.push(c.choice);
+      (c.trade || []).forEach((k) => trade.add(k));
+    });
+    p.wonders.filter((w) => w.built && WONDER[w.id].choice).forEach((w) => choice.push(WONDER[w.id].choice));
+    return { fixed, choice, trade };
+  }
+
   // ---- 카드 설명 ----
-  function cardInfoHtml(c) {
+  function cardInfoHtml(c, extra = '') {
     const col = COLORS[c.color];
     let chain = '';
     if (c.from) {
       const g = giverOf(c.from);
-      chain += `<div class="small">🔗 ${CHAINS[c.from]} 기호(${g ? esc(g.name) : '?'})가 있으면 무료</div>`;
+      chain += `<div class="dl-i-row">🔗 <span>${CHAINS[c.from]} 기호(${g ? esc(g.name) : '?'})가 있으면 <b>무료</b></span></div>`;
     }
-    if (c.gives) chain += `<div class="small dim">이 카드를 지으면 ${CHAINS[c.gives]} 기호 → ${takerOf(c.gives).map(esc).join(', ') || '없음'}을(를) 무료로 지을 수 있어요</div>`;
-    return `<div class="dinfo"><div class="dinfo-h"><i class="dband dc-${c.color}"></i><b>${esc(c.name)}</b> <span class="dim small">${c.age}시대 · ${col.name}</span></div>
-      <div class="small">비용 ${resText(c.cost)}</div><div class="small">${esc(cardDesc(c)) || '효과 없음'}</div>${chain}</div>`;
+    if (c.gives) chain += `<div class="dl-i-row dim">${CHAINS[c.gives]} <span>지으면 → ${takerOf(c.gives).map(esc).join(', ') || '없음'}을(를) 나중에 무료로</span></div>`;
+    return `<div class="dl-info k-${c.color}"><div class="dl-i-h"><span class="dl-i-ico">${cardIcon(c)}</span><b>${esc(c.name)}</b><span class="dl-i-tag">${ROMAN[c.age]}시대 · ${col.name}</span></div>
+      <div class="dl-i-row">💰 <span>비용 ${resText(c.cost)}</span>${extra}</div><div class="dl-i-row">✨ <span>${esc(cardDesc(c)) || '효과 없음'}</span></div>${chain}</div>`;
   }
 
   function wonderInfoHtml(w) {
-    return `<div class="dinfo"><div class="dinfo-h"><i class="dband dwonder"></i><b>🏛️ ${esc(w.name)}</b></div>
-      <div class="small">비용 ${resText(w.cost)}</div><div class="small">${esc(w.desc)}</div></div>`;
+    return `<div class="dl-info k-wonder"><div class="dl-i-h"><span class="dl-i-ico">${WART[w.id][0]}</span><b>${esc(w.name)}</b><span class="dl-i-tag">불가사의</span></div>
+      <div class="dl-i-row">💰 <span>비용 ${resText(w.cost)}</span></div><div class="dl-i-row">✨ <span>${esc(w.desc)}</span></div></div>`;
   }
 
   function tokenInfoHtml(id) {
     const t = TOKENS[id];
-    return `<div class="dinfo"><div class="dinfo-h"><b>${t.icon} ${esc(t.name)}</b> <span class="dim small">진보 토큰</span></div><div class="small">${esc(t.desc)}</div></div>`;
+    return `<div class="dl-info k-token"><div class="dl-i-h"><span class="dl-i-ico">${t.icon}</span><b>${esc(t.name)}</b><span class="dl-i-tag">진보 토큰</span></div><div class="dl-i-row">✨ <span>${esc(t.desc)}</span></div></div>`;
   }
 
-  // ---- 판 ----
+  // ---- 시대 카드 피라미드 ----
   function pyramidHtml() {
     const s = st();
-    const rows = Math.max(...S.slots.map((x) => x.row)) + 1;
-    const STEP = 40;
-    const H = (rows - 1) * STEP + 64;
+    // 위쪽 줄이 다 빠지면 남은 카드만큼 판을 위로 당긴다
+    const left = S.slots.filter((x) => !x.taken);
+    const top = Math.min(...left.map((x) => x.row));
+    const rows = Math.max(...left.map((x) => x.row)) - top + 1;
+    const STEP = 44;
+    const CH = 78;
+    const H = (rows - 1) * STEP + CH + 8;
     const pick = S.mode === 'pick';
-    const tiles = S.slots.filter((x) => !x.taken).map((x) => {
-      const left = `calc(50% + ${(((x.x - 1) * 100) / 12).toFixed(3)}%)`;
-      const style = `left:${left};top:${x.row * STEP}px;z-index:${x.row + 1}`;
+    const tiles = left.map((x) => {
+      const lx = `calc(50% + ${(((x.x - 1) * 100) / 12).toFixed(3)}%)`;
+      const style = `left:${lx};top:${(x.row - top) * STEP}px;z-index:${x.row + 1}`;
       const sel = s.focus && s.focus.kind === 'slot' && s.focus.i === x.i;
-      if (x.card === null) return `<div class="dcard back" style="${style}"><span>?</span></div>`;
+      if (x.card === null) return `<div class="dlc back a${S.age}" style="${style}"><span>${ROMAN[S.age]}</span></div>`;
       const c = CARD[x.card];
-      let price = `<span class="dcost">${resText(c.cost)}</span>`;
+      let price = `<span class="dlc-cost">${c.from ? `🔗${CHAINS[c.from]} ` : ''}${resText(c.cost)}</span>`;
+      let ok = '';
       if (pick && x.open) {
         const k = S.costs[x.i];
-        price = `<span class="dprice ${k.ok ? 'ok' : 'no'}">${k.chain ? '🔗무료' : k.coins ? `🪙${k.coins}` : '무료'}</span>`;
+        ok = k.ok ? 'can' : 'cant';
+        price = `<span class="dlc-price ${k.ok ? 'ok' : 'no'}">${k.chain ? '🔗무료' : k.coins ? `🪙${k.coins}` : '무료'}</span>`;
       }
-      return `<button class="dcard dc-${c.color} ${x.open ? 'open' : ''} ${sel ? 'sel' : ''}" data-act="dlSlot" data-i="${x.i}" style="${style}">
-        <span class="dico">${cardIcon(c)}</span><span class="dnm">${esc(c.name)}</span>${price}</button>`;
+      return `<button class="dlc k-${c.color} ${x.open ? 'open' : 'covered'} ${ok} ${sel ? 'sel' : ''}" data-act="dlSlot" data-i="${x.i}" style="${style}" aria-label="${esc(c.name)}${x.open ? '' : ' (가려짐)'}">
+        <span class="dlc-band"><span class="dlc-ico">${cardIcon(c)}</span>${c.gives ? `<i class="dlc-chain">${CHAINS[c.gives]}</i>` : ''}</span>
+        <span class="dlc-nm">${esc(c.name)}</span>${price}</button>`;
     }).join('');
-    return `<div class="dpyr" style="height:${H}px">${tiles}</div>`;
+    return `<div class="dlpyr" style="height:${H}px">${tiles}</div>`;
   }
 
+  // ---- 군사 트랙 ----
   function trackHtml() {
+    const [a, b] = S.players;
     const cells = [];
     for (let p = -9; p <= 9; p++) {
-      const tok = [3, 6].includes(Math.abs(p)) ? `${Math.abs(p) === 3 ? 2 : 5}` : '';
-      const fired = S.milTokens[`${p < 0 ? '-' : '+'}${Math.abs(p)}`];
-      const zone = Math.abs(p) >= 6 ? 'z3' : Math.abs(p) >= 3 ? 'z2' : Math.abs(p) >= 1 ? 'z1' : 'z0';
-      const inner = Math.abs(p) === 9 ? '🏰' : p === S.military ? '⚔️' : tok ? `<small class="${fired ? 'gone' : ''}">🪙${tok}</small>` : '';
-      cells.push(`<div class="dtc ${zone} ${p === S.military ? 'pawn' : ''}">${p === S.military && Math.abs(p) === 9 ? '⚔️' : inner}</div>`);
+      const ab = Math.abs(p);
+      const zone = ab === 9 ? 'cap' : ab >= 6 ? 'z3' : ab >= 3 ? 'z2' : ab >= 1 ? 'z1' : 'z0';
+      const side = p < 0 ? 'l' : p > 0 ? 'r' : '';
+      const pawn = p === S.military ? '<i class="dl-pawn" aria-label="군사 말"><svg viewBox="0 0 16 22"><path d="M8 1 L14 9 L8 21 L2 9 Z" fill="#ff5a3c" stroke="#3a0a00" stroke-width="1.3" stroke-linejoin="round"/><path d="M8 1 L8 21 M2 9 L14 9" stroke="#ffd2a8" stroke-opacity=".7" stroke-width=".8"/></svg></i>' : '';
+      const inner = ab === 9 ? `<span class="dl-castle" style="--pc:${p < 0 ? a.color : b.color}">🏰</span>` : p === 0 ? '<span class="dl-mid">◆</span>' : '';
+      cells.push(`<div class="dl-tc ${zone} ${side}">${inner}${pawn}</div>`);
     }
-    const [a, b] = S.players;
-    return `<div class="dtrack">${cells.join('')}</div>
-      <div class="dtrack-l"><span>◀ ${esc(a.name)} 수도</span><span class="dim small">말이 상대 쪽으로 갈수록 상대의 동전이 줄고 점수를 얻어요</span><span>${esc(b.name)} 수도 ▶</span></div>`;
+    const loot = (key, n, col) => {
+      const gone = S.milTokens[key];
+      return `<span class="dl-loot ${gone ? 'gone' : ''}" style="grid-column:${col}">🪙−${n}</span>`;
+    };
+    // 존 점수 표시: 1~2칸 2점, 3~5칸 5점, 6~8칸 10점
+    const zl = (from, to, txt) => `<span class="dl-zl" style="grid-column:${from} / ${to}">${txt}</span>`;
+    const zones = [zl(2, 5, '10점'), zl(5, 8, '5점'), zl(8, 10, '2점'), zl(11, 13, '2점'), zl(13, 16, '5점'), zl(16, 19, '10점')].join('');
+    const loots = [loot('-6', 5, '2 / 5'), loot('-3', 2, '5 / 8'), loot('+3', 2, '13 / 16'), loot('+6', 5, '16 / 19')].join('');
+    const lead = S.military === 0 ? '군사력이 팽팽해요' : `${esc((S.military > 0 ? a : b).name)}님이 ${Math.abs(S.military)}칸 앞서요`;
+    return `<section class="dl-mil">
+      <div class="dl-mil-h"><span style="--pc:${a.color}">◀ ${esc(a.name)} 수도</span><b>⚔️ ${lead}</b><span style="--pc:${b.color}">${esc(b.name)} 수도 ▶</span></div>
+      <div class="dl-track">${cells.join('')}</div>
+      <div class="dl-zones">${zones}</div>
+      <div class="dl-zones loot">${loots}</div>
+      <p class="dl-mil-f">방패를 지으면 말이 상대 수도 쪽으로 가요. 끝에 닿으면 즉시 승리, 아니면 게임 끝에 말이 있는 쪽 반대편 사람이 그 칸의 점수를 받아요.</p></section>`;
   }
 
   function playerBar(p) {
     const you = p.id === S.me;
-    const turn = p.id === S.turnId;
-    const sci = p.sci.map((k) => SYMS[k].icon).join('');
-    const toks = p.tokens.map((t) => `<button class="dtok" data-act="dlInfo" data-kind="token" data-id="${t}">${TOKENS[t].icon}</button>`).join('');
-    return `<div class="dpl ${turn ? 'turn' : ''} ${you ? 'me' : ''}">
-      <div class="dpl-h"><i class="vchip big" style="background:${p.color}"></i><span class="dot ${p.connected ? '' : 'off'}"></span><b>${esc(p.name)}${you ? ' (나)' : ''}</b>${turn ? ' 👈' : ''}${S.winnerIds.includes(p.id) ? ' 🏆' : ''}</div>
-      <div class="dpl-r"><b class="dcoin">🪙 ${p.coins}</b><span class="small">${sci ? `과학 ${sci} (${p.sci.length}/6)` : '과학 -'}</span></div>
-      ${toks ? `<div class="dtoks">${toks}</div>` : ''}</div>`;
+    const turn = p.id === S.turnId || (S.pend && S.pend.playerId === p.id) || (S.draft && S.draft.pickerId === p.id) || S.chooserId === p.id;
+    const sci = p.sci.map((k) => `<i title="${SYMS[k].name}">${SYMS[k].icon}</i>`).join('');
+    const toks = p.tokens.map((t) => `<button class="dl-tk sm" data-act="dlInfo" data-kind="token" data-id="${t}" aria-label="${esc(TOKENS[t].name)}">${TOKENS[t].icon}</button>`).join('');
+    const counts = COLOR_ORDER.map((k) => {
+      const n = p.cards.filter((id) => CARD[id].color === k).length;
+      return n ? `<span class="dl-cnt k-${k}">${n}</span>` : '';
+    }).join('');
+    const sciWarn = p.sci.length >= 5 ? 'warn' : '';
+    return `<div class="dlp ${turn ? 'turn' : ''} ${you ? 'me' : ''} ${S.winnerIds.includes(p.id) ? 'win' : ''}" style="--pc:${p.color}">
+      <div class="dlp-h"><span class="dot ${p.connected ? '' : 'off'}"></span><b class="dlp-nm">${esc(p.name)}${you ? ' (나)' : ''}</b>${S.winnerIds.includes(p.id) ? '<span>🏆</span>' : ''}</div>
+      <div class="dlp-r">${coins(p.coins)}<span class="dl-sci ${sciWarn}" aria-label="과학 기호 ${p.sci.length}종">${sci || '<em>과학 0</em>'}<small>${p.sci.length}/6</small></span></div>
+      <div class="dlp-r">${counts ? `<span class="dl-cnts">${counts}</span>` : '<span class="dim small">건물 없음</span>'}${toks ? `<span class="dl-tks">${toks}</span>` : ''}</div></div>`;
+  }
+
+  function wonderHtml(p, w, you) {
+    const W = WONDER[w.id];
+    const [glyph, hue] = WART[w.id];
+    const cls = w.built ? 'built' : w.lost ? 'lost' : '';
+    const c = you && !w.built && !w.lost ? S.wonderCosts[w.id] : null;
+    const price = c ? `<em class="dl-wprice ${c.ok ? 'ok' : 'no'}">${c.coins ? `🪙${c.coins}` : '무료'}</em>` : '';
+    const state = w.built ? '<span class="dl-wst">✅ 완성</span>' : w.lost ? '<span class="dl-wst">✖ 지을 수 없음</span>' : `<span class="dl-wcost">${resText(W.cost)}</span>`;
+    return `<button class="dlw ${cls}" style="--wh:${hue}" data-act="dlInfo" data-kind="wonder" data-id="${w.id}">
+      <span class="dlw-g">${glyph}</span><span class="dlw-t"><b>${esc(W.name)}</b><small>${esc(W.desc)}</small>${state}</span>${price}</button>`;
+  }
+
+  function prodHtml(p, you) {
+    const o = S.players.find((x) => x.id !== p.id);
+    const { fixed, choice, trade } = prodOf(p);
+    const op = prodOf(o).fixed;
+    const fx = RK.filter((k) => fixed[k]).map((k) => `<span>${RES[k]}${fixed[k]}</span>`).join('');
+    const ch = choice.map((list) => `<span class="ch">${list.map((k) => RES[k]).join('/')}</span>`).join('');
+    const buy = you ? `<div class="dl-prod buy"><b>사 오는 값</b>${RK.map((k) => `<span title="${RES_NAME[k]}">${RES[k]}<small>${trade.has(k) ? 1 : 2 + op[k]}</small></span>`).join('')}</div>` : '';
+    return `<div class="dl-prod"><b>생산</b>${fx || ch ? fx + ch : '<span class="dim">없음</span>'}</div>${buy}`;
   }
 
   function cityHtml(p) {
     const you = p.id === S.me;
-    const wonders = p.wonders.map((w) => {
-      const W = WONDER[w.id];
-      const cls = w.built ? 'built' : w.lost ? 'lost' : '';
-      const cost = you && !w.built && !w.lost && S.wonderCosts[w.id] ? ` · ${S.wonderCosts[w.id].coins ? `🪙${S.wonderCosts[w.id].coins}` : '무료'}` : '';
-      return `<button class="dwon ${cls}" data-act="dlInfo" data-kind="wonder" data-id="${w.id}"><b>${esc(W.name)}</b><small>${w.built ? '✅ 완성' : w.lost ? '✖ 지을 수 없음' : `${resText(W.cost)}${cost}`}</small></button>`;
+    const wonders = p.wonders.map((w) => wonderHtml(p, w, you)).join('');
+    const groups = COLOR_ORDER.map((k) => {
+      const list = p.cards.map((id) => CARD[id]).filter((c) => c.color === k);
+      if (!list.length) return '';
+      return `<div class="dl-grp">${list.map((c) => `<button class="dl-chip k-${c.color}" data-act="dlInfo" data-kind="card" data-id="${c.id}"><span>${cardIcon(c)}</span>${esc(c.name)}</button>`).join('')}</div>`;
     }).join('');
-    const order = ['brown', 'grey', 'blue', 'green', 'yellow', 'red', 'purple'];
-    const cards = p.cards.map((id) => CARD[id]).sort((a, b) => order.indexOf(a.color) - order.indexOf(b.color));
-    const chips = cards.map((c) => `<button class="dchip dc-${c.color}" data-act="dlInfo" data-kind="card" data-id="${c.id}">${cardIcon(c)} ${esc(c.name)}</button>`).join('');
-    return `<div class="card dcity ${you ? 'me' : ''}"><div class="small"><b>${esc(p.name)}${you ? ' (나)' : ''}</b>의 도시</div>
-      <div class="dwons">${wonders}</div>
-      <div class="dchips">${chips || '<span class="dim small">아직 지은 건물이 없어요</span>'}</div></div>`;
+    return `<section class="dl-city ${you ? 'me' : ''}" style="--pc:${p.color}">
+      <div class="dl-city-h"><b>${esc(p.name)}${you ? ' (나)' : ''}의 도시</b><span class="dim small">불가사의 ${p.wonders.filter((w) => w.built).length}개 완성</span></div>
+      ${prodHtml(p, you)}
+      <div class="dlws">${wonders}</div>
+      <div class="dl-grps">${groups || '<span class="dim small">아직 지은 건물이 없어요</span>'}</div></section>`;
   }
 
   function draftHtml() {
     const mine = S.mode === 'draft';
     const items = S.draft.pool.map((id) => {
       const W = WONDER[id];
-      return `<button class="dpick" ${mine ? `data-act="dlDraft" data-id="${id}"` : 'disabled'}><b>🏛️ ${esc(W.name)}</b><span class="small">비용 ${resText(W.cost)}</span><span class="small dim">${esc(W.desc)}</span></button>`;
+      const [glyph, hue] = WART[id];
+      return `<button class="dlw big" style="--wh:${hue}" ${mine ? `data-act="dlDraft" data-id="${id}"` : 'disabled'}>
+        <span class="dlw-g">${glyph}</span><span class="dlw-t"><b>${esc(W.name)}</b><small>${esc(W.desc)}</small><span class="dl-wcost">비용 ${resText(W.cost)}</span></span></button>`;
     }).join('');
-    return `<div class="card panel"><h2>불가사의 고르기 (${S.draft.set + 1}/2)</h2>
-      <p class="small dim">${mine ? '가져갈 불가사의를 하나 고르세요.' : `${pname(S.draft.pickerId)}님이 고르는 중이에요.`} 마지막 한 장은 자동으로 정해져요.</p>${items}</div>`;
+    return `<section class="card panel dl-draft"><h2>🏛️ 불가사의 고르기 <small>${S.draft.set + 1}/2묶음</small></h2>
+      <p class="small dim">${mine ? '<b class="dl-hot">내 차례!</b> 가져갈 불가사의를 하나 누르세요.' : `${pname(S.draft.pickerId)}님이 고르는 중이에요.`} 마지막 한 장은 자동으로 정해져요.</p>
+      <div class="dl-draft-list">${items}</div></section>`;
   }
 
   function overHtml() {
     const isHost = S.hostId === S.me;
-    const reason = { military: '군사 승리', science: '과학 승리', points: '점수 승리', tie: '동점 (공동 우승)' }[S.reason];
-    const rows = [['blue', '시민'], ['green', '과학'], ['yellow', '상업'], ['purple', '길드'], ['wonders', '불가사의'], ['tokens', '진보 토큰'], ['military', '군사'], ['coins', '동전']];
+    const reason = { military: '⚔️ 군사 승리 — 상대 수도를 점령했어요!', science: '🔬 과학 승리 — 서로 다른 과학 기호 6종!', points: '🏛️ 점수 승리', tie: '🤝 동점 (공동 우승)' }[S.reason];
+    const rows = [['blue', '🔵 시민'], ['green', '🟢 과학'], ['yellow', '🟡 상업'], ['purple', '🟣 길드'], ['wonders', '🏛️ 불가사의'], ['tokens', '🧪 진보 토큰'], ['military', '⚔️ 군사'], ['coins', '🪙 동전']];
     const [a, b] = S.players;
     const sa = S.result.scores[a.id];
     const sb = S.result.scores[b.id];
     const table = rows.map(([k, n]) => `<div class="drow"><span>${sa[k]}</span><span class="dim">${n}</span><span>${sb[k]}</span></div>`).join('');
-    return `<div class="card panel"><h2>게임 끝</h2><p class="big ok">🏆 ${S.winnerIds.map(pname).join(', ')}</p><p class="center dim">${reason}</p>
+    return `<section class="card panel dl-over"><h2>게임 끝</h2><p class="big ok">🏆 ${S.winnerIds.map(pname).join(', ')}</p><p class="center">${reason}</p>
       <div class="drow head"><b>${esc(a.name)}</b><span></span><b>${esc(b.name)}</b></div>${table}
       <div class="drow total"><b>${sa.total}</b><span class="dim">합계</span><b>${sb.total}</b></div>
-      ${genericOverButtons(isHost)}</div>`;
+      ${S.reason === 'military' || S.reason === 'science' ? '<p class="small dim center">즉시 승리라서 점수와 상관없이 이겼어요.</p>' : ''}
+      ${S.reason === 'points' && sa.total === sb.total ? '<p class="small dim center">합계가 같아서 시민(파랑) 점수가 높은 쪽이 이겼어요.</p>' : ''}
+      ${genericOverButtons(isHost)}</section>`;
   }
 
   // ---- 아래 도크 ----
@@ -171,20 +249,22 @@
     const s = st();
     const f = s.focus;
     if (!f || f.kind !== 'slot' || !S.slots[f.i] || !S.slots[f.i].open) {
-      return `<p class="center dim">${S.mode === 'pick' ? '가져올 카드를 고르세요. (노란 테두리가 지금 가져올 수 있는 카드)' : ''}</p>`;
+      const covered = f && f.kind === 'slot' ? '<b>이 카드는 다른 카드에 가려져 있어서 아직 못 가져와요.</b><br>' : '';
+      return `<p class="center dl-hint">${covered}👆 <b>금빛 테두리</b> 카드를 눌러요<br><span class="small">가격표 초록 = 지을 수 있음 · 빨강 = 동전 부족</span></p>`;
     }
     const k = S.costs[f.i];
     if (s.wpick) {
       const list = me().wonders.filter((w) => !w.built && !w.lost).map((w) => {
         const c = S.wonderCosts[w.id];
-        return `<button ${c.ok ? '' : 'disabled'} data-act="dlWonder" data-w="${w.id}">${esc(WONDER[w.id].name)} · ${c.coins ? `🪙${c.coins}` : '무료'}${c.ok ? '' : ' (동전 부족)'}</button>`;
+        return `<button class="dl-wbtn" ${c.ok ? '' : 'disabled'} data-act="dlWonder" data-w="${w.id}"><span>${WART[w.id][0]}</span><b>${esc(WONDER[w.id].name)}</b><em>${c.coins ? `🪙${c.coins}` : '무료'}${c.ok ? '' : ' · 동전 부족'}</em></button>`;
       }).join('') || '<p class="dim center">지을 수 있는 불가사의가 없어요.</p>';
-      return `<div class="dact"><p class="small center">어느 불가사의를 지을까요? (이 카드는 불가사의 밑에 깔려요)</p>${list}<button class="ghost" data-act="dlWback">뒤로</button></div>`;
+      return `<div class="dact"><p class="small center">어느 불가사의를 지을까요? 이 카드는 불가사의 밑에 깔려요.</p>${list}<button class="ghost" data-act="dlWback">뒤로</button></div>`;
     }
-    return `<div class="dact row3">
-      <button class="primary" ${k.ok ? '' : 'disabled'} data-act="dlBuild">🏗️ 건설<br>${k.ok ? (k.chain ? '연계 무료' : k.coins ? `🪙${k.coins}` : '무료') : '동전 부족'}</button>
-      <button data-act="dlDiscard">♻️ 버리기<br>🪙+${S.discardGain}</button>
-      <button data-act="dlWpick" ${Object.keys(S.wonderCosts).length ? '' : 'disabled'}>🏛️ 불가사의<br>짓기</button></div>`;
+    const canW = Object.keys(S.wonderCosts).length;
+    return `<div class="dact row3 dl-acts">
+      <button class="primary" ${k.ok ? '' : 'disabled'} data-act="dlBuild"><span>🏗️</span>건설<small>${k.ok ? (k.chain ? '연계 무료' : k.coins ? `🪙${k.coins}` : '무료') : `🪙${k.coins} 필요`}</small></button>
+      <button data-act="dlDiscard"><span>♻️</span>버리기<small>🪙+${S.discardGain}</small></button>
+      <button data-act="dlWpick" ${canW ? '' : 'disabled'}><span>🏛️</span>불가사의<small>${canW ? '짓기' : '없음'}</small></button></div>`;
   }
 
   function pendHtml() {
@@ -192,28 +272,28 @@
     const mine = S.mode === pe.type;
     if (!mine) return `<p class="center dim">${pname(pe.playerId)}님이 고르는 중이에요…</p>`;
     if (pe.type === 'token' || pe.type === 'library') {
-      const items = pe.options.map((t) => `<button data-act="dlToken" data-t="${t}"><b>${TOKENS[t].icon} ${esc(TOKENS[t].name)}</b><br><span class="small dim">${esc(TOKENS[t].desc)}</span></button>`).join('');
-      return `<div class="dact"><p class="center"><b>${pe.type === 'library' ? '대도서관: 진보 토큰을 고르세요' : '과학 기호 한 쌍! 진보 토큰을 고르세요'}</b></p>${items}</div>`;
+      const items = pe.options.map((t) => `<button class="dl-tkpick" data-act="dlToken" data-t="${t}"><span class="dl-tk">${TOKENS[t].icon}</span><span><b>${esc(TOKENS[t].name)}</b><small>${esc(TOKENS[t].desc)}</small></span></button>`).join('');
+      return `<div class="dact"><p class="center"><b>${pe.type === 'library' ? '📚 대도서관: 진보 토큰을 하나 고르세요' : '🔬 같은 과학 기호 한 쌍! 진보 토큰을 고르세요'}</b></p>${items}</div>`;
     }
-    const title = pe.type === 'destroy' ? `상대의 ${COLORS[pe.color].name} 카드 하나를 파괴하세요` : '버려진 카드 하나를 무료로 지으세요';
+    const title = pe.type === 'destroy' ? `💥 상대의 ${COLORS[pe.color].name} 카드 하나를 파괴하세요` : '⚱️ 버려진 카드 하나를 무료로 지으세요';
     const items = pe.options.map((id) => {
       const c = CARD[id];
-      return `<button data-act="dlCard" data-c="${id}"><i class="dband dc-${c.color}"></i> ${cardIcon(c)} <b>${esc(c.name)}</b> <span class="small dim">${c.age}시대</span><br><span class="small dim">${esc(cardDesc(c))}</span></button>`;
+      return `<button class="dl-cpick k-${c.color}" data-act="dlCard" data-c="${id}"><span class="dl-i-ico">${cardIcon(c)}</span><span><b>${esc(c.name)}</b> <small class="dim">${ROMAN[c.age]}시대</small><small>${esc(cardDesc(c))}</small></span></button>`;
     }).join('');
     return `<div class="dact"><p class="center"><b>${title}</b></p>${items}</div>`;
   }
 
   function dock() {
     if (S.mode === 'over') return '';
-    if (S.mode === 'draft') return '<p class="center"><b>불가사의를 골라주세요</b></p>';
+    if (S.mode === 'draft') return '<p class="center dl-hint">👆 위에서 불가사의를 하나 골라요</p>';
     if (S.mode === 'chooseStart') {
-      return `<div class="dact"><p class="center"><b>${S.age + 1}시대를 누가 먼저 시작할까요?</b></p><button class="primary" data-act="dlStart" data-who="me">내가 먼저</button><button data-act="dlStart" data-who="opp">상대가 먼저</button></div>`;
+      return `<div class="dact"><p class="center"><b>${ROMAN[S.age + 1]}시대를 누가 먼저 시작할까요?</b></p><div class="row"><button class="primary" data-act="dlStart" data-who="me">내가 먼저</button><button data-act="dlStart" data-who="opp">상대가 먼저</button></div></div>`;
     }
     if (S.pend) return pendHtml();
     if (S.mode === 'pick') return actionsHtml();
     if (S.phase === 'chooseStart') return `<p class="center dim">${pname(S.chooserId)}님이 다음 시대의 시작 플레이어를 고르는 중이에요…</p>`;
     if (S.phase === 'draft') return `<p class="center dim">${pname(S.draft.pickerId)}님이 불가사의를 고르는 중이에요…</p>`;
-    return `<p class="center dim">${pname(S.turnId)}님 차례예요</p>`;
+    return `<p class="center dim"><span class="dl-hour">⏳</span> ${pname(S.turnId)}님 차례예요</p>`;
   }
 
   function renderDuel() {
@@ -221,26 +301,33 @@
     const [a, b] = S.players;
     const mine = me();
     const other = opp();
-    const log = S.log.length ? `<div class="ulog">${S.log.slice(-5).reverse().map((l, i) => `<div class="${i === 0 ? 'new' : ''}">${esc(l)}</div>`).join('')}</div>` : '';
-    const board = S.phase === 'play' || S.phase === 'chooseStart' || S.phase === 'over' ? `
-      ${S.boardTokens.length ? `<div class="dboard small"><span class="dim">진보 토큰</span>${S.boardTokens.map((t) => `<button class="dtok" data-act="dlInfo" data-kind="token" data-id="${t}">${TOKENS[t].icon} ${esc(TOKENS[t].name)}</button>`).join('')}</div>` : ''}
-      ${S.slots.some((x) => !x.taken) ? `<div class="small dim center">${S.age}시대 · 버린 카드 ${S.discard.length}장</div>${pyramidHtml()}` : ''}` : '';
-    return `
-    <div class="top"><span>${roomTag()}</span><span>세븐 원더스 듀얼${S.age ? ` · ${S.age}시대` : ''}</span></div>
+    const log = S.log.length ? `<div class="ulog dl-log">${S.log.slice(-4).reverse().map((l, i) => `<div class="${i === 0 ? 'new' : ''}">${esc(l)}</div>`).join('')}</div>` : '';
+    const tokens = S.boardTokens.length
+      ? `<section class="dl-toks"><div class="dl-cap">🧪 진보 토큰 <small>같은 과학 기호 2장을 모으면 하나 가져와요</small></div>
+        <div class="dl-tkrow">${S.boardTokens.map((t) => `<button class="dl-tkb" data-act="dlInfo" data-kind="token" data-id="${t}"><span class="dl-tk">${TOKENS[t].icon}</span><small>${esc(TOKENS[t].name)}</small></button>`).join('')}</div></section>` : '';
+    let board = '';
+    if (S.phase === 'play' || S.phase === 'chooseStart' || S.phase === 'over') {
+      const live = S.slots.some((x) => !x.taken);
+      board = `${tokens}${live ? `<section class="dl-age"><div class="dl-cap">🃏 ${ROMAN[S.age]}시대 카드 <small>남은 ${S.slots.filter((x) => !x.taken).length}장 · 버린 카드 ${S.discard.length}장</small></div>${pyramidHtml()}</section>` : ''}`;
+      if (S.phase === 'chooseStart') board += `<div class="dl-agebanner"><b>${ROMAN[S.age]}시대 끝!</b><span>곧 ${ROMAN[S.age + 1]}시대가 시작돼요${S.age + 1 === 3 ? ' · 보라색 길드 카드가 섞여 있어요' : ''}</span></div>`;
+    }
+    return `<div class="dlx">
+    <div class="top"><span>${roomTag()}</span><span>🏛️ 세븐 원더스 듀얼${S.age ? ` · ${ROMAN[S.age]}시대` : ''}</span></div>
     ${S.phase === 'over' ? overHtml() : ''}
+    <div class="dlps">${playerBar(a)}${playerBar(b)}</div>
     ${S.phase === 'draft' ? draftHtml() : ''}
-    <div class="dpls">${playerBar(a)}${playerBar(b)}</div>
-    ${S.phase === 'lobby' ? '' : trackHtml()}
+    ${trackHtml()}
     ${board}
     ${other ? cityHtml(other) : ''}
     ${mine ? cityHtml(mine) : ''}
     ${log}
-    <div class="bdock">
+    <div class="bdock dl-dock">
       ${S.mode === 'pick' || st().focus ? focusHtml() : ''}
       ${dock()}
       ${isHost ? '<div class="foot"><button data-act="hostmenu">⚙ 방장</button></div>' : ''}
     </div>
-    ${ui.hostOpen && isHost ? genericHostMenu('멈춘 곳 대신 진행 (자동으로 한 수 진행)', '자리를 비운 사람 대신 한 수 진행할까요? (카드를 버려 동전을 받거나 첫 번째 선택지를 골라요)') : ''}`
+    ${ui.hostOpen && isHost ? genericHostMenu('멈춘 곳 대신 진행 (자동으로 한 수 진행)', '자리를 비운 사람 대신 한 수 진행할까요? (카드를 버려 동전을 받거나 첫 번째 선택지를 골라요)') : ''}
+    </div>`;
   }
 
   function sync() {
@@ -252,6 +339,20 @@
       if (!x || x.taken || x.card === null || S.mode !== 'pick') s.focus = null;
     }
     if (S.mode !== 'pick') s.wpick = false;
+  }
+
+  // 군사 말이 움직였으면 이전 칸에서 미끄러지듯 옮겨 준다
+  let lastMil = null;
+  function afterRender() {
+    if (!S || S.kind !== 'duel' || S.phase === 'lobby') { lastMil = null; return; }
+    const key = `${S.code}:${S.gameNo}`;
+    const pawn = document.querySelector('.dlx .dl-pawn');
+    if (pawn && lastMil && lastMil.key === key && lastMil.v !== S.military && pawn.animate
+      && !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) {
+      const cell = pawn.parentElement.getBoundingClientRect().width + 1;
+      pawn.animate([{ transform: `translateX(${(lastMil.v - S.military) * cell}px)` }, { transform: 'none' }], { duration: 520, easing: 'cubic-bezier(.2,.8,.2,1)' });
+    }
+    lastMil = { key, v: S.military };
   }
 
   function focusOn(kind, id) {
@@ -276,9 +377,9 @@
       case 'dlInfo': focusOn(el.dataset.kind, el.dataset.kind === 'token' ? el.dataset.id : Number(el.dataset.id)); return true;
       case 'dlWpick': s.wpick = true; render(); return true;
       case 'dlWback': s.wpick = false; render(); return true;
-      case 'dlBuild': send({ t: 'build', slot: s.focus.i }); s.focus = null; return true;
-      case 'dlDiscard': send({ t: 'discard', slot: s.focus.i }); s.focus = null; return true;
-      case 'dlWonder': send({ t: 'wonder', slot: s.focus.i, wonder: Number(el.dataset.w) }); s.focus = null; s.wpick = false; return true;
+      case 'dlBuild': if (s.focus) send({ t: 'build', slot: s.focus.i }); s.focus = null; return true;
+      case 'dlDiscard': if (s.focus) send({ t: 'discard', slot: s.focus.i }); s.focus = null; return true;
+      case 'dlWonder': if (s.focus) send({ t: 'wonder', slot: s.focus.i, wonder: Number(el.dataset.w) }); s.focus = null; s.wpick = false; return true;
       case 'dlDraft': send({ t: 'draftWonder', wonder: Number(el.dataset.id) }); return true;
       case 'dlToken': send({ t: 'choose', token: el.dataset.t }); return true;
       case 'dlCard': send({ t: 'choose', card: Number(el.dataset.c) }); return true;
@@ -288,6 +389,7 @@
   }
 
   window.GAME_UI.duel = {
-    name: '세븐 원더스 듀얼', label: '🏛️ 세븐 원더스 듀얼', range: '2명', rules: RULES, render: renderDuel, sync, click,
+    name: '세븐 원더스 듀얼', label: '🏛️ 세븐 원더스 듀얼', range: '2명', rules: RULES, render: renderDuel, sync, click, afterRender,
+    helpers: { prodOf },
   };
 }());

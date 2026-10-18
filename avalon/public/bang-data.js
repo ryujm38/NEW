@@ -74,11 +74,12 @@ const BANG_DATA = {
     vulture: { name: '벌처 샘', life: 4, desc: '누군가 탈락하면 그 사람의 카드를 모두 가져와요.' },
     willy: { name: '윌리 더 키드', life: 4, desc: '뱅!을 횟수 제한 없이 쓸 수 있어요.' },
   },
+  // icon은 화면 표시용
   ROLES: {
-    sheriff: { name: '보안관', team: 'law', goal: '모든 무법자와 배신자를 제거하세요. 체력이 +1이고 모두에게 정체가 공개돼요.' },
-    deputy: { name: '부보안관', team: 'law', goal: '보안관을 지키세요. 보안관 팀이 이기면 승리해요.' },
-    outlaw: { name: '무법자', team: 'outlaw', goal: '보안관을 제거하세요. 무법자를 쓰러뜨리면 3장을 뽑아요.' },
-    renegade: { name: '배신자', team: 'renegade', goal: '마지막 한 명으로 남아 보안관과 1:1로 이기세요. (먼저 보안관이 죽으면 안 돼요)' },
+    sheriff: { name: '보안관', icon: '⭐', team: 'law', goal: '모든 무법자와 배신자를 제거하세요. 체력이 +1이고 모두에게 정체가 공개돼요.' },
+    deputy: { name: '부보안관', icon: '🛡️', team: 'law', goal: '보안관을 지키세요. 보안관 팀이 이기면 승리해요.' },
+    outlaw: { name: '무법자', icon: '💰', team: 'outlaw', goal: '보안관을 제거하세요. 무법자를 쓰러뜨리면 3장을 뽑아요.' },
+    renegade: { name: '배신자', icon: '🐍', team: 'renegade', goal: '마지막 한 명으로 남아 보안관과 1:1로 이기세요. (먼저 보안관이 죽으면 안 돼요)' },
   },
 };
 
