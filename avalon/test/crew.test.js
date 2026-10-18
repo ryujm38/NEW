@@ -115,7 +115,7 @@ test('과제 고르기: 사령관부터 시계 방향으로 한 장씩, 남의 �
   assert.deepStrictEqual(room.tasks.map((t) => t.owner), [id(room, order[1]), id(room, order[2]), id(room, cmd), id(room, cmd)]);
 });
 
-test('사령관이 나눠 주기(assign): 사령관만, 한 사람에게 최대 ⌈과제/인원⌉개', () => {
+test('사령관이 나눠 주기(assign): 사령관만, 고르게(누구도 다른 사람보다 2개 이상 많지 않게)', () => {
   const room = mk(3, 11); // assign, 과제 4개 → 최대 2개
   const cmd = P(room, room.commander);
   const other = P(room, (room.commander + 1) % 3);
@@ -125,7 +125,11 @@ test('사령관이 나눠 주기(assign): 사령관만, 한 사람에게 최대 
   assert.deepStrictEqual(c.assignTask(room, cmd.id, 1, other.id), {});
   assert.ok(c.assignTask(room, cmd.id, 2, other.id).error, '3개째는 안 된다');
   assert.deepStrictEqual(c.assignTask(room, cmd.id, 2, cmd.id), {});
-  assert.deepStrictEqual(c.assignTask(room, cmd.id, 3, cmd.id), {});
+  // 4개를 3명에게: 2·1·1이어야 한다. 사령관에게 2개째를 주면 남은 한 명이 0개가 되므로 막는다
+  assert.match(c.assignTask(room, cmd.id, 3, cmd.id).error, /고르게/);
+  const third = P(room, (room.commander + 2) % 3);
+  assert.deepStrictEqual(c.viewFor(room, cmd.id).assignable, [third.id]);
+  assert.deepStrictEqual(c.assignTask(room, cmd.id, 3, third.id), {});
   assert.strictEqual(room.phase, 'play');
   assert.strictEqual(c.viewFor(room, cmd.id).mode, 'play');
 });
@@ -219,12 +223,29 @@ test('순서 번호 1~5: 전체 과제 중 정확히 그 번째에 완료해야 
   rig(bad, { hands: [['b9', 'p9'], ['b1', 'p1'], ['b2', 'p2']], tasks: [{ card: 'p1', token: '1', owner: 0 }, { card: 'b1', token: '2', owner: 0 }], lead: 0 });
   trick(bad, ['b9', 'b1', 'b2']);
   assert.strictEqual(bad.result.ok, false);
-  // 번호 과제가 다른 과제와 같은 트릭에 함께 → 실패
+  // 원작: 한 트릭에서 함께 완료되면 어느 쪽이 먼저 나왔든 순서에 맞게 완료한 것 (1과 표시 없는 과제, 1과 2)
   const same = mk(3);
-  rig(same, { hands: [['b9', 'p9'], ['b1', 'p1'], ['b2', 'p2']], tasks: [{ card: 'b1', token: '1', owner: 0 }, { card: 'b2', owner: 0 }], lead: 0 });
+  rig(same, { hands: [['b9', 'p9'], ['b1', 'p1'], ['b2', 'p2']], tasks: [{ card: 'b1', token: '1', owner: 0 }, { card: 'b2', owner: 0 }, { card: 'p1', owner: 0 }], lead: 0 });
   trick(same, ['b9', 'b1', 'b2']);
-  assert.strictEqual(same.result.ok, false);
-  assert.match(same.result.reason, /함께/);
+  assert.strictEqual(same.phase, 'play');
+  assert.strictEqual(same.tasks.filter((t) => t.done).length, 2);
+  const pair = mk(3);
+  rig(pair, { hands: [['b9', 'p9'], ['b1', 'p1'], ['b2', 'p2']], tasks: [{ card: 'b2', token: '2', owner: 0 }, { card: 'b1', token: '1', owner: 0 }, { card: 'p1', token: '3', owner: 0 }], lead: 0 });
+  trick(pair, ['b9', 'b1', 'b2']);
+  assert.strictEqual(pair.phase, 'play', '1과 2가 같은 트릭이면 괜찮다(2가 먼저 나왔어도)');
+  trick(pair, ['p9', 'p1', 'p2']);
+  assert.strictEqual(pair.result.ok, true);
+  // 1과 3이 함께(사이를 채울 과제 없음) → 실패
+  const gap = mk(3);
+  rig(gap, { hands: [['b9', 'p9'], ['b1', 'p1'], ['b2', 'p2']], tasks: [{ card: 'b1', token: '1', owner: 0 }, { card: 'b2', token: '3', owner: 0 }, { card: 'p1', token: '2', owner: 0 }], lead: 0 });
+  trick(gap, ['b9', 'b1', 'b2']);
+  assert.strictEqual(gap.result.ok, false);
+  assert.match(gap.result.reason, /3번 과제/);
+  // 2번 과제와 표시 없는 과제가 함께 첫 트릭에: 표시 없는 쪽이 1번째, 2번이 2번째 → 괜찮다
+  const fill = mk(3);
+  rig(fill, { hands: [['b9', 'p9'], ['b1', 'p1'], ['b2', 'p2']], tasks: [{ card: 'b1', token: '2', owner: 0 }, { card: 'b2', owner: 0 }, { card: 'p1', owner: 0 }], lead: 0 });
+  trick(fill, ['b9', 'b1', 'b2']);
+  assert.strictEqual(fill.phase, 'play');
   // 번호 없는 과제가 먼저여도 번호 2는 두 번째면 된다
   const two = mk(3);
   rig(two, { hands: [['b9', 'p9'], ['b1', 'p1'], ['b2', 'p2']], tasks: [{ card: 'p1', token: '2', owner: 0 }, { card: 'b1', owner: 0 }], lead: 0 });
@@ -246,11 +267,16 @@ test('상대 순서 › ›› ›››: 표시끼리 순서만 지키면 사�
   trick(bad, ['b9', 'b1', 'b2']);
   assert.strictEqual(bad.result.ok, false);
   assert.match(bad.result.reason, /앞 순서/);
-  // 화살표 둘이 같은 트릭 → 실패, 화살표와 표시 없는 과제는 같은 트릭이어도 괜찮다
+  // 이어지는 화살표 둘이 같은 트릭 → 괜찮다(원작). 사이 화살표가 남아 있으면 실패
   const same = mk(3);
-  rig(same, { hands, tasks: [{ card: 'b1', token: '>', owner: 0 }, { card: 'b2', token: '>>', owner: 0 }], lead: 0 });
+  rig(same, { hands, tasks: [{ card: 'b2', token: '>>', owner: 0 }, { card: 'b1', token: '>', owner: 0 }], lead: 0 });
   trick(same, ['b9', 'b1', 'b2']);
-  assert.strictEqual(same.result.ok, false);
+  assert.strictEqual(same.result.ok, true);
+  const skip = mk(3);
+  rig(skip, { hands, tasks: [{ card: 'b1', token: '>', owner: 0 }, { card: 'b2', token: '>>>', owner: 0 }, { card: 'p1', token: '>>', owner: 0 }], lead: 0 });
+  trick(skip, ['b9', 'b1', 'b2']);
+  assert.strictEqual(skip.result.ok, false);
+  assert.match(skip.result.reason, /앞 순서/);
   const mixed = mk(3);
   rig(mixed, { hands, tasks: [{ card: 'b1', token: '>', owner: 0 }, { card: 'b2', owner: 0 }, { card: 'p1', token: '>>', owner: 0 }], lead: 0 });
   trick(mixed, ['b9', 'b1', 'b2']);
@@ -258,7 +284,7 @@ test('상대 순서 › ›› ›››: 표시끼리 순서만 지키면 사�
   assert.strictEqual(mixed.tasks.filter((t) => t.done).length, 2);
 });
 
-test('Ω: 모든 과제 중 마지막에, 혼자 완료해야 한다', () => {
+test('Ω: 모든 과제 중 마지막에 (마지막 트릭에서 다른 과제와 함께여도 된다)', () => {
   const hands = [['b9', 'p9'], ['b1', 'p1'], ['b2', 'p2']];
   const ok = mk(3);
   rig(ok, { hands, tasks: [{ card: 'p1', token: 'O', owner: 0 }, { card: 'b1', owner: 0 }], lead: 0 });
@@ -273,7 +299,16 @@ test('Ω: 모든 과제 중 마지막에, 혼자 완료해야 한다', () => {
   const same = mk(3);
   rig(same, { hands, tasks: [{ card: 'b1', token: 'O', owner: 0 }, { card: 'b2', owner: 0 }], lead: 0 });
   trick(same, ['b9', 'b1', 'b2']);
-  assert.strictEqual(same.result.ok, false);
+  assert.strictEqual(same.result.ok, true);
+  // Ω와 번호가 함께 마지막 트릭에: 번호가 Ω 자리(맨 끝)를 차지하면 실패
+  const clash = mk(3);
+  rig(clash, { hands, tasks: [{ card: 'b1', token: 'O', owner: 0 }, { card: 'b2', token: '2', owner: 0 }], lead: 0 });
+  trick(clash, ['b9', 'b1', 'b2']);
+  assert.strictEqual(clash.result.ok, false);
+  const fine = mk(3);
+  rig(fine, { hands, tasks: [{ card: 'b1', token: 'O', owner: 0 }, { card: 'b2', token: '1', owner: 0 }], lead: 0 });
+  trick(fine, ['b9', 'b1', 'b2']);
+  assert.strictEqual(fine.result.ok, true);
 });
 
 test('첫 트릭은 사령관이 이겨야 하는 임무(cmdFirst)', () => {
@@ -432,7 +467,7 @@ test('방장 force: 사령관 선택 / 과제 고르기 / 나눠 주기 / 가장
   for (let k = 0; k < 4; k++) assert.deepStrictEqual(c.force(a, a.hostId), {});
   assert.strictEqual(a.phase, 'play');
   const per = a.players.map((p) => a.tasks.filter((t) => t.owner === p.id).length);
-  assert.ok(Math.max(...per) <= 2);
+  assert.ok(Math.max(...per) - Math.min(...per) <= 1);
 
   const r = mk(3);
   rig(r, { hands: [['b5', 'r2', 'p1'], ['b3', 'b9', 'y1'], ['g4', 'r1', 'g1']], lead: 0, tasks: [{ card: 'y1', owner: 1 }] });
@@ -495,8 +530,8 @@ function randomStep(room) {
   if (room.phase === 'tasks') {
     const free = room.tasks.map((t, i) => (t.owner ? -1 : i)).filter((i) => i >= 0);
     if (c.MISSIONS[room.mission - 1].assign) {
-      const cap = Math.ceil(room.tasks.length / ids.length);
-      const ok = ids.filter((x) => room.tasks.filter((t) => t.owner === x).length < cap);
+      const ok = ids.filter((x) => c.canAssign(room, x));
+      assert.deepStrictEqual(c.viewFor(room, cmd.id).assignable, ok);
       return c.actions.assign(room, cmd.id, { index: rnd(free), target: rnd(ok) });
     }
     return c.actions.pick(room, room.players[room.picker].id, { index: rnd(free) });
@@ -549,10 +584,16 @@ test('3~5명이 무작위로 여러 임무를 하면 임무는 늘 끝나고, �
           // 순서가 있는 과제가 끝났다면 규칙대로였는지
           const done = room.tasks.filter((t) => t.done);
           done.filter((t) => /^[1-5]$/.test(t.token || '')).forEach((t) => {
-            assert.strictEqual(room.tasks.filter((x) => x.done && x.trick < t.trick).length, Number(t.token) - 1);
+            const before = room.tasks.filter((x) => x.done && x.trick < t.trick).length;
+            const upto = room.tasks.filter((x) => x.done && x.trick <= t.trick).length;
+            assert.ok(before < Number(t.token) && Number(t.token) <= upto, '번호 과제는 그 트릭이 차지한 자리 안에서 완료');
           });
         }
         missions += 1;
+        if (c.MISSIONS[room.mission - 1].assign) {
+          const per = room.players.map((p) => room.tasks.filter((t) => t.owner === p.id).length);
+          assert.ok(Math.max(...per) - Math.min(...per) <= 1, '나눠 주기는 고르게');
+        }
         if (room.result.ok) {
           wins += 1;
           assert.ok(room.tasks.every((t) => t.done));
@@ -564,4 +605,40 @@ test('3~5명이 무작위로 여러 임무를 하면 임무는 늘 끝나고, �
   }
   assert.ok(missions >= 18 * 1);
   assert.ok(wins >= 0);
+});
+
+function getHost(room) { return room.players.find((p) => p.id === room.hostId); }
+
+test('결과 넘기기: 방장만. 방장 접속이 끊기면 남은 사람 누구나 넘길 수 있다', () => {
+  const room = mk(3);
+  rig(room, { hands: [['b9'], ['b1'], ['b2']], tasks: [{ card: 'b1', owner: 1 }], lead: 0 });
+  trick(room, ['b9', 'b1', 'b2']);
+  assert.strictEqual(room.result.ok, false);
+  const g = guest(room);
+  assert.strictEqual(c.viewFor(room, g).canNext, false);
+  assert.strictEqual(c.viewFor(room, room.hostId).canNext, true);
+  assert.ok(c.next(room, g).error);
+  getHost(room).connected = false;
+  assert.ok(c.next(room, 'nobody').error, '방에 없는 사람은 안 된다');
+  assert.strictEqual(c.viewFor(room, g).canNext, true);
+  assert.deepStrictEqual(c.next(room, g), {});
+  assert.strictEqual(room.attempt, 2);
+});
+
+test('과제 고르게 나누기(canAssign): 여러 인원·과제 수에서 끝까지 나눌 수 있고 차이는 1 이하', () => {
+  for (const n of [3, 4, 5]) {
+    for (let t = 1; t <= 9; t++) {
+      for (let g = 0; g < 30; g++) {
+        const room = mk(n);
+        room.tasks = Array.from({ length: t }, (_, i) => ({ card: c.TASK_DECK[i], token: null, owner: null, done: false, trick: null }));
+        for (let i = 0; i < t; i++) {
+          const ok = room.players.filter((p) => c.canAssign(room, p.id));
+          assert.ok(ok.length > 0, `${n}명 ${t}개: 줄 사람이 없음`);
+          room.tasks[i].owner = ok[crypto.randomInt(ok.length)].id;
+        }
+        const per = room.players.map((p) => room.tasks.filter((x) => x.owner === p.id).length);
+        assert.ok(Math.max(...per) - Math.min(...per) <= 1);
+      }
+    }
+  }
 });

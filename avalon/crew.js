@@ -8,8 +8,9 @@
 //   사령관부터 시계 방향으로 한 장씩 가져간다(임무에 따라 사령관이 나눠 주거나, 한 명이 모두 맡기도 한다).
 //   과제 = 그 카드가 들어 있는 트릭을 과제 주인이 이겨야 한다. 다른 사람이 이기면 바로 실패.
 // 순서 표시(일부 임무): 1~5 = 전체 과제 중 정확히 그 번째에 완료, › ›› ››› ›››› = 표시끼리의 상대 순서,
-//   Ω = 모든 과제 중 마지막에 완료. 순서가 있는 과제가 다른 과제와 같은 트릭에서 함께 완료되면 순서를 지킨 게 아니다
-//   (번호/Ω는 다른 어떤 과제와도, 화살표는 다른 화살표와 함께 완료되면 실패). ← 원작 FAQ를 따른 판단.
+//   Ω = 모든 과제 중 마지막에 완료. 한 트릭에서 과제 여러 개가 함께 완료되면(이긴 사람은 한 명이니 모두 그 사람 과제)
+//   원작 규칙대로 "어느 쪽이 먼저 나왔든" 순서에 맞게 완료한 것으로 본다: 그 트릭의 과제들이 D+1..D+k번째 자리를
+//   순서에 맞게 나눠 가질 수 있으면 성공(예: 1과 2, ››와 ›››, 마지막 트릭의 Ω와 다른 과제). 1과 3처럼 사이가 비면 실패.
 // 트릭: 먼저 낸 사람은 아무 카드나. 나머지는 낸 색이 있으면 반드시 따라 낸다. 없으면 아무거나(로켓 포함).
 //   로켓이 있으면 가장 높은 로켓이, 없으면 처음 낸 색 중 가장 높은 카드가 이긴다. 이긴 사람이 다음 트릭을 먼저 낸다.
 // 통신: 임무마다 한 사람당 한 번, 트릭이 시작되기 전(아무도 안 냈을 때)에만, 손에 든 색 카드 한 장을 공개하며
@@ -273,6 +274,19 @@ function choose(room, id, targetId) {
 }
 
 const assignCap = (room) => Math.ceil(room.tasks.length / room.players.length);
+// 원작: 다 나눈 뒤 누구도 다른 사람보다 과제가 2개 이상 많으면 안 된다 → 각자 ⌊t/n⌋ 또는 ⌈t/n⌉개.
+// 이 사람에게 한 개 더 줘도 끝까지 고르게 나눌 수 있는지
+function canAssign(room, targetId) {
+  const n = room.players.length;
+  const t = room.tasks.length;
+  const q = Math.floor(t / n);
+  const r = t % n;
+  const cnt = (pid) => room.tasks.filter((x) => x.owner === pid).length;
+  const have = cnt(targetId);
+  if (have < q) return true;
+  if (r === 0 || have > q) return false;
+  return room.players.filter((p) => cnt(p.id) > q).length < r;
+}
 
 function pickTask(room, id, index) {
   if (room.phase !== 'tasks') return { error: '지금은 과제를 고를 때가 아니에요.' };
@@ -297,8 +311,12 @@ function assignTask(room, id, index, targetId) {
   if (t.owner) return { error: '이미 나눠 준 과제예요.' };
   const target = getPlayer(room, targetId);
   if (!target) return { error: '없는 사람이에요.' };
-  const cap = assignCap(room);
-  if (room.tasks.filter((x) => x.owner === target.id).length >= cap) return { error: `한 사람에게 ${cap}개까지만 줄 수 있어요.` };
+  if (!canAssign(room, target.id)) {
+    const cap = assignCap(room);
+    return { error: room.tasks.filter((x) => x.owner === target.id).length >= cap
+      ? `한 사람에게 ${cap}개까지만 줄 수 있어요.`
+      : '과제는 고르게 나눠야 해요. 다 나눈 뒤 다른 사람보다 2개 이상 많은 사람이 있으면 안 돼요.' };
+  }
   t.owner = target.id;
   say(room, `📋 사령관이 ${target.name}님에게 과제를 줬어요: ${cardName(t.card)}${t.token ? ` (${TOKEN_NAME[t.token]})` : ''}`);
   if (room.tasks.every((x) => x.owner)) startPlay(room);
@@ -358,22 +376,28 @@ function play(room, id, card) {
 }
 
 // 순서 규칙을 어겼으면 이유를, 괜찮으면 null. T: 이번 트릭에서 완료되는 과제들(주인은 맞음)
+// T의 과제들은 D+1..end번째 자리를 함께 차지하고, 그 안에서는 순서에 맞게 놓였다고 본다(원작: 먼저 나온 쪽과 상관없음).
 function orderProblem(room, T) {
   const D = room.tasks.filter((t) => t.done).length;
+  const end = D + T.length;
   const rest = room.tasks.filter((t) => !t.done && !T.includes(t));
-  if (T.length >= 2) {
-    if (T.some((t) => isNum(t.token))) return '번호가 붙은 과제가 다른 과제와 같은 트릭에서 함께 완료됐어요.';
-    if (T.filter((t) => isArrow(t.token)).length >= 2) return '순서(›) 과제 두 개가 같은 트릭에서 함께 완료됐어요.';
-    if (T.some((t) => t.token === 'O')) return 'Ω 과제가 다른 과제와 같은 트릭에서 함께 완료됐어요.';
-  }
+  const omega = T.find((t) => t.token === 'O');
+  if (omega && rest.length) return `Ω 과제(${cardName(omega.card)})가 마지막이 아닌데 완료됐어요.`;
   for (const t of T) {
-    if (isNum(t.token) && Number(t.token) !== D + 1) return `${t.token}번 과제(${cardName(t.card)})가 ${D + 1}번째로 완료됐어요.`;
+    if (isNum(t.token)) {
+      const k = Number(t.token);
+      const last = omega ? end - 1 : end; // Ω가 함께면 맨 끝 자리는 Ω 몫
+      if (k < D + 1 || k > last) {
+        return T.length === 1
+          ? `${k}번 과제(${cardName(t.card)})가 ${D + 1}번째로 완료됐어요.`
+          : `${k}번 과제(${cardName(t.card)})가 ${D + 1}~${end}번째 과제들과 함께 완료돼서 순서가 안 맞아요.`;
+      }
+    }
     if (isArrow(t.token) && rest.some((r) => isArrow(r.token) && r.token.length < t.token.length)) {
       return `${TOKEN_NAME[t.token]} 과제(${cardName(t.card)})가 앞 순서 과제보다 먼저 완료됐어요.`;
     }
-    if (t.token === 'O' && rest.length) return `Ω 과제(${cardName(t.card)})가 마지막이 아닌데 완료됐어요.`;
   }
-  const skipped = rest.find((r) => isNum(r.token) && Number(r.token) <= D + T.length);
+  const skipped = rest.find((r) => isNum(r.token) && Number(r.token) <= end);
   if (skipped) return `${skipped.token}번 과제(${cardName(skipped.card)})보다 다른 과제가 먼저 완료됐어요.`;
   return null;
 }
@@ -423,8 +447,13 @@ function endMission(room, ok, reason) {
 }
 
 // 결과 화면에서: 성공이면 다음 임무, 실패면 같은 임무 다시
+// 방장이 누른다. 방장 접속이 끊겼으면 누구나 누를 수 있다(방장 폰이 꺼져도 캠페인이 멈추지 않게).
+function canNext(room, byId) {
+  const host = getPlayer(room, room.hostId);
+  return byId === room.hostId || (!!getPlayer(room, byId) && !(host && host.connected));
+}
 function next(room, byId) {
-  if (byId !== room.hostId) return { error: '방장만 다음으로 넘길 수 있어요.' };
+  if (!canNext(room, byId)) return { error: '방장만 다음으로 넘길 수 있어요.' };
   if (room.phase !== 'result') return { error: '아직 임무가 끝나지 않았어요.' };
   if (room.result.ok) {
     if (room.mission >= MISSIONS.length) {
@@ -582,6 +611,8 @@ function viewFor(room, viewerId) {
     commPlayerId: room.commPlayer,
     pickerId: room.phase === 'tasks' && !d.assign ? room.players[room.picker].id : null,
     assignCap: room.phase === 'tasks' && d.assign ? assignCap(room) : null,
+    assignable: room.phase === 'tasks' && d.assign ? room.players.filter((p) => canAssign(room, p.id)).map((p) => p.id) : null,
+    canNext: room.phase === 'result' && canNext(room, viewerId),
     tasks: room.tasks.map((t) => ({ card: t.card, token: t.token, owner: t.owner, done: t.done, trick: t.trick })),
     turnId: turnP ? turnP.id : null,
     trick: room.trick ? { leadId: room.players[room.trick.lead].id, plays: room.trick.plays.map((x) => ({ ...x })) } : null,
@@ -656,5 +687,6 @@ module.exports = {
   commTokenFor,
   commBlock,
   orderProblem,
+  canAssign,
   sortHand,
 };

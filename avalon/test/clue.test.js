@@ -424,3 +424,63 @@ test('2~6명이 무작위로 끝까지 두면 늘 끝나고, 카드가 보존되
     }
   }
 });
+
+// ---- 2차 검토에서 추가 ----
+
+test('검토: 게임 중 대기실로 / 끊긴 사람이 있으면 바로 다시 하기는 막힘', () => {
+  const room = mk(3);
+  room.players[2].connected = false;
+  assert.ok(c.restart(room, room.hostId).error);
+  assert.strictEqual(room.phase, 'play', '실패해도 진행 중인 판은 그대로');
+  ok(c.backToLobby(room, room.hostId));
+  assert.strictEqual(room.phase, 'lobby');
+  assert.strictEqual(room.players.length, 3, '게임 중에 돌아오면 끊긴 사람도 남겨 둔다(방장이 정리)');
+  assert.ok(c.start(room, room.hostId).error);
+  assert.ok(c.kick(room, room.hostId, room.players[2].id).kicked);
+  ok(c.start(room, room.hostId));
+  assert.ok(c.backToLobby(room, room.players[1].id).error);
+});
+
+test('검토: 보여 주는 중에는 방장만 넘길 수 있고, 질문자는 아무것도 못 한다', () => {
+  const room = mk(3);
+  rig(room, { turn: 0, hands: [['zoro', 'drum'], ['sword', 'nami'], ['meat', 'fishman']] });
+  const [A, B, C] = room.players;
+  ok(c.ask(room, A.id, Q('luffy', 'meat', 'punk'))); // B는 없음 → C가 고기
+  assert.deepStrictEqual(room.history[0].passed, [B.id]);
+  assert.strictEqual(room.history[0].shower, C.id);
+  assert.ok(c.force(room, C.id).error);
+  assert.ok(c.show(room, A.id, 'meat').error);
+  assert.ok(c.endTurn(room, A.id).error);
+  ok(c.force(room, room.hostId));
+  assert.strictEqual(room.history[0].card, 'meat');
+  assert.ok(room.log.some((l) => l.includes('대신 카드를 골랐어요')));
+  // 질문 뒤 단계에서 넘기면 다음 사람 차례
+  ok(c.force(room, room.hostId));
+  assert.strictEqual(cur(room).id, B.id);
+  assert.strictEqual(room.step, 'ask');
+});
+
+test('검토: 끝나면 모두에게 손패·보여 준 카드·소문 카드가 공개되고, 그 전에는 남의 화면에 정답 id 조합이 없다', () => {
+  const room = mk(2);
+  const [A, B] = room.players;
+  room.turn = 0; room.step = 'ask'; room.asked = false;
+  const q = { who: B.hand.find((x) => c.CARD[x].cat === 'who') || room.envelope.who, what: room.envelope.what, where: room.envelope.where };
+  ok(c.ask(room, A.id, q));
+  if (room.step === 'respond') ok(c.show(room, B.id, B.hand.find((x) => [q.who, q.what, q.where].includes(x))));
+  const vB = c.viewFor(room, B.id);
+  assert.ok(!JSON.stringify(vB).includes(JSON.stringify(room.envelope)));
+  ok(c.accuse(room, A.id, room.envelope));
+  const v = c.viewFor(room, B.id);
+  assert.deepStrictEqual(v.players[0].hand, A.hand);
+  assert.deepStrictEqual(v.rumor, room.rumor);
+  assert.deepStrictEqual(v.history.map((h) => h.card), room.history.map((h) => h.card));
+});
+
+test('검토: 잘못된 설정 값/종류는 거부', () => {
+  const room = c.createRoom('V');
+  c.addPlayer(room, 'a');
+  for (const [k, v] of [['p1', 'franky'], ['p2', ''], ['p3', null], ['__proto__', 'random'], ['toString', 'random']]) {
+    assert.ok(c.setSetting(room, room.hostId, k, v).error, `${k}=${v}`);
+  }
+  assert.deepStrictEqual(room.settings, { p1: 'random', p2: 'random', p3: 'random' });
+});

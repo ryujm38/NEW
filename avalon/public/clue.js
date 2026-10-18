@@ -25,7 +25,7 @@
   const FLIP_MS = 700;
 
   const st = () => {
-    if (!ui.cl) ui.cl = { tab: 'play', compose: null, sel: {}, pick: null, peek: null, key: '' };
+    if (!ui.cl) ui.cl = { tab: 'play', compose: null, sel: {}, pick: null, peek: null, seen: [], key: '' };
     return ui.cl;
   };
   const player = (id) => S.players.find((p) => p.id === id);
@@ -38,6 +38,10 @@
   const C = (id) => cardMap()[id] || { id, name: '?', short: '?', icon: '❔', cat: 'who' };
   const cname = (id) => esc(C(id).name);
   const tripleTxt = (q) => `${cname(q.who)} · ${cname(q.what)} · ${cname(q.where)}`;
+  // 받침에 맞는 조사: eul('검') → '을', ro('펑크 하자드') → '로' (ㄹ 받침도 '로')
+  const jong = (w) => { const c = String(w).charCodeAt(String(w).length - 1) - 0xac00; return c >= 0 && c < 11172 ? c % 28 : 0; };
+  const eul = (w) => (jong(w) ? '을' : '를');
+  const ro = (w) => (jong(w) && jong(w) !== 8 ? '으로' : '로');
   const initial = (id) => (player(id) ? esc([...player(id).name][0] || '?') : '?');
 
   // 카드 칩: 종류와 상관없이 같은 양피지 모양 (멀리서 색으로 무슨 카드인지 알 수 없게)
@@ -84,7 +88,7 @@
     if (S.rumorCount) cols.push({ key: 'rumor', label: '소문', title: '소문 카드', rumor: true });
     return cols;
   }
-  // 내가 직접 아는 사실만 자동으로: 내 카드, 공개 카드, 나에게 보여 준 카드(보여 준 사람 칸 ✓)
+  // 내가 직접 아는 사실만 자동으로: 내 카드, 공개 카드, 나에게 보여 준 카드(보여 준 사람 칸 ✓, 다른 칸 ✕)
   function nbAuto() {
     const auto = {};
     const all = nbCols().map((c) => c.key);
@@ -92,9 +96,10 @@
     S.hand.forEach(no);
     S.publicCards.forEach(no);
     S.history.forEach((h) => {
+      // 보여 받은 카드는 그 사람 것: 그 칸 ✓, 나머지 칸(봉투 포함)은 ✕
       if (h.by === S.me && h.card && h.shower) {
-        auto[h.card] = auto[h.card] || {};
-        auto[h.card][h.shower] = 'y';
+        auto[h.card] = {};
+        all.forEach((k) => { auto[h.card][k] = k === h.shower ? 'y' : 'n'; });
       }
     });
     return auto;
@@ -125,7 +130,7 @@
       }).join('');
       return `<div class="cl-nb-cat">${CAT_LABEL[cat]} · ${CAT_NAME[cat]}</div>${rows}`;
     }).join('');
-    return `<section class="cl-nb" style="--cols:${cols.length}">
+    return `<section class="cl-nb ${cols.length >= 5 ? 'many' : ''}" style="--cols:${cols.length}">
       <div class="cl-nb-top"><b>📓 내 추리 노트</b><small>칸을 누를 때마다 ✓ 있음 → ✕ 없음 → ? 의심 → 빈칸. 진한 칸은 확실한 사실(자동). 내 폰에만 저장돼요.</small></div>
       <div class="cl-nb-grid">${head}${body}</div>
       <div class="cl-nb-legend"><span>열: 내 왼쪽부터 시계 방향 · 봉투 = 정답 봉투${S.rumorCount ? ' · 소문 = 소문 카드' : ''}</span>
@@ -140,7 +145,10 @@
     const q = S.question;
     let icon = '🔎';
     let text;
-    if (S.phase === 'over') { icon = '🏆'; text = '사건 종료! 정답이 공개됐어요'; }
+    if (S.phase === 'over') {
+      icon = S.winnerId ? '🏆' : '💀';
+      text = S.winnerId ? `<b>${S.winnerId === S.me ? '내가' : `${pname(S.winnerId)}님이`}</b> 사건을 해결했어요! 정답이 공개됐어요` : '<b>아무도 못 맞혔어요</b> · 정답이 공개됐어요';
+    }
     else if (m === 'ask') text = '<b>내 차례!</b> 질문하거나 고발해요';
     else if (m === 'after') { icon = '🧭'; text = '<b>내 차례</b> · 결과를 보고 고발하거나 차례를 끝내요'; }
     else if (m === 'respond') { icon = '🃏'; text = `<b>${pname(q.by)}</b>님에게 카드 1장을 보여 줘야 해요`; }
@@ -159,15 +167,14 @@
       if (q) {
         if (p.id === q.by) tag = '<em class="ask">🔍 질문</em>';
         else if (q.passed.includes(p.id)) tag = '<em class="pass">✕ 패스</em>';
-        else if (p.id === q.shower) tag = q.card || S.step !== 'respond' ? '<em class="show">🃏 보여 줌</em>' : '<em class="wait">⏳ 고르는 중</em>';
+        else if (p.id === q.shower) tag = q.card || S.step !== 'respond' ? '<em class="show">🃏 보여 줌</em>' : `<em class="wait" style="animation-delay:-${Date.now() % 1200}ms">⏳ 고르는 중</em>`;
         else tag = '<em class="skip">– 안 물음</em>';
       }
       const turn = p.id === S.turnId;
       return `<div class="cl-pl ${turn ? 'turn' : ''} ${p.id === S.me ? 'me' : ''} ${p.out ? 'out' : ''}">
         <span class="cl-pl-seat">${i + 1}</span>
         <span class="cl-pl-nm">${esc(p.name)}${p.id === S.me ? '<small>나</small>' : ''}</span>
-        <span class="cl-pl-sub"><span class="cl-pl-cnt" title="카드 ${p.count}장">🂠${p.count}</span>${p.out ? '<em class="out">고발 실패</em>' : turn ? '<em class="turn">차례</em>' : ''}${p.connected ? '' : '<em class="off">끊김</em>'}</span>
-        ${tag ? `<span class="cl-pl-q">${tag}</span>` : ''}
+        <span class="cl-pl-sub">${p.out ? '<em class="out">고발 실패</em>' : turn && !tag ? '<em class="turn">차례</em>' : ''}${p.connected ? '' : '<em class="off">끊김</em>'}${tag ? `<span class="cl-pl-q">${tag}</span>` : ''}</span>
       </div>`;
     }).join('')}</div>`;
   }
@@ -207,7 +214,7 @@
       if (q.card) res = peekHtml(q);
       else if (!q.shower) res = '<p class="cl-q-res none">😮 아무도 보여 주지 못했어요! 셋 다 다른 사람에게는 없어요.</p>';
     } else if (q.shower === S.me && q.card) {
-      res = `<p class="cl-q-res">내가 ${pname(q.by)}님에게 <b>${cname(q.card)}</b>을(를) 보여 줬어요.</p>`;
+      res = `<p class="cl-q-res">내가 ${pname(q.by)}님에게 <b>${cname(q.card)}</b>${eul(C(q.card).name)} 보여 줬어요.</p>`;
     } else if (!q.shower && S.step !== 'respond') {
       res = '<p class="cl-q-res none">😮 아무도 보여 주지 못했어요!</p>';
     } else if (q.card === null && q.shower && S.step !== 'respond') {
@@ -235,7 +242,7 @@
   function handHtml() {
     if (!S.hand.length) return '';
     const shown = S.myShown || {};
-    return `<section class="cl-hand"><div class="cl-hand-h"><b>🃏 내 카드 ${S.hand.length}장</b><small>나만 보여요 · 👁 = 보여 준 사람 수</small></div>
+    return `<section class="cl-hand"><div class="cl-hand-h"><b>🃏 내 카드 ${S.hand.length}장</b><small>모두 ${S.handSize}장씩 · 나만 보여요 · 👁 = 보여 준 사람 수</small></div>
       <div class="cl-cards">${S.hand.map((id) => {
         const n = (shown[id] || []).length;
         return `<span class="cl-hc">${chip(id, 'sm')}${n ? `<em title="${(shown[id] || []).map(pname).join(', ')}">👁${n}</em>` : ''}</span>`;
@@ -278,7 +285,8 @@
     }).join('');
     const ready = CATS.every((cat) => s.sel[cat]);
     const summary = ready ? CATS.map((cat) => cname(s.sel[cat])).join(' · ') : '세 가지를 하나씩 골라요';
-    const confirm = accuse ? ` data-confirm="${esc(`${CATS.map((cat) => C(s.sel[cat] || '').name).join(' · ')}(으)로 고발할까요? 틀리면 이번 판은 더 추리할 수 없어요.`)}"` : '';
+    const accName = CATS.map((cat) => C(s.sel[cat] || '').name).join(' · ');
+    const confirm = accuse ? ` data-confirm="${esc(`${accName}${ro(accName)} 고발할까요? 틀리면 이번 판은 더 추리할 수 없어요.`)}"` : '';
     return `<div class="overlay" data-act="closeall"><div class="sheet cl-sheet ${accuse ? 'accuse' : ''}">
       <h2>${accuse ? '⚖️ 고발하기' : '🔍 질문하기'}</h2>
       <p class="cl-sheet-sub">${accuse ? '정답 봉투의 3장을 맞혀요. <b>맞으면 승리</b>, 틀리면 이번 판은 구경하며 카드만 보여 줘요.' : '내 왼쪽 사람부터 차례로, 셋 중 하나를 가진 첫 사람이 1장을 몰래 보여 줘요. 내 카드를 섞어서 물어도 돼요.'}</p>
@@ -305,7 +313,7 @@
     }).join('');
     return `<div class="cl-resp">
       <p class="cl-resp-h"><b>${pname(q.by)}</b>님의 질문: ${tripleTxt(q)}<br><small>내 카드 중 <b>1장</b>을 골라 ${pname(q.by)}님에게만 몰래 보여 줘요.${matches.length > 1 ? ' 어떤 걸 보여 줄지는 내가 골라요.' : ''}</small></p>
-      <p class="cl-resp-sub">${pname(q.by)}님에게 지금까지 보여 준 카드: ${before.length ? before.map((id) => `<b>${cname(id)}</b>`).join(', ') : '아직 없어요'}</p>
+      ${before.length ? `<p class="cl-resp-sub">${pname(q.by)}님에게 지금까지 보여 준 카드: ${before.map((id) => `<b>${cname(id)}</b>`).join(', ')}</p>` : ''}
       <div class="cl-picks">${picks}</div>
       <button class="primary cl-showbtn" data-act="clShow" ${s.pick && matches.includes(s.pick) ? '' : 'disabled'}>🃏 이 카드 보여 주기</button>
     </div>`;
@@ -319,7 +327,7 @@
         <button class="ghost sm cl-skip" data-act="clEnd" data-confirm="질문하지 않고 차례를 넘길까요?">질문 없이 차례 넘기기</button>`;
     }
     if (m === 'after') {
-      return `<div class="cl-acts"><button class="cl-accbtn" data-act="clAccuse">⚖️ 고발하기</button><button class="primary cl-endbtn" data-act="clEnd">차례 끝내기</button></div>`;
+      return `<div class="cl-acts after"><button class="cl-accbtn" data-act="clAccuse">⚖️ 고발</button><button class="primary cl-endbtn" data-act="clEnd">차례 끝내기</button></div>`;
     }
     if (m === 'respond') return respondHtml();
     if (m === 'over') return '';
@@ -386,6 +394,9 @@
   function renderClue() {
     const isHost = S.hostId === S.me;
     const s = st();
+    // 다시 그려도 질문/고발 창이 맨 위로 튀지 않게 스크롤 위치를 기억했다가 afterRender에서 되돌린다
+    const sheet = document.querySelector('.cl-sheet');
+    s.sheetTop = sheet && s.compose ? sheet.scrollTop : 0;
     const over = S.phase === 'over';
     const log = S.log.length ? `<div class="ulog cl-log">${S.log.slice(-4).reverse().map((l, i) => `<div class="${i === 0 ? 'new' : ''}">${esc(l)}</div>`).join('')}</div>` : '';
     let body = '';
@@ -415,7 +426,7 @@
     if (!S || S.kind !== 'clue') return;
     const s = st();
     const key = `${S.code}:${S.gameNo}`;
-    if (s.key !== key) Object.assign(s, { key, tab: 'play', compose: null, sel: {}, pick: null, peek: null, peekAt: 0 });
+    if (s.key !== key) Object.assign(s, { key, tab: 'play', compose: null, sel: {}, pick: null, peek: null, peekAt: 0, seen: [] });
     if (S.mode !== 'ask' && S.mode !== 'after') s.compose = null;
     // 끝나는 순간을 직접 본 경우에만 봉투 여는 연출 (새로고침해서 들어오면 바로 결과)
     if (S.phase === 'over') {
@@ -455,7 +466,7 @@
       case 'clShow': if (s.pick) send({ t: 'show', card: s.pick }); return true;
       case 'clPeek': {
         const seq = Number(el.dataset.seq);
-        if (s.peek === seq) { s.peek = null; } else { s.peek = seq; s.peekAt = Date.now(); setTimeout(render, FLIP_MS + 30); }
+        if (s.peek === seq) { s.peek = null; } else { s.peek = seq; s.peekAt = Date.now(); if (!s.seen.includes(seq)) s.seen.push(seq); setTimeout(render, FLIP_MS + 30); }
         render();
         return true;
       }
@@ -491,8 +502,14 @@
     return `<div class="cl-lb"><p class="cl-lb-h"><b>인물 6명</b> · 루피·조로·상디는 항상 나와요. 나머지 3명은 짝마다 한 명씩.${isHost ? '' : ' (방장이 정해요)'}</p>${rows}</div>`;
   }
 
+  function afterRender() {
+    if (!S || S.kind !== 'clue' || !ui.cl) return;
+    const sheet = document.querySelector('.cl-sheet');
+    if (sheet && ui.cl.sheetTop) sheet.scrollTop = ui.cl.sheetTop;
+  }
+
   window.GAME_UI.clue = {
-    name: '클루', label: '🔎 클루', range: '2~6명', rules: RULES, render: renderClue, sync, click, lobbyOptions,
+    name: '클루', label: '🔎 클루', range: '2~6명', rules: RULES, render: renderClue, sync, click, lobbyOptions, afterRender,
     closeAll: () => { if (ui.cl) ui.cl.compose = null; },
   };
 }());

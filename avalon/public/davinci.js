@@ -89,7 +89,7 @@
       if (!t || t.open || p.out) { s.sel = null; s.val = null; }
     }
     if (S.mode !== 'reveal') s.rsel = null;
-    if (!S.slots) s.slot = null;
+    if (!S.slots) { s.slot = null; s.moving = false; }
     else if (s.slot !== null && (s.slot < S.slots[0] || s.slot > S.slots[1])) s.slot = null;
   }
 
@@ -138,6 +138,13 @@
     return `<span class="dv-bub ${ev.ok ? 'ok' : 'bad'}" style="--ad:-${e}ms">${ev.ok ? '🎯' : '✗'}${numTxt(ev.value)}</span>`;
   }
 
+  // 줄이 길어지면 타일을 작게 (2명이면 한 줄이 13개까지 길어진다). 크기는 CSS에서 --n으로 계산
+  // 9개까지는 한 줄, 그보다 많으면 두 줄로 (한 줄에 다 넣으면 타일이 너무 작아져서 누르기 어렵다)
+  const rowStyle = (n) => `style="--n:${Math.min(9, Math.max(4, n))}"`;
+
+  // 틀린 숫자·메모 목록: 숫자 중간에서 줄이 바뀌지 않게 하나씩 묶는다
+  const chips = (list) => list.map((v) => `<i>${numTxt(v)}</i>`).join('');
+
   // ---- 상대 줄 ----
   function oppCell(p, t, i, memo) {
     const s = st();
@@ -145,9 +152,9 @@
     const tappable = !t.open && S.phase !== 'over' && !p.out;
     const sel = !!(s.sel && s.sel.tid === t.id);
     const notes = [];
-    if (!t.open && t.miss.length) notes.push(`<span class="dv-miss" title="틀린 숫자">✗${t.miss.map(numTxt).join('·')}</span>`);
+    if (!t.open && t.miss.length) notes.push(`<span class="dv-miss" title="틀린 숫자">✗${chips(t.miss)}</span>`);
     const m = memo[t.id];
-    if (!t.open && m && m.length) notes.push(`<span class="dv-memo" title="내 메모">📝${m.map(numTxt).join('·')}</span>`);
+    if (!t.open && m && m.length) notes.push(`<span class="dv-memo" title="내 메모">📝${chips(m)}</span>`);
     const label = `${p.name}님 왼쪽 ${i + 1}번째 ${colorWord(t.c)} 타일${t.open ? ` 공개 ${numWord(t.n)}` : ''}`;
     return `<div class="dv-cell">${bubbleHtml(t)}${tileHtml(t, p.id, { pick: canPick, sel, act: tappable ? 'dvTile' : '', pid: p.id, label })}
       <span class="dv-i">${i + 1}</span>${notes.length ? `<span class="dv-notes">${notes.join('')}</span>` : ''}</div>`;
@@ -173,7 +180,7 @@
     if (win) badges.push('<span class="dv-badge win">🏆 승리</span>');
     return `<section class="dv-rack ${turn ? 'turn' : ''} ${p.out ? 'out' : ''} ${win ? 'win' : ''}">
       <div class="dv-rh"><span class="dv-av">${initial(p)}</span><b class="dv-nm">${esc(p.name)}</b><span class="dot ${p.connected ? '' : 'off'}"></span>${badges.join('')}${info}</div>
-      <div class="dv-row">${tiles}</div></section>`;
+      <div class="dv-row" ${rowStyle(p.row.length)}>${tiles}</div></section>`;
   }
 
   // 내 다음 사람부터 차례 순서대로
@@ -202,28 +209,36 @@
     const over = S.phase === 'over';
     const revealing = S.mode === 'reveal';
     const cells = [];
+    // 놓을 자리 고르기: 처음에는 정해 둔 자리에 타일만 보이고, 그 타일을 눌러야 다른 자리(＋)가 펼쳐진다.
+    // 그래서 조커를 받았거나 뽑았을 때도 화면 모양이 다른 사람과 같다(멀리서 ＋가 줄줄이 보이지 않게).
+    const many = !!(pend && S.slots && S.slots[1] > S.slots[0]);
     const slotAt = (i) => {
       if (!pend || !S.slots || i < S.slots[0] || i > S.slots[1]) return '';
       if (i === chosenSlot()) {
-        return `<div class="dv-cell dv-ghostcell"><span class="dv-slotlbl">여기</span>${tileHtml(pend, S.me, { ghost: true, label: '놓을 타일' })}<span class="dv-i">▲</span></div>`;
+        const lbl = S.phase === 'setup' ? '' : '<span class="dv-slotlbl">여기</span>';
+        const ghost = tileHtml(pend, S.me, { ghost: true, act: many ? 'dvMove' : '', label: many ? '놓을 타일 · 눌러서 자리 옮기기' : '놓을 타일' });
+        return `<div class="dv-cell dv-ghostcell ${s.moving ? 'moving' : ''}">${lbl}${ghost}<span class="dv-i">▲</span></div>`;
       }
+      if (!s.moving) return '';
       return `<button class="dv-slot" data-act="dvSlot" data-i="${i}" aria-label="${i + 1}번째 자리에 놓기"><i>＋</i></button>`;
     };
     m.row.forEach((t, i) => {
       cells.push(slotAt(i));
       const canPick = revealing && !t.open;
-      cells.push(`<div class="dv-cell">${bubbleHtml(t)}${tileHtml(t, S.me, { pick: canPick, sel: s.rsel === t.id, act: canPick ? 'dvMine' : '', label: `내 왼쪽 ${i + 1}번째 ${colorWord(t.c)} 타일${t.open ? ' 공개' : ' 숨김'}` })}<span class="dv-i">${i + 1}</span>${!t.open && t.miss.length ? `<span class="dv-notes"><span class="dv-miss" title="틀린 숫자">✗${t.miss.map(numTxt).join('·')}</span></span>` : ''}</div>`);
+      cells.push(`<div class="dv-cell">${bubbleHtml(t)}${tileHtml(t, S.me, { pick: canPick, sel: s.rsel === t.id, act: canPick ? 'dvMine' : '', label: `내 왼쪽 ${i + 1}번째 ${colorWord(t.c)} 타일${t.open ? ' 공개' : ' 숨김'}` })}<span class="dv-i">${i + 1}</span>${!t.open && t.miss.length ? `<span class="dv-notes"><span class="dv-miss" title="틀린 숫자">✗${chips(t.miss)}</span></span>` : ''}</div>`);
     });
     cells.push(slotAt(m.row.length));
-    const hidden = m.row.filter((t) => !t.open).length;
+    // 준비 단계에는 아직 안 놓은 조커도 센다(개수가 남과 같게)
+    const extra = S.phase === 'setup' ? m.pending.length : 0;
+    const hidden = m.row.filter((t) => !t.open).length + extra;
     // 뽑아 둔 타일(아직 맞히는 중): 줄 아래에 작게
     const drawnBox = S.drawn && S.mode === 'guess'
       ? `<div class="dv-drawn">${tileHtml(S.drawn, S.me, { label: '뽑은 타일' })}<small><b>뽑은 타일</b> · 맞히기를 마치면 내 줄에 들어가요 (그만하면 숨긴 채로, 틀리면 공개해서)</small></div>` : '';
-    const toggle = over ? '' : `<button class="dv-hide" data-act="dvHide" aria-pressed="${hideMine()}">${hideMine() ? '👁 숫자 보기' : '🙈 숫자 가리기'}</button>`;
-    return `<section class="dv-rack dv-me ${m.out ? 'out' : ''} ${S.winnerIds.includes(S.me) ? 'win' : ''} ${pend ? 'placing' : ''}">
+    const toggle = over ? '' : `<button class="dv-hide" data-act="dvHide" aria-pressed="${hideMine()}" aria-label="${hideMine() ? '내 숫자 보기' : '내 숫자 가리기'}">${hideMine() ? '👁 <span class="dv-hw">숫자 </span>보기' : '🙈 <span class="dv-hw">숫자 </span>가리기'}</button>`;
+    return `<section class="dv-rack dv-me ${m.out ? 'out' : ''} ${S.winnerIds.includes(S.me) ? 'win' : ''} ${pend && S.phase !== 'setup' ? 'placing' : ''}">
       <div class="dv-rh"><span class="dv-av">${initial(m)}</span><b class="dv-nm">내 타일</b>${m.out ? '<span class="dv-badge out">탈락</span>' : ''}${S.winnerIds.includes(S.me) ? '<span class="dv-badge win">🏆 승리</span>' : ''}
-        <small class="dv-cnt">숨은 <b>${hidden}</b> / ${m.row.length}개</small>${toggle}</div>
-      <div class="dv-mywrap"><div class="dv-row">${cells.join('')}</div>${drawnBox}</div>
+        <small class="dv-cnt">숨은 <b>${hidden}</b> / ${m.row.length + extra}개</small>${toggle}</div>
+      <div class="dv-mywrap"><div class="dv-row" ${rowStyle(m.row.length + (pend ? 1 : 0))}>${cells.join('')}</div>${drawnBox}</div>
       ${over ? '' : '<p class="dv-legend"><i class="dv-mk h"></i>숨김 <i class="dv-mk o"></i>공개 · 내 숫자는 나만 보여요</p>'}</section>`;
   }
 
@@ -314,14 +329,10 @@
     const s = st();
     const m = me();
     switch (S.mode) {
-      case 'setup': {
-        if (S.slots) {
-          return `<p class="dv-msg"><b>🃏 조커를 놓을 자리를 골라요</b><small>조커는 숫자 순서와 상관없이 아무 자리에나 둘 수 있어요. 위 내 줄에서 ＋를 눌러 자리를 바꿔요.</small></p>
-            <button class="primary dv-big" data-act="dvJoker">✔ 여기에 조커 놓기</button>`;
-        }
-        return `<p class="dv-msg"><b>내 타일을 확인했나요?</b><small>왼쪽부터 작은 숫자 순서예요. 모두 준비되면 시작해요.</small></p>
+      case 'setup':
+        // 조커를 받은 사람도 같은 문구·같은 버튼 하나 (조커 자리는 이 버튼을 누를 때 함께 정해진다)
+        return `<p class="dv-msg"><b>내 타일을 확인했나요?</b><small>왼쪽부터 작은 숫자 순서예요. 조커(−)는 눌러서 원하는 자리로 옮길 수 있어요.</small></p>
           <button class="primary dv-big" data-act="dvReady">✅ 준비 완료</button>`;
-      }
       case 'guess': {
         const sel = selectedInfo();
         const stopBtn = S.guesses
@@ -340,7 +351,7 @@
         const t = S.drawn;
         const many = S.slots && S.slots[1] > S.slots[0];
         return `<p class="dv-msg"><b>${S.placeOpen ? '📢 틀렸어요! 뽑은 타일을 공개해서 놓아요' : '🤫 뽑은 타일을 숨겨서 놓아요'}</b>
-            <small>${t && t.n === J ? '조커는 아무 자리에나 둘 수 있어요. ＋를 눌러 자리를 골라요.' : many ? '조커 옆이라 놓을 수 있는 자리가 여러 곳이에요. ＋를 눌러 고를 수 있어요.' : '숫자 순서대로 들어갈 자리예요.'}</small></p>
+            <small>${t && t.n === J ? '조커는 아무 자리에나 둘 수 있어요. 금색 테두리 타일을 눌러 자리를 옮겨요.' : many ? '조커 옆이라 놓을 수 있는 자리가 여러 곳이에요. 금색 테두리 타일을 눌러 옮길 수 있어요.' : '숫자 순서대로 들어갈 자리예요.'}</small></p>
           <button class="primary dv-big" data-act="dvPlace">✔ 여기에 놓기</button>`;
       }
       case 'reveal': {
@@ -373,7 +384,7 @@
     const keys = vals.map((v) => `<button class="dv-mkey ${memo.includes(v) ? 'on' : ''} ${tile.miss.includes(v) ? 'missed' : ''}" data-act="dvMemoVal" data-v="${v}">${numTxt(v)}</button>`).join('');
     return `<div class="overlay" data-act="closeall"><div class="sheet dv-sheet">
       <div class="dv-sh-h">${tileHtml(tile, owner.id, { label: '메모할 타일' })}<span><b>📝 ${esc(owner.name)}님 · 왼쪽 ${owner.row.indexOf(tile) + 1}번째</b><small>나만 보는 메모예요. 이 타일일 것 같은 숫자를 눌러 표시해요. (서버로 보내지 않아요)</small></span></div>
-      ${tile.miss.length ? `<p class="dv-selmiss">모두 들은 사실: 이 타일은 <b>${tile.miss.map(numWord).join(', ')}</b>이(가) 아니에요.</p>` : ''}
+      ${tile.miss.length ? `<p class="dv-selmiss">모두 들은 사실: 이미 틀린 숫자 <b>${tile.miss.map(numWord).join(', ')}</b> (이 숫자들은 아니에요)</p>` : ''}
       <div class="dv-mpad">${keys}</div>
       <div class="row"><button data-act="dvMemoClear">지우기</button><button class="primary" data-act="closeall">닫기</button></div>
     </div></div>`;
@@ -413,7 +424,7 @@
     // 맞히기 결과 알림·말풍선은 시간이 지나면 지운다 (움직임 줄이기 설정이면 애니메이션 없이 남아 있으므로)
     clearTimeout(popTimer);
     if (S.ev && A.evAt && since(A.evAt) < POP_MS) popTimer = setTimeout(render, POP_MS - since(A.evAt) + 60);
-    const need = S.mode === 'place' || S.mode === 'reveal' || (S.mode === 'setup' && S.slots);
+    const need = S.mode === 'place' || S.mode === 'reveal'; // 준비 단계는 내 줄이 맨 위라 굴리지 않는다(조커 받은 사람만 화면이 움직이지 않게)
     const key = need ? `${S.gameNo}:${S.turnId}:${S.mode}:${A.seq}` : null;
     if (!need) { scrolledFor = null; return; }
     if (key === scrolledFor) return;
@@ -466,10 +477,10 @@
         return true;
       }
       case 'dvStop': send({ t: 'stop' }); s.sel = null; s.val = null; return true;
-      case 'dvSlot': s.slot = Number(el.dataset.i); render(); return true;
-      case 'dvPlace': send({ t: 'place', pos: chosenSlot() }); s.slot = null; return true;
-      case 'dvJoker': send({ t: 'setupJoker', pos: chosenSlot() }); s.slot = null; return true;
-      case 'dvReady': send({ t: 'ready' }); return true;
+      case 'dvSlot': s.slot = Number(el.dataset.i); s.moving = false; render(); return true;
+      case 'dvMove': s.moving = !s.moving; render(); return true;
+      case 'dvPlace': send({ t: 'place', pos: chosenSlot() }); s.slot = null; s.moving = false; return true;
+      case 'dvReady': send(S.slots ? { t: 'ready', pos: chosenSlot() } : { t: 'ready' }); s.slot = null; s.moving = false; return true;
       case 'dvMine': s.rsel = s.rsel === el.dataset.tid ? null : el.dataset.tid; render(); return true;
       case 'dvReveal': if (s.rsel) send({ t: 'reveal', tile: s.rsel }); s.rsel = null; return true;
       case 'dvHide': store.set('dv-hide', hideMine() ? '0' : '1'); render(); return true;

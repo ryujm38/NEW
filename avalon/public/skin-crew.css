@@ -103,6 +103,10 @@ body:has(.cw) {
 .cw-pips { display: flex; gap: 3px; margin-top: 4px; }
 .cw-pips i { width: 8px; height: 8px; border-radius: 50%; background: #ffffff22; }
 .cw-pips i.on { background: #39d98a; box-shadow: 0 0 6px #39d98a; }
+.cw-mtasks { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 6px 10px; margin-top: 8px; }
+.cw-mtk { display: inline-flex; align-items: center; gap: 4px; min-width: 0; font-size: 12px; color: var(--cw-mute); }
+.cw-mtk small { font-size: 12px; max-width: 72px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cw-mtk.me small { color: var(--cw-ink); font-weight: 800; }
 .cw-story { position: relative; z-index: 1; margin: 8px 0 0; font-size: 14px; color: #c9d2f5; }
 .cw-rules { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
 .cw-rule { font-size: 13px; font-weight: 700; padding: 3px 9px; border-radius: 99px; background: #ffffff12; border: 1px solid #ffffff22; }
@@ -203,13 +207,14 @@ button.cw-pt.sel { border-color: #ffe08a; background: #2a2650; box-shadow: 0 0 0
 
 /* ---- 아래: 손패 ---- */
 .cw-dock {
+  gap: 6px; padding-top: 10px;
   background: linear-gradient(to bottom, transparent, #0a0d1c 16px); padding-bottom: calc(6px + env(safe-area-inset-bottom));
 }
 .cw-dh { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 14px; color: var(--cw-mute); }
 .cw-dh b { color: var(--cw-ink); }
 .cw-hide { width: auto; min-height: 36px; padding: 4px 10px; font-size: 13px; position: relative; }
 .cw-hide::after { content: ''; position: absolute; inset: -5px 0; }
-.cw-hand { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 3px; padding: 10px 5px; border-radius: 14px; background: #121831e6; border: 1px solid var(--cw-line); }
+.cw-hand { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px 3px; padding: 7px 4px; border-radius: 14px; background: #121831e6; border: 1px solid var(--cw-line); }
 .cw-hg { display: contents; }
 .cw-hand .cw-card { width: 44px; height: 58px; }
 .cw-hand .cw-card b { font-size: 22px; }
@@ -222,8 +227,10 @@ button.cw-hc { cursor: pointer; }
 .cw-empty { margin: 0; text-align: center; color: var(--cw-mute); font-size: 14px; }
 .cw-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .cw-acts > * { flex: 1 1 100%; }
-.cw-acts > .cw-msg { flex: 1 1 150px; }
+.cw-acts > .cw-msg, .cw-acts > .cw-go { flex: 1 1 150px; width: auto; }
 .cw-acts > .cw-commbtn { flex: 0 0 auto; width: auto; }
+.cw-acts > .cw-commno { flex: 1 1 100%; font-size: 12px; }
+.cw-dock .cw-go { min-height: 48px; }
 .cw-msg { margin: 0; text-align: center; font-size: 15px; line-height: 1.6; }
 .cw-msg .cw-task { vertical-align: middle; margin-right: 4px; }
 .cw-msg.wait { color: var(--cw-mute); }
@@ -303,6 +310,10 @@ button.cw-hc { cursor: pointer; }
   .cw-card { width: 40px; height: 58px; }
   .cw-card.lg, .cw-slot { width: 48px; height: 68px; }
   .cw-stasks { max-width: 40%; }
+  /* 좁은 폰: 13~14장도 두 줄에 들어가게 (한 줄 7장) */
+  .cw-hand { gap: 5px 2px; padding: 6px 2px; }
+  .cw-hand .cw-card { width: 37px; height: 54px; }
+  .cw-hand .cw-card b { font-size: 20px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

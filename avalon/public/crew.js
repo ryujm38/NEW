@@ -11,7 +11,7 @@
 <li>카드 40장: 4색(분홍·파랑·초록·노랑) 1~9와 <b>로켓 1~4</b>. 모두 똑같이 나눠 가지고, <b>로켓 4</b>를 가진 사람이 <b>사령관</b>이에요.</li>
 <li>임무마다 <b>과제 카드</b>를 펼쳐 사령관부터 한 장씩 가져가요. 과제 = 그 카드가 들어간 <b>트릭을 내가 이겨야</b> 해요. 다른 사람이 이기면 임무 실패!</li>
 <li>트릭: 먼저 내는 사람은 아무 카드나. 나머지는 <b>같은 색이 있으면 꼭 같은 색</b>을 내요. 없으면 아무거나(로켓도 OK). <b>로켓이 있으면 가장 높은 로켓</b>, 없으면 처음 낸 색의 가장 높은 카드가 이겨요. 이긴 사람이 다음 트릭을 먼저 내요.</li>
-<li>순서 표시: <b>①②③</b> 전체 과제 중 정확히 그 번째에, <b>› ›› ›››</b> 표시끼리 이 순서로, <b>Ω</b> 맨 마지막에 완료해야 해요. 순서 있는 과제가 다른 과제와 같은 트릭에서 함께 완료돼도 실패예요.</li>
+<li>순서 표시: <b>①②③</b> 전체 과제 중 정확히 그 번째에, <b>› ›› ›››</b> 표시끼리 이 순서로, <b>Ω</b> 맨 마지막에 완료해야 해요. 한 트릭에서 과제 여러 개를 함께 완료하면 어느 카드가 먼저 나왔든 <b>순서에 맞게 한 것으로 쳐요</b>(예: ①과 ②를 한 트릭에). 단 ①과 ③처럼 사이 순서가 비면 실패예요.</li>
 <li><b>통신</b>: 임무마다 한 번, 트릭이 시작되기 전에 내 색 카드 한 장을 공개하며 그 색에서 <b>가장 높아요 / 하나뿐이에요 / 가장 낮아요</b> 중 사실인 것을 알려요. 로켓은 안 돼요.</li>
 <li><b>카드 얘기는 금지!</b> "나 파랑 9 있어" 같은 말은 하면 안 돼요. 정보는 통신과 내는 카드로만 나눠요.</li>
 <li>모든 과제를 끝내면 성공 → 다음 임무. 실패하면 같은 임무를 다시 섞어서 도전해요. 시작 임무는 대기실에서 방장이 고를 수 있어요.</li>
@@ -24,7 +24,7 @@
     y: { name: '노랑', sym: '★' },
     r: { name: '로켓', sym: '🚀' },
   };
-  const COMM = { high: { short: '위', long: '가장 높아요', ico: '▲' }, only: { short: '유일', long: '하나뿐이에요', ico: '●' }, low: { short: '아래', long: '가장 낮아요', ico: '▼' } };
+  const COMM = { high: { short: '최고', long: '가장 높아요', ico: '▲' }, only: { short: '유일', long: '하나뿐이에요', ico: '●' }, low: { short: '최저', long: '가장 낮아요', ico: '▼' } };
   const TOKEN = { 1: '①', 2: '②', 3: '③', 4: '④', 5: '⑤', '>': '›', '>>': '››', '>>>': '›››', '>>>>': '››››', O: 'Ω' };
   const SHOW_LAST_MS = 2200; // 트릭이 끝난 뒤 가운데에 잠깐 남겨 두는 시간
   const PLAY_MS = 450;
@@ -116,6 +116,13 @@
     }
   }
 
+  // 트릭 중: 누가 어떤 과제를 맡았는지 + 지금도 걸려 있는 특별 규칙(나눠 주기·혼자 맡기는 이미 끝났으니 뺀다)을 한 줄로
+  function playRow(m) {
+    const rules = ruleChips(m).filter(([k]) => k).map(([k, t]) => `<span class="cw-rule ${k}">${t}</span>`).join('');
+    const tasks = S.tasks.map((t) => `<span class="cw-mtk ${t.owner === S.me ? 'me' : ''}">${taskChip(t)}<small>${who(t.owner)}</small></span>`).join('');
+    return `<div class="cw-mtasks">${tasks}${rules}</div>`;
+  }
+
   function bannerHtml() {
     const m = S.missionInfo;
     if (!m) return '';
@@ -127,7 +134,7 @@
         <span class="cw-mt"><b>${esc(m.title)}</b><small>${S.attempt > 1 ? `${S.attempt}번째 도전` : '첫 도전'}</small></span>
         <span class="cw-prog"><b>${done}/${S.tasks.length}</b><small>과제 완료</small><span class="cw-pips">${pips}</span></span></div>
       ${S.phase === 'play' ? '' : `<p class="cw-story">${esc(m.story)}</p>`}
-      ${ruleChips(m).length ? `<div class="cw-rules">${chipsHtml(m)}</div>` : ''}
+      ${S.phase === 'play' ? playRow(m) : ruleChips(m).length ? `<div class="cw-rules">${chipsHtml(m)}</div>` : ''}
       <div class="cw-status ${mine ? 'mine' : ''}"><span>${statusText()}</span>${S.phase === 'play' ? `<span class="cw-tn">트릭 ${Math.min(S.trickNo + 1, S.totalTricks)}/${S.totalTricks}</span>` : ''}</div>
     </section>`;
   }
@@ -176,7 +183,7 @@
         ? `<button class="cw-pt ${s.task === i ? 'sel' : ''}" data-act="cwTask" data-i="${i}" aria-pressed="${s.task === i}">${inner}</button>`
         : `<span class="cw-pt">${inner}</span>`;
     }).join('');
-    return `<section class="cw-pool"><h3>📋 남은 과제 ${free.length}개 <small>${S.missionInfo.assign ? `사령관이 나눠 줘요 · 한 사람에게 ${S.assignCap}개까지` : S.missionInfo.solo ? '사령관이 고른 한 명이 모두 맡아요' : '사령관부터 차례로 한 장씩'}</small></h3>
+    return `<section class="cw-pool"><h3>📋 남은 과제 ${free.length}개 <small>${S.missionInfo.assign ? `사령관이 나눠 줘요 · 고르게(한 사람에게 ${S.assignCap}개까지, 차이는 1개까지)` : S.missionInfo.solo ? '사령관이 고른 한 명이 모두 맡아요' : '사령관부터 차례로 한 장씩'}</small></h3>
       <div class="cw-pts">${tiles}</div>
       ${S.mode === 'wait' ? '' : `<div class="cw-acts cw-pacts">${setupActs()}</div>`}
       <p class="cw-hint">과제 카드와 같은 카드가 든 트릭을 <b>가져간 사람이 이겨야</b> 해요. 내 손에 그 색의 높은 카드나 로켓이 있으면 유리해요.</p></section>`;
@@ -260,7 +267,7 @@
       if (s.task != null && S.tasks[s.task] && !S.tasks[s.task].owner) {
         act = `<p class="cw-msg">${taskChip(S.tasks[s.task])} <b>누구에게 줄까요?</b></p><div class="cw-choices">${S.players.map((p) => {
           const have = S.tasks.filter((t) => t.owner === p.id).length;
-          return `<button class="cw-choice" data-act="cwAssign" data-id="${p.id}" ${have >= S.assignCap ? 'disabled' : ''}>${esc(p.name)}${p.id === S.me ? ' (나)' : ''}<small>${have}/${S.assignCap}개</small></button>`;
+          return `<button class="cw-choice" data-act="cwAssign" data-id="${p.id}" ${S.assignable && !S.assignable.includes(p.id) ? 'disabled' : ''}>${esc(p.name)}${p.id === S.me ? ' (나)' : ''}<small>${have}/${S.assignCap}개</small></button>`;
         }).join('')}</div>`;
       } else act = '<p class="cw-msg"><b>나눠 줄 과제를 먼저 눌러요</b></p>';
     } else if (m === 'choose') {
@@ -328,11 +335,13 @@
       return `<div class="cw-peekbar ${ok ? 'ok' : 'bad'}"><b>${ok ? '🎉 임무 성공' : '💥 임무 실패'}</b><button class="sm" data-act="cwPeek">결과 다시 보기</button></div>`;
     }
     const last = S.mission >= S.missionCount;
-    const btn = isHost
+    const el = Date.now() - seenAt(`${S.code}:${S.tries}:result`);
+    const pop = el < 400 ? `style="animation-delay:-${el}ms"` : 'style="animation:none"';
+    const btn = S.canNext
       ? `<button class="primary cw-next" data-act="cwNext">${ok ? (last ? '🌌 캠페인 마치기' : `다음 임무 ▶ ${S.mission + 1}번`) : '↻ 다시 도전'}</button>
-         <button class="sm ghost" data-act="again" data-confirm="대기실로 돌아갈까요? 다음에 이어서 할 임무는 기억해 둬요.">대기실로</button>`
+         ${isHost ? '<button class="sm ghost" data-act="again" data-confirm="대기실로 돌아갈까요? 다음에 이어서 할 임무는 기억해 둬요.">대기실로</button>' : '<p class="small dim">방장 접속이 끊겨서 내가 대신 넘길 수 있어요.</p>'}`
       : `<p class="progress">방장이 ${ok ? '다음 임무' : '다시 도전'}을 누르길 기다리는 중…</p>`;
-    return `<div class="cw-result ${ok ? 'ok' : 'bad'}"><div class="cw-rc">
+    return `<div class="cw-result ${ok ? 'ok' : 'bad'}"><div class="cw-rc" ${pop}>
       <div class="cw-rbig">${ok ? '🎉' : '💥'}</div>
       <h2>임무 ${S.mission} ${ok ? '성공!' : '실패'}</h2>
       <p class="cw-rr">${esc(S.result.reason)}</p>

@@ -18,6 +18,7 @@
 //   - 뽑은 타일을 줄에 넣을 때는 늘 주인이 "놓기"를 한 번 누른다. 숫자 타일은 들어갈 자리가 정해져 있고
 //     (조커 옆이라 자리가 여러 곳일 때만 그중에서 고름), 조커는 아무 데나. 조커일 때만 한 단계가 더 있으면 들키므로 늘 똑같이 둔다.
 //   - 처음 나눠 받은 뒤 모두 "준비 완료"를 누른다(조커를 받은 사람만 기다리면 조커가 있다는 게 들키니까). 조커를 빼면 이 단계는 없다.
+//     조커를 받은 사람은 같은 "준비 완료" 버튼으로 조커 자리까지 정한다(ready에 pos). 따로 누르는 단계가 없어서 화면·횟수가 같다.
 //   - 가운데 남은 타일은 개수만 알려 준다(색별 개수를 알려 주면 방금 뽑은 타일의 색을 알 수 있어서).
 //   - 틀린 추측("이 타일은 5가 아니다")은 모두가 들은 정보라 타일마다 기록해서 보여 준다.
 //   - 뽑지 못한 채로 틀렸는데 내 숨은 타일이 하나뿐이면 고를 것 없이 바로 그 타일을 공개한다(그리고 탈락).
@@ -333,11 +334,18 @@ function setupJoker(room, id, pos) {
   return {};
 }
 
-function ready(room, id) {
+// 준비 완료. 조커가 남아 있으면 pos 자리에 조커 하나를 놓고, 남은 조커가 없을 때만 준비 완료가 된다.
+// (조커를 받은 사람도 똑같이 "준비 완료" 한 번이면 되게 해서, 누르는 횟수·화면으로 조커가 들키지 않게 한다)
+function ready(room, id, pos) {
   if (room.phase !== 'setup') return { error: '지금은 준비 단계가 아니에요.' };
   const p = getPlayer(room, id);
   if (!p) return { error: '플레이어가 아니에요.' };
-  if (p.pendingJokers.length) return { error: '먼저 조커를 놓을 자리를 고르세요.' };
+  if (p.pendingJokers.length) {
+    if (pos === undefined || pos === null) return { error: '먼저 조커를 놓을 자리를 고르세요.' };
+    const r = setupJoker(room, id, pos);
+    if (r.error) return r;
+    if (p.pendingJokers.length) return {};
+  }
   if (p.ready) return {};
   p.ready = true;
   maybeBegin(room);
@@ -523,7 +531,7 @@ const actions = {
   force: (room, id) => force(room, id),
   setting: (room, id, msg) => setSetting(room, id, msg.key, msg.value),
   setupJoker: (room, id, msg) => setupJoker(room, id, msg.pos),
-  ready: (room, id) => ready(room, id),
+  ready: (room, id, msg) => ready(room, id, msg.pos),
   guess: (room, id, msg) => guess(room, id, msg.target, msg.tile, msg.value),
   stop: (room, id) => stop(room, id),
   place: (room, id, msg) => place(room, id, msg.pos),

@@ -104,6 +104,29 @@ test('시작: 2~4명, 2~3명은 4개씩·4명은 3개씩, 조커가 있으면 �
   assert.ok(room.players.every((p) => p.row.every((t) => t.n !== J)));
 });
 
+test('준비 완료 한 번으로 조커 자리까지: 조커를 받은 사람도 누르는 단계가 같다', () => {
+  const room = d.createRoom('R');
+  for (let i = 0; i < 2; i++) d.addPlayer(room, `p${i}`);
+  d.start(room, room.hostId);
+  const [A, B] = room.players;
+  // A가 조커 2개를 받은 상황, B는 조커 없음
+  A.row = [T('b', 2), T('w', 5)];
+  A.pendingJokers = [T('b', J), T('w', J)];
+  B.pendingJokers = [];
+  assert.ok(d.ready(room, A.id).error); // 자리 없이 누르면 안 됨
+  assert.ok(d.ready(room, A.id, 9).error); // 없는 자리
+  assert.deepStrictEqual(d.actions.ready(room, A.id, { pos: 1 }), {});
+  assert.strictEqual(A.ready, false); // 조커가 하나 더 남아서 아직 준비 전
+  assert.deepStrictEqual(A.row.map((t) => t.n), [2, J, 5]);
+  assert.deepStrictEqual(d.actions.ready(room, A.id, { pos: 3 }), {});
+  assert.strictEqual(A.ready, true);
+  assert.deepStrictEqual(A.row.map((t) => t.n), [2, J, 5, J]);
+  assert.strictEqual(room.phase, 'setup');
+  // 조커가 없는 사람은 pos를 보내도 무시하고 준비 완료
+  assert.deepStrictEqual(d.actions.ready(room, B.id, { pos: 0 }), {});
+  assert.strictEqual(room.phase, 'play');
+});
+
 test('대기실 설정: 방장만, 대기실에서만, 조커 켜고 끄기', () => {
   const room = d.createRoom('S');
   d.addPlayer(room, 'a');
