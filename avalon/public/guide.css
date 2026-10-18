@@ -1,0 +1,43 @@
+/* 초보자 가이드 (guide.js) */
+.gd-bar { position: relative; display: grid; gap: 6px; padding: 10px 12px; border-radius: 14px; color: #eaf2ff;
+  background: linear-gradient(135deg, #1d2b55 0%, #22336b 55%, #2a2466 100%); border: 1px solid #4a63b8; box-shadow: 0 6px 18px #0006, inset 0 1px 0 #ffffff1a; }
+.gd-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.gd-badge { flex: none; font-size: 11px; font-weight: 800; letter-spacing: 0.02em; color: #0e1530; background: linear-gradient(135deg, #8fd3ff, #b69cff); border-radius: 999px; padding: 2px 8px; }
+.gd-title { flex: 1; min-width: 0; font-size: 15px; line-height: 1.3; }
+.gd-x { flex: none; width: auto; min-height: 30px; padding: 4px 10px; font-size: 12px; border-radius: 999px; background: #ffffff14; border-color: #ffffff2a; color: #cfd9ff; }
+.gd-text { margin: 0; font-size: 14px; line-height: 1.5; color: #d7e2ff; }
+.gd-text b { color: #fff; }
+.gd-acts { display: flex; gap: 8px; }
+.gd-link { width: auto; min-height: 0; padding: 0; border: 0; background: none; color: #9fc3ff; font-size: 13px; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.gd-suggest { margin: 2px 0 0; font-size: 13px; color: #ffe39a; }
+.gd-off { display: flex; justify-content: flex-end; margin-top: -6px; }
+.gd-chip { width: auto; min-height: 32px; padding: 4px 12px; font-size: 13px; border-radius: 999px; background: #1d2b55; border-color: #4a63b8; color: #cfe0ff; }
+
+/* 지금 눌러야 할 곳 */
+.gd-hl { position: relative; z-index: 3; animation: gdpulse 1.6s ease-in-out infinite; outline: 3px solid #7cc4ff; outline-offset: 2px; }
+@keyframes gdpulse { 0%, 100% { box-shadow: 0 0 0 0 #7cc4ffaa; } 50% { box-shadow: 0 0 0 8px #7cc4ff00; } }
+
+/* 대기실 켜기/끄기 */
+.gd-lobby { display: flex; align-items: center; gap: 12px; margin: 4px 0 10px; padding: 10px 12px; border-radius: 12px; background: #1d2b55; border: 1px solid #4a63b8; }
+.gd-lobby > div { flex: 1; display: grid; gap: 2px; }
+.gd-lobby small { color: #b9c8f2; font-size: 12.5px; }
+.gd-toggle { flex: none; position: relative; width: 52px; min-height: 30px; height: 30px; padding: 0; border-radius: 999px; background: #3a4266; border-color: #56608a; }
+.gd-toggle i { position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; transition: transform 0.2s; box-shadow: 0 1px 3px #0006; }
+.gd-toggle.on { background: linear-gradient(135deg, #4fa3ff, #8b6dff); border-color: #8fb8ff; }
+.gd-toggle.on i { transform: translateX(22px); }
+.gd-preview { margin: -4px 0 10px; }
+
+/* 처음 설명 카드 */
+.gd-ov { align-items: center; padding: 18px; }
+.gd-card { width: 100%; max-width: 400px; display: grid; gap: 10px; text-align: center; padding: 20px 18px 16px; border-radius: 22px; color: #eef3ff;
+  background: radial-gradient(circle at 50% 0%, #34407e 0%, #1a2048 60%, #141836 100%); border: 1px solid #5a6cc4; box-shadow: 0 20px 60px #000c; animation: gdin 0.35s ease-out both; }
+.gd-step { font-size: 12px; color: #a9b8ee; font-weight: 700; }
+.gd-icon { font-size: 54px; line-height: 1.1; filter: drop-shadow(0 6px 12px #0008); }
+.gd-card h2 { margin: 0; font-size: 21px; }
+.gd-card p { margin: 0; font-size: 15px; line-height: 1.6; color: #d4ddfb; }
+.gd-card p b { color: #fff; }
+.gd-dots { display: flex; justify-content: center; gap: 6px; margin: 4px 0; }
+.gd-dots i { width: 7px; height: 7px; border-radius: 50%; background: #ffffff33; }
+.gd-dots i.on { width: 20px; border-radius: 4px; background: linear-gradient(90deg, #6fb6ff, #a58bff); }
+@keyframes gdin { from { transform: translateY(16px) scale(0.97); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .gd-hl, .gd-card { animation: none; } }

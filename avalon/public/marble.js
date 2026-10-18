@@ -494,7 +494,7 @@
 
   window.GAME_UI.marble = {
     name: '부루마블', label: '🎲 부루마블', range: '2~6명', rules: RULES,
-    render: renderMarble, sync, click, lobbyOptions, afterRender,
+    render: renderMarble, sync, click, lobbyOptions, afterRender, busy: () => animating(),
     closeAll: () => { if (ui.mb) ui.mb.info = null; },
   };
 }());

@@ -95,6 +95,7 @@ function connect() {
     } else if (m.t === 'state') {
       const prev = S;
       S = m.state;
+      guideOnState(prev, S);
       if (prev && prev.phase !== 'lobby') {
         if (S.phase === 'lobby' && prev.phase !== 'over') showToast('방장이 게임을 초기화했어요. 대기실로 돌아왔어요.');
         else if (S.gameNo !== prev.gameNo) showToast('방장이 게임을 처음부터 다시 시작했어요.');
@@ -255,6 +256,8 @@ function render() {
   else if (S.kind === 'mafia') html = renderMafia();
   else if (GAME_UI[S.kind]) html = GAME_UI[S.kind].render();
   else html = renderGame();
+  if (S && S.phase !== 'lobby') html = withGuideBar(html);
+  if (S) html += guideIntroHtml();
   document.title = S ? `${APP_NAME}:${gameName(S.kind)}` : APP_NAME;
   const toast = ui.toast ? `<div class="toast">${esc(ui.toast)}</div>` : '';
   const active = document.activeElement;
@@ -262,6 +265,7 @@ function render() {
   $app.innerHTML = banner + html + toast;
   if (typeof mafiaAfterRender === 'function') mafiaAfterRender();
   uiGames().forEach((g) => g.afterRender && g.afterRender());
+  guideAfterRender();
   if (keep) {
     const el = document.getElementById(keep.id);
     if (el) {
@@ -269,6 +273,15 @@ function render() {
       try { el.setSelectionRange(keep.s, keep.e); } catch { /* noop */ }
     }
   }
+}
+
+// 게임 화면의 맨 위 줄(.top) 바로 아래에 초보자 가이드 띠를 끼운다
+function withGuideBar(html) {
+  const bar = guideBarHtml();
+  if (!bar) return html;
+  const at = html.indexOf('class="top"');
+  const end = at < 0 ? -1 : html.indexOf('</div>', at);
+  return end < 0 ? bar + html : html.slice(0, end + 6) + bar + html.slice(end + 6);
 }
 
 function renderHome() {
@@ -366,6 +379,7 @@ function renderLobby() {
     <div class="slots">${slots.join('')}</div>
     ${S.kind === 'mafia' ? mafiaLobbyOptions(isHost) : ''}
     ${GAME_UI[S.kind] && GAME_UI[S.kind].lobbyOptions ? GAME_UI[S.kind].lobbyOptions(isHost) : ''}
+    ${guideLobbyHtml(S.kind)}
     ${action}
   </div>
   <div class="card">${rulesHtml(S.kind)}</div>
@@ -599,6 +613,7 @@ $app.addEventListener('click', (e) => {
   // 오버레이 배경을 눌렀을 때만 닫고, 시트 안쪽 클릭은 무시
   if (act === 'closeall' && el.classList.contains('overlay') && e.target !== el) return;
   if (el.dataset.confirm && !window.confirm(el.dataset.confirm)) return;
+  if (guideClick(act, el, e)) return;
   if (typeof unoClick === 'function' && unoClick(act, el)) return;
   if (typeof bangClick === 'function' && bangClick(act, el)) return;
   if (typeof mafiaClick === 'function' && mafiaClick(act, el)) return;
