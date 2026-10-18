@@ -41,3 +41,7 @@
 .gd-dots i.on { width: 20px; border-radius: 4px; background: linear-gradient(90deg, #6fb6ff, #a58bff); }
 @keyframes gdin { from { transform: translateY(16px) scale(0.97); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .gd-hl, .gd-card { animation: none; } }
+
+/* 효과음 켜기/끄기 (sfx.js) */
+.sfx-btn { flex: none; width: 34px; min-height: 30px; height: 30px; padding: 0; font-size: 15px; line-height: 1; border-radius: 999px; background: #ffffff14; border-color: #ffffff2a; }
+.gd-off { gap: 8px; align-items: center; }

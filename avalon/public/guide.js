@@ -29,6 +29,7 @@ function setGuide(kind, on) {
 
 // 새 상태가 올 때: 게임이 막 시작됐으면 설명 카드를 열고, 막 끝났으면 판 수를 센다
 function guideOnState(prev, cur) {
+  if (typeof sfxOnState === 'function') sfxOnState(prev, cur); // 효과음도 여기서 같이 (sfx.js)
   if (!cur || !GUIDES[cur.kind]) return;
   const key = `${cur.code}:${cur.gameNo}`;
   if (cur.phase !== 'lobby' && cur.phase !== 'over' && prev && prev.phase === 'lobby' && guideOn(cur.kind) && !GUIDE.seenGame[key]) {
@@ -52,10 +53,12 @@ function guideTip() {
 
 // 게임 화면 맨 위(방장 이름 줄 바로 아래)에 들어가는 안내 띠
 function guideBarHtml() {
-  if (!S || S.phase === 'lobby' || !GUIDES[S.kind]) return '';
+  if (!S || S.phase === 'lobby') return '';
+  const snd = typeof sfxButtonHtml === 'function' ? sfxButtonHtml() : '';
   const kind = S.kind;
+  if (!GUIDES[kind]) return snd ? `<div class="gd-off">${snd}</div>` : '';
   if (!guideOn(kind)) {
-    return '<div class="gd-off"><button class="gd-chip" data-act="guideOn">🧭 초보자 가이드 켜기</button></div>';
+    return `<div class="gd-off">${snd}<button class="gd-chip" data-act="guideOn">🧭 초보자 가이드 켜기</button></div>`;
   }
   const tip = guideTip();
   const plays = guidePlays(kind);
@@ -63,7 +66,7 @@ function guideBarHtml() {
     ? `<p class="gd-suggest">벌써 ${plays}판 했어요! 이제 가이드 없이 해도 될 것 같아요. <button class="gd-link" data-act="guideOff">가이드 끄기</button></p>` : '';
   return `<div class="gd-bar" role="status">
     <div class="gd-head"><span class="gd-badge">🧭 가이드</span>${tip ? `<b class="gd-title">${esc(tip.title)}</b>` : '<b class="gd-title">설명 카드를 다시 볼 수 있어요</b>'}
-      <button class="gd-x" data-act="guideOff" aria-label="가이드 끄기">끄기</button></div>
+      ${snd}<button class="gd-x" data-act="guideOff" aria-label="가이드 끄기">끄기</button></div>
     ${tip && tip.text ? `<p class="gd-text">${tip.html ? tip.text : esc(tip.text)}</p>` : ''}
     <div class="gd-acts"><button class="gd-link" data-act="guideIntro">📖 처음 설명 다시 보기</button></div>
     ${suggest}
@@ -72,9 +75,14 @@ function guideBarHtml() {
 
 // 대기실에서 보이는 켜기/끄기 줄
 function guideLobbyHtml(kind) {
-  if (!GUIDES[kind]) return '';
+  const sOn = typeof sfxOn === 'function' && sfxOn();
+  const sound = typeof sfxOn === 'function' ? `<div class="gd-lobby">
+    <div><b>🔊 효과음</b><small>주사위·카드·내 차례 알림 소리. 나만 들려요.</small></div>
+    <button class="gd-toggle ${sOn ? 'on' : ''}" data-act="sfxToggle" role="switch" aria-checked="${sOn}"><i></i></button>
+  </div>` : '';
+  if (!GUIDES[kind]) return sound;
   const on = guideOn(kind);
-  return `<div class="gd-lobby">
+  return sound + `<div class="gd-lobby">
     <div><b>🧭 초보자 가이드</b><small>${on ? '게임 중에 지금 할 일을 알려 줘요. 나만 보여요.' : '꺼져 있어요. 처음이라면 켜 두세요.'}</small></div>
     <button class="gd-toggle ${on ? 'on' : ''}" data-act="${on ? 'guideOff' : 'guideOn'}" role="switch" aria-checked="${on}"><i></i></button>
   </div>${on ? '<button class="ghost sm gd-preview" data-act="guideIntro">📖 게임 설명 미리 보기</button>' : ''}`;
@@ -112,6 +120,7 @@ function guideAfterRender() {
 
 // 가이드 버튼 처리. 처리했으면 true
 function guideClick(act, el, ev) {
+  if (typeof sfxClick === 'function' && sfxClick(act)) return true;
   const kind = S && S.kind;
   switch (act) {
     case 'guideOn': setGuide(kind, true); render(); return true;
