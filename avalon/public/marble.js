@@ -417,8 +417,8 @@
         return '';
       default: {
         const who = pd ? pd.who : S.turnId;
-        const what = pd ? { buy: '땅을 살지 고르는 중', build: '건물을 지을지 고르는 중', debt: '빚을 갚는 중', warp: '우주여행 갈 곳을 고르는 중' }[pd.t] : '주사위를 굴릴 차례';
-        return `<p class="center dim mwait">${pname(who)}님이 ${what}이에요</p>`;
+        const what = pd ? { buy: '땅을 살지 고르는 중', build: '건물을 지을지 고르는 중', debt: '빚을 갚는 중', warp: '우주여행 갈 곳을 고르는 중' }[pd.t] : null;
+        return `<p class="center dim mwait">${what ? `${pname(who)}님이 ${what}이에요` : `${pname(who)}님이 주사위를 굴릴 차례예요`}</p>`;
       }
     }
   }
