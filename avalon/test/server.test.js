@@ -542,7 +542,7 @@ test('부루마블 방: 설정은 방장만, 시작 후 차례인 사람만 굴�
     await Promise.all(cs.map((c) => c.until((x) => x.state.settings.maxRounds === 20)));
     cs[0].send({ t: 'start' });
     await Promise.all(cs.map((c) => c.until((x) => x.state.phase === 'play')));
-    assert.ok(cs.every((c) => c.state.tiles.length === 32));
+    assert.ok(cs.every((c) => c.state.tiles.length === 40));
     const mover = cs.find((c) => c.state.mode === 'roll');
     const others = cs.filter((c) => c !== mover);
     others[0].send({ t: 'roll' });
