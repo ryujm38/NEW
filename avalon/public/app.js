@@ -284,107 +284,246 @@ function withGuideBar(html) {
   return end < 0 ? bar + html : html.slice(0, end + 6) + bar + html.slice(end + 6);
 }
 
+// ---- 첫 화면·대기실 꾸밈: 게임마다 색과 작은 문장(직접 그린 SVG, 48×48) ----
+
+// n갈래 별 (보안관 배지·카지노 칩에 쓴다)
+function hmStar(cx, cy, R, r, n) {
+  let d = '';
+  for (let i = 0; i < n * 2; i++) {
+    const a = -Math.PI / 2 + (i * Math.PI) / n;
+    const rad = i % 2 ? r : R;
+    d += `${i ? 'L' : 'M'}${(cx + rad * Math.cos(a)).toFixed(1)} ${(cy + rad * Math.sin(a)).toFixed(1)}`;
+  }
+  return `${d}Z`;
+}
+function hmTips(cx, cy, R, n, rr, fill) {
+  let s = '';
+  for (let i = 0; i < n; i++) {
+    const a = -Math.PI / 2 + (i * 2 * Math.PI) / n;
+    s += `<circle cx="${(cx + R * Math.cos(a)).toFixed(1)}" cy="${(cy + R * Math.sin(a)).toFixed(1)}" r="${rr}" fill="${fill}"/>`;
+  }
+  return s;
+}
+
+// c: 게임 색(밝은 쪽, 글자는 어두운 색으로 올린다) · d: 바탕용 어두운 색
+const HM_GAME = {
+  avalon: { c: '#9fb0ff', d: '#1a2160', art: `<circle cx="11" cy="12" r="1.3" fill="#fff"/><circle cx="15" cy="21" r=".9" fill="#fff"/><circle cx="38" cy="33" r="1" fill="#fff"/>
+    <path d="M33 6a9 9 0 1 0 8.5 12.6A7 7 0 0 1 33 6Z" fill="#ffe7a3"/>
+    <path d="M24 6l3 4v19h-6V10Z" fill="#eef2ff"/><path d="M24 11v17" stroke="#97a3c8" stroke-width="1.3"/>
+    <rect x="15" y="28.5" width="18" height="3.6" rx="1.8" fill="#e9c46a"/><rect x="22.4" y="32" width="3.2" height="7.5" fill="#9a6a24"/><circle cx="24" cy="41.5" r="2.7" fill="#e9c46a"/>` },
+  mafia: { c: '#ff6b78', d: '#3a0d16', art: `<path d="M6 43h36" stroke="#ffffff2a" stroke-width="2" stroke-linecap="round"/>
+    <path d="M10.5 31c0-13 4.5-20 13.5-20s13.5 7 13.5 20Z" fill="#24242c" stroke="#ffffff4a" stroke-width="1.2"/><path d="M18 12.5q6 5.5 12 0" fill="none" stroke="#000" stroke-width="1.8" stroke-linecap="round"/>
+    <path d="M10.5 25.5h27v5.5h-27Z" fill="#ff4d5a"/><ellipse cx="24" cy="32" rx="21" ry="5.6" fill="#30303a" stroke="#ffffff4a" stroke-width="1.2"/>
+    <path d="M15 23c0-5 2-8.5 5.5-10" fill="none" stroke="#ffffff50" stroke-width="2.2" stroke-linecap="round"/>` },
+  uno: { c: '#ffd23f', d: '#3a2508', art: `<g stroke="#fff" stroke-width="2"><rect x="9" y="12" width="16" height="23" rx="3.2" fill="#3b82e0" transform="rotate(-20 17 36)"/>
+    <rect x="16" y="10" width="16" height="23" rx="3.2" fill="#35a862"/><rect x="23" y="12" width="16" height="23" rx="3.2" fill="#e0453a" transform="rotate(20 31 36)"/></g>
+    <ellipse cx="31.5" cy="24" rx="4.2" ry="7" fill="#fff" transform="rotate(38 31.5 24)"/><ellipse cx="31.5" cy="24" rx="2.2" ry="4.2" fill="#f0c331" transform="rotate(38 31.5 24)"/>` },
+  bang: { c: '#f0954a', d: '#3a1d0b', art: `<path d="${hmStar(24, 24, 17, 8.5, 6)}" fill="#f3c45a" stroke="#7a4a1c" stroke-width="1.6" stroke-linejoin="round"/>
+    ${hmTips(24, 24, 17, 6, 2.6, '#f3c45a')}<circle cx="24" cy="24" r="6.5" fill="#d99a35" stroke="#7a4a1c" stroke-width="1.4"/>
+    <path d="M20 20.5l4-1.5 4 1.5" fill="none" stroke="#fff5d0" stroke-width="1.4" stroke-linecap="round" opacity=".8"/>` },
+  splendor: { c: '#c98bff', d: '#2a1240', art: `<path d="M12 18l6-8h12l6 8L24 40Z" fill="#9b55ea"/><path d="M12 18l6-8h12l6 8Z" fill="#e5ccff"/>
+    <path d="M12 18L24 40l-5-22Z" fill="#c792ff"/><path d="M36 18L24 40l5-22Z" fill="#6f2fc0"/>
+    <path d="M12 18h24M18 10l1 8 5-8 5 8 1-8M19 18l5 22 5-22" fill="none" stroke="#ffffffa0" stroke-width="1" stroke-linejoin="round"/>
+    <path d="M38 7l1 2.5 2.5 1-2.5 1L38 14l-1-2.5-2.5-1 2.5-1Z" fill="#fff"/>` },
+  marble: { c: '#4cc9ff', d: '#0b2a44', art: `<rect x="8" y="8" width="32" height="32" rx="4" fill="#eaf6ff"/>
+    <rect x="11" y="11" width="26" height="26" fill="none" stroke="#2f7fd6" stroke-width="5" stroke-dasharray="4.2 1.3"/>
+    <rect x="8.5" y="8.5" width="7" height="7" rx="1.5" fill="#ff5a5a"/><rect x="32.5" y="8.5" width="7" height="7" rx="1.5" fill="#ffc531"/>
+    <rect x="8.5" y="32.5" width="7" height="7" rx="1.5" fill="#35b36a"/><rect x="32.5" y="32.5" width="7" height="7" rx="1.5" fill="#9b6cff"/>
+    <rect x="18" y="18" width="12" height="12" rx="2.6" fill="#fff" stroke="#b9cbe0"/><circle cx="21.5" cy="21.5" r="1.4" fill="#e0453a"/><circle cx="24" cy="24" r="1.4" fill="#e0453a"/><circle cx="26.5" cy="26.5" r="1.4" fill="#e0453a"/>` },
+  bohnanza: { c: '#98d65a', d: '#1f3010', art: `<path d="M27 13c.5-4.5 3.5-7 8-7-.3 4.3-3.4 6.8-8 7Z" fill="#c6f28a"/><path d="M26.5 14c.6-2.4 2-4.2 4-5.4" fill="none" stroke="#5e9a2a" stroke-width="1.2"/>
+    <path d="M14.5 31c-4.5-8 0-18 9.5-19.5 8.5-1.3 13.5 4.5 11.5 10.5-1 3-3.8 4-3.8 7s3 5 1 8c-3 4.5-13.5 2.5-18.2-6Z" fill="#c8633a"/>
+    <path d="M18.5 20.5c1.8-3.6 4.6-5 7.6-5.2" fill="none" stroke="#ffd2b0" stroke-width="2.4" stroke-linecap="round"/>
+    <circle cx="20.5" cy="26" r="1.7" fill="#2a1408"/><circle cx="27" cy="25" r="1.7" fill="#2a1408"/><path d="M21 31q3 2.4 6-.6" fill="none" stroke="#2a1408" stroke-width="1.5" stroke-linecap="round"/>` },
+  vegas: { c: '#ff5fbf', d: '#3a0c34', art: `<circle cx="24" cy="24" r="17" fill="#e8379b"/><circle cx="24" cy="24" r="14.5" fill="none" stroke="#fff" stroke-width="5" stroke-dasharray="5.4 6"/>
+    <circle cx="24" cy="24" r="10" fill="#2a1038" stroke="#ffd76a" stroke-width="1.6"/><path d="${hmStar(24, 24, 6.5, 2.7, 5)}" fill="#ffd76a"/>` },
+  duel: { c: '#e2b46a', d: '#3a250d', art: `<path d="M9 17.5L24 9l15 8.5Z" fill="#f3e7cb"/><circle cx="24" cy="14.5" r="1.6" fill="#a97b32"/><rect x="9.5" y="18.5" width="29" height="3" fill="#f3e7cb"/>
+    <g fill="#f3e7cb"><rect x="12" y="22.5" width="3.6" height="12"/><rect x="19" y="22.5" width="3.6" height="12"/><rect x="25.4" y="22.5" width="3.6" height="12"/><rect x="32.4" y="22.5" width="3.6" height="12"/></g>
+    <rect x="9" y="35" width="30" height="3.2" fill="#f3e7cb"/><rect x="6.5" y="38.6" width="35" height="3" rx="1" fill="#dcc79a"/>` },
+};
+const HM_DICE = `<rect x="10" y="10" width="28" height="28" rx="6" fill="#f2f4fb"/><circle cx="17" cy="17" r="2.6" fill="#1b1f2e"/><circle cx="24" cy="24" r="2.6" fill="#1b1f2e"/><circle cx="31" cy="31" r="2.6" fill="#1b1f2e"/>`;
+const hmGame = (kind) => HM_GAME[kind] || { c: '#c9cee6', d: '#262a3c', art: HM_DICE };
+const hmVars = (kind) => `--gc:${hmGame(kind).c};--gd:${hmGame(kind).d}`;
+const hmEmblem = (kind, cls = '') => `<span class="hm-em ${cls}" style="${hmVars(kind)}" aria-hidden="true"><svg viewBox="0 0 48 48" focusable="false">${hmGame(kind).art}</svg></span>`;
+// 첫 화면의 게임 목록: [종류, 버튼 글자, 인원]
+const hmGameList = () => [
+  ['avalon', '🛡️ 아발론', '5~10명'], ['mafia', '🕵️ 마피아', '5~12명'], ['uno', '🃏 우노', '2~10명'], ['bang', '🤠 뱅!', '4~7명'],
+  ...Object.entries(GAME_UI).map(([k, g]) => [k, g.label, g.range]),
+];
+// 그 게임의 최소 인원 ('5~10명' → 5). 모르면 0
+const hmMin = (kind) => {
+  const g = hmGameList().find(([k]) => k === kind);
+  return g ? parseInt(String(g[2]), 10) || 0 : 0;
+};
+// 규칙 접기 제목 앞에 그 게임 문장을 붙인다. 첫 화면(목록)에서는 제목을 "게임 이름 + 인원"으로 줄인다
+const hmRules = (kind, range = '') => `<div class="hm-rule" style="${hmVars(kind)}">${rulesHtml(kind).replace(/<summary>[^<]*<\/summary>|<summary>/, (m) => (range
+  ? `<summary>${hmEmblem(kind, 'sm')}<span class="hm-rn">${esc(gameName(kind) || kind)}</span><small class="hm-rr">${esc(range)}</small></summary>`
+  : `${m}`.replace('<summary>', `<summary>${hmEmblem(kind, 'sm')}`)))}</div>`;
+
 function renderHome() {
-  const gameList = [
-    ['avalon', '🛡️ 아발론', '5~10명'], ['mafia', '🕵️ 마피아', '5~12명'], ['uno', '🃏 우노', '2~10명'], ['bang', '🤠 뱅!', '4~7명'],
-    ...Object.entries(GAME_UI).map(([k, g]) => [k, g.label, g.range]),
-  ];
-  const gameBtn = (g, label, sub) => `<button class="gamebtn ${ui.game === g ? 'on' : ''}" data-act="setgame" data-game="${g}"><b>${label}</b><small>${sub}</small></button>`;
+  const gameList = hmGameList();
+  const gameBtn = (g, label, sub) => {
+    const on = ui.game === g;
+    return `<button class="hm-game ${on ? 'on' : ''}" data-act="setgame" data-game="${g}" style="${hmVars(g)}" aria-pressed="${on}">
+      ${HM_GAME[g] ? hmEmblem(g) : `<span class="hm-em" aria-hidden="true">${esc(String(label).split(' ')[0])}</span>`}
+      <b>${esc(gameName(g) || label)}</b><small>${esc(sub)}</small>${on ? '<i class="hm-check" aria-hidden="true">✓</i>' : ''}</button>`;
+  };
   const ago = (t) => {
     const s = Math.round((Date.now() - t) / 1000);
     return s < 10 ? '방금' : s < 60 ? `${s}초 전` : `${Math.floor(s / 60)}분 전`;
   };
   // 비밀번호 칸: 목록에서 고른 비밀번호 방 바로 아래에 연다
-  const pwBox = () => `<div class="pwbox">
-      <label class="field">방 비밀번호
+  const pwBox = () => `<div class="pwbox hm-pw">
+      <label class="field">🔒 방 비밀번호
         <input type="text" id="joinpw" maxlength="20" autocomplete="off" value="${esc(ui.joinPw)}" placeholder="방장에게 받은 비밀번호" />
       </label>
       <div class="row2"><button class="primary" data-act="join">들어가기</button><button class="ghost" data-act="pwcancel">취소</button></div>
     </div>`;
-  // 방 목록: 게임, 방장 이름, 인원, 공개/비밀번호, 게임 중 여부만 보여 준다
-  const roomRow = (r) => `<button class="roomrow ${ui.needPw && ui.code === r.code ? 'picked' : ''}" data-act="pickroom" data-code="${esc(r.code)}" data-locked="${r.locked ? 1 : 0}">
-      <span class="ri"><b>${esc(gameName(r.kind) || r.kind)}</b><small>방장 ${esc(r.host)}</small></span>
-      <span class="rc"><span>${r.players}${r.max ? `/${r.max}` : ''}명</span>
-        <span class="tags">${r.playing ? '<span class="tag play">게임 중</span>' : ''}${r.locked ? '<span class="tag lock">🔒 비밀번호</span>' : '<span class="tag open">공개</span>'}</span></span>
-    </button>${ui.needPw && ui.code === r.code ? pwBox() : ''}`;
+  // 방 목록 한 줄: 문장 | 게임·방장·상태 꼬리표 | 큰 인원 숫자
+  const roomRow = (r) => {
+    const picked = ui.needPw && ui.code === r.code;
+    const full = !r.playing && r.max && r.players >= r.max;
+    const need = r.playing || full ? 0 : Math.max(0, hmMin(r.kind) - r.players);
+    const state = r.playing ? '<span class="tag play">게임 중</span>'
+      : full ? '<span class="tag full">가득 찼어요</span>'
+        : need ? `<span class="tag need">${need}명 더 필요</span>` : '';
+    return `<button class="hm-room ${picked ? 'picked' : ''} ${r.playing || full ? 'busy' : ''}" data-act="pickroom" data-code="${esc(r.code)}" data-locked="${r.locked ? 1 : 0}" style="${hmVars(r.kind)}">
+      ${hmEmblem(r.kind)}
+      <span class="hm-ri"><b>${esc(gameName(r.kind) || r.kind)}</b><span class="hm-host">👑 <em>${esc(r.host)}</em></span>
+        <span class="tags">${state}${r.locked ? '<span class="tag lock">🔒 비밀번호</span>' : '<span class="tag open">공개</span>'}</span></span>
+      <span class="hm-cnt" aria-label="${r.players}명${r.max ? ` / 최대 ${r.max}명` : ''}"><b>${r.players}</b>${r.max ? `<i>/${r.max}</i>` : ''}<small>명</small></span>
+      <span class="hm-go" aria-hidden="true">›</span>
+    </button>${picked ? pwBox() : ''}`;
+  };
+  const skeleton = '<div class="hm-skel" aria-hidden="true"><i></i><i></i></div>';
   const roomBody = ui.rooms === null
-    ? `<p class="dim small center">${online ? '방 목록을 불러오는 중…' : '연결되면 방 목록을 불러와요.'}</p>`
+    ? `${online ? skeleton : ''}<p class="hm-note">${online ? '방 목록을 불러오는 중…' : '연결되면 방 목록을 불러와요.'}</p>`
     : ui.rooms.length === 0
-      ? '<p class="dim small center">지금 열린 방이 없어요. 위에서 새로 만들어 보세요.</p>'
-      : `<div class="roomlist">${ui.rooms.map(roomRow).join('')}</div>`;
-  return `
-  <h1>🎲 ${APP_NAME}<small>친구들과 폰으로 같이 하는 보드게임</small></h1>
-  <div class="card">
-    <label class="field">내 이름 (8자까지)
+      ? `<div class="hm-empty">${hmEmblem('', 'ghost')}<span><b>지금 열린 방이 없어요.</b>친구가 방을 만들었다면 ↻ 새로고침을 눌러 보세요. 내가 먼저 만들려면 아래 ‘새 방 만들기’로!</span></div>`
+      : `<div class="hm-rooms">${ui.rooms.map(roomRow).join('')}</div>`;
+  const nRooms = ui.rooms ? ui.rooms.length : 0;
+  const busy = ui.roomsLoading && ui.rooms !== null;
+  const step = (n, t, sub = '') => `<div class="hm-step"><span class="hm-n">${n}</span><span>${t}${sub ? ` <small>${sub}</small>` : ''}</span></div>`;
+  return `<div class="hm" style="${hmVars(ui.game)}">
+  <header class="hm-hero">
+    <div class="hm-fan" aria-hidden="true">${gameList.map(([k]) => hmEmblem(k)).join('')}</div>
+    <h1>${APP_NAME}<small>친구들과 폰으로 같이 하는 보드게임 ${gameList.length}종</small></h1>
+  </header>
+  <section class="card hm-card hm-me">
+    <label class="field hm-name"><span class="hm-lbl">먼저, 내 이름 <small>8자까지 · 다른 사람에게 이렇게 보여요</small></span>
       <input type="text" id="name" maxlength="8" autocomplete="off" value="${esc(ui.name)}" placeholder="예: 민수" />
     </label>
-    <p class="field" style="margin-bottom:6px">무슨 게임을 할까요?</p>
-    <div class="gamegrid">
+  </section>
+  <section class="card hm-card hm-join" id="hm-list">
+    <div class="listhead hm-lh"><h2 class="hm-h"><span class="hm-hi" aria-hidden="true">🚪</span>친구 방에 들어가기</h2>
+      <button class="sm ghost hm-refresh" data-act="roomsrefresh" ${busy ? 'disabled' : ''}>${busy ? '불러오는 중…' : '↻ 새로고침'}</button></div>
+    <p class="hm-note">${[nRooms ? `열린 방 <b>${nRooms}개</b>` : '', nRooms ? '방을 누르면 바로 들어가요' : '', ui.roomsAt ? `<span class="hm-ago">${ago(ui.roomsAt)} 기준</span>` : ''].filter(Boolean).join(' · ') || '친구가 만든 방이 여기에 나타나요.'}</p>
+    ${roomBody}
+  </section>
+  <div class="hm-or" role="separator"><span>또는</span></div>
+  <section class="card hm-card hm-make">
+    <h2 class="hm-h"><span class="hm-hi" aria-hidden="true">✨</span>새 방 만들기 <small>내가 방장이 돼요</small></h2>
+    ${step(1, '무슨 게임을 할까요?')}
+    <div class="hm-grid">
       ${gameList.map(([k, label, range]) => gameBtn(k, label, range)).join('')}
     </div>
-    <div class="seg2" role="group" aria-label="방 공개 설정">
-      <button class="${ui.locked ? '' : 'on'}" data-act="setaccess" data-v="0">🔓 공개방</button>
-      <button class="${ui.locked ? 'on' : ''}" data-act="setaccess" data-v="1">🔒 비밀번호 방</button>
+    ${step(2, '누가 들어올 수 있나요?')}
+    <div class="seg2 hm-seg" role="group" aria-label="방 공개 설정">
+      <button class="${ui.locked ? '' : 'on'}" data-act="setaccess" data-v="0" aria-pressed="${!ui.locked}"><b>🔓 공개방</b><small>누구나</small></button>
+      <button class="${ui.locked ? 'on' : ''}" data-act="setaccess" data-v="1" aria-pressed="${ui.locked}"><b>🔒 비밀번호 방</b><small>아는 사람만</small></button>
     </div>
     ${ui.locked
-      ? `<label class="field">방 비밀번호 (20자까지)
+      ? `<label class="field hm-cpw">방 비밀번호 (20자까지)
       <input type="text" id="createpw" maxlength="20" autocomplete="off" value="${esc(ui.createPw)}" placeholder="예: 1234" />
-    </label>`
-      : '<p class="dim small">공개방은 방 목록에서 누구나 눌러서 들어올 수 있어요.</p>'}
-    <button class="primary" data-act="create">${gameName(ui.game)} ${ui.locked ? '비밀번호 ' : ''}방 만들기</button>
-  </div>
-  <div class="card">
-    <div class="listhead"><h2>방 목록${ui.roomsAt ? ` <small>${ago(ui.roomsAt)} 기준</small>` : ''}</h2>
-      <button class="sm ghost" data-act="roomsrefresh" ${ui.roomsLoading && ui.rooms !== null ? 'disabled' : ''}>${ui.roomsLoading && ui.rooms !== null ? '불러오는 중…' : '↻ 새로고침'}</button></div>
-    ${roomBody}
-  </div>
-  <div class="card">${AVALON_RULES_HTML}${MAFIA_RULES_HTML}${UNO_RULES_HTML}${BANG_RULES_HTML}${uiGames().map((g) => g.rules).join('')}</div>`;
+    </label><p class="hm-note">친구들에게 이 비밀번호를 알려 주세요.</p>`
+      : '<p class="hm-note">방 목록에서 누구나 눌러서 들어올 수 있어요.</p>'}
+    ${step(3, '방을 만들고 친구를 기다려요')}
+    <button class="primary hm-create" data-act="create">${hmEmblem(ui.game, 'sm')}<span>${esc(gameName(ui.game))} ${ui.locked ? '비밀번호 ' : ''}방 만들기</span></button>
+  </section>
+  <section class="card hm-card hm-rulebox">
+    <h2 class="hm-h">게임 규칙 <small>눌러서 펼쳐 보세요</small></h2>
+    ${gameList.map(([k, , range]) => hmRules(k, range)).join('')}
+  </section>
+  </div>`;
 }
 
 function renderLobby() {
   const isHost = S.hostId === S.me;
   const n = S.players.length;
   const { minPlayers: min, maxPlayers: max } = S;
-  const shown = Math.max(n + (n < max ? 1 : 0), min); // 우노는 빈 자리를 한 칸만 보여준다
-  const slots = [];
-  for (let i = 0; i < shown; i++) {
-    const p = S.players[i];
-    if (!p) {
-      slots.push('<div class="slot empty">빈 자리</div>');
-      continue;
-    }
-    slots.push(`<div class="slot">
-      <span class="dot ${p.connected ? '' : 'off'}"></span>
-      <span class="nm">${esc(p.name)}${p.id === S.me ? ' (나)' : ''}</span>
-      ${p.id === S.hostId ? '<span class="tag host">방장</span>' : ''}
+  const need = Math.max(0, min - n);
+  const host = S.players.find((p) => p.id === S.hostId);
+  const slots = S.players.map((p, i) => {
+    const me = p.id === S.me;
+    const sub = p.connected ? '' : '접속이 끊겼어요';
+    return `<div class="slot lb-slot ${me ? 'me' : ''} ${p.connected ? '' : 'off'}">
+      <span class="lb-av" style="--ac:${LB_AV[i % LB_AV.length]}">${esc([...p.name][0] || '?')}<span class="dot ${p.connected ? '' : 'off'}"></span></span>
+      <span class="nm"><span class="lb-pn">${esc(p.name)}${me ? ' <em>(나)</em>' : ''}</span>${sub ? `<small>${sub}</small>` : ''}</span>
+      ${p.id === S.hostId ? '<span class="tag host">👑 방장</span>' : ''}
       ${p.wins ? `<span class="tag">🏆 ${p.wins}</span>` : ''}
-      ${isHost && p.id !== S.me ? `<button class="sm ghost" data-act="kick" data-id="${p.id}">내보내기</button>` : ''}
-    </div>`);
+      ${isHost && p.id !== S.me ? `<button class="sm ghost lb-kick" data-act="kick" data-id="${p.id}">내보내기</button>` : ''}
+    </div>`;
+  });
+  // 빈 자리는 한 줄로 묶는다: 꼭 필요한 자리(+n) 또는 더 들어올 수 있는 자리
+  const free = max - n;
+  if (need) {
+    slots.push(`<div class="slot empty lb-slot lb-need"><span class="lb-av" aria-hidden="true">+${need}</span><span class="nm">빈 자리 ${need}개<small>꼭 필요한 자리예요</small></span></div>`);
+  } else if (free > 0) {
+    slots.push(`<div class="slot empty lb-slot"><span class="lb-av">＋</span><span class="nm">빈 자리 ${free}개<small>더 들어올 수 있어요 (없어도 시작 가능)</small></span></div>`);
   }
   const allOn = S.players.every((p) => p.connected);
   const ready = n >= min && n <= max && allOn;
-  const startLabel = n < min ? `${min - n}명 더 필요해요` : allOn ? '게임 시작' : '접속이 끊긴 사람이 있어요';
+  const startLabel = n < min ? `${need}명 더 필요해요` : allOn ? '게임 시작' : '접속이 끊긴 사람이 있어요';
+  const count = min === max ? `${max}명` : `${min}~${max}명`;
+  // 인원 막대: 칸 하나가 한 사람. 시작에 꼭 필요한 칸(최소 인원)과 더 들어올 수 있는 칸을 나눠 그린다
+  const cells = (from, to) => Array.from({ length: to - from }, (_, k) => `<i class="${from + k < n ? 'on' : ''}"></i>`).join('');
+  const meter = `<div class="lb-meter" aria-hidden="true" style="--a:${min};--b:${max - min}">
+      <span class="lb-mg need"><span class="lb-cells">${cells(0, min)}</span><small>${min === max ? `${max}명 모두 필요` : `최소 ${min}명`}</small></span>
+      ${max > min ? `<span class="lb-mg extra"><span class="lb-cells">${cells(min, max)}</span><small>최대 ${max}명</small></span>` : ''}
+    </div>`;
+  const status = need ? `<b>${need}명</b> 더 모이면 시작할 수 있어요`
+    : !allOn ? '접속이 끊긴 사람이 있어요. 다시 들어올 때까지 기다려 주세요'
+      : n >= max ? `자리가 다 찼어요. ${isHost ? '시작할 수 있어요!' : '곧 시작해요!'}`
+        : `${isHost ? '시작할 수 있어요' : '시작할 수 있는 인원이에요'} · ${free}명 더 들어올 수 있어요`;
   let action;
   if (isHost) {
-    action = `<button class="primary" data-act="start" ${ready ? '' : 'disabled'}>${startLabel}</button>`;
+    action = `<button class="primary lb-start" data-act="start" ${ready ? '' : 'disabled'}>${ready ? '▶ ' : ''}${startLabel}</button>
+      <p class="lb-hint">${ready ? '다 모였으면 눌러 주세요.' : need ? '사람이 다 모이면 버튼이 켜져요.' : '끊긴 사람이 다시 들어오거나, 내보내면 시작할 수 있어요.'}</p>`;
   } else {
-    action = '<p class="dim center">방장이 시작하길 기다리는 중…</p>';
+    action = `<div class="lb-wait"><span class="lb-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+      <b>방장${host ? ` <em>${esc(host.name)}</em>님` : ''}이 시작하길 기다리는 중…</b>
+      <small>${need ? `${need}명 더 모여야 시작할 수 있어요` : !allOn ? '접속이 끊긴 사람이 돌아오길 기다려요' : '인원이 됐어요. 곧 시작할 거예요'}</small></div>`;
   }
-  const count = min === max ? `${max}명` : `${min}~${max}명`;
-  return `
-  <h1>대기실<small>${APP_NAME}:${gameName(S.kind)} · ${count}</small></h1>
-  <div class="card">
-    <p class="dim center small">친구들은 방 목록에서 이 방을 눌러 들어와요</p>
-    <p class="dim center small">${S.locked ? '🔒 비밀번호 방 · 비밀번호를 아는 사람만 들어올 수 있어요' : '🔓 공개방 · 방 목록에서 누구나 들어올 수 있어요'}</p>
-    <div class="slots">${slots.join('')}</div>
-    ${S.kind === 'mafia' ? mafiaLobbyOptions(isHost) : ''}
-    ${GAME_UI[S.kind] && GAME_UI[S.kind].lobbyOptions ? GAME_UI[S.kind].lobbyOptions(isHost) : ''}
-    ${guideLobbyHtml(S.kind)}
-    ${action}
-  </div>
-  <div class="card">${rulesHtml(S.kind)}</div>
-  <div class="foot"><button class="ghost" data-act="leave">방 나가기</button></div>`;
+  // 친구 부르기 안내: 방장에게는 할 일로, 다른 사람에게는 짧은 참고로
+  const hostName = host ? esc(host.name) : '';
+  const invite = free <= 0 ? ''
+    : isHost
+      ? `<div class="lb-invite host"><b>📣 친구를 불러 주세요</b><span>첫 화면 <em>친구 방에 들어가기</em>에서 <em>👑 ${hostName}</em> 방을 누르면 들어와요.${S.locked ? ' 🔒 비밀번호도 꼭 알려 주세요.' : ''}</span></div>`
+      : `<p class="lb-invite">친구를 더 부르려면: 첫 화면 방 목록에서 <em>👑 ${hostName}</em> 방을 누르면 돼요.</p>`;
+  const opts = `${S.kind === 'mafia' ? mafiaLobbyOptions(isHost) : ''}${GAME_UI[S.kind] && GAME_UI[S.kind].lobbyOptions ? GAME_UI[S.kind].lobbyOptions(isHost) : ''}`;
+  const mine = guideLobbyHtml(S.kind);
+  return `<div class="lb ${isHost ? 'is-host' : 'is-guest'}" style="${hmVars(S.kind)}">
+  <header class="lb-hero">
+    ${hmEmblem(S.kind, 'lg')}
+    <h1><small>대기실</small>${esc(gameName(S.kind))}</h1>
+    <div class="lb-chips"><span>👥 ${count}</span><span>${S.locked ? '🔒 비밀번호 방' : '🔓 공개방'}</span></div>
+  </header>
+  <section class="card lb-card lb-people">
+    <div class="lb-count"><span class="lb-n"><b>${n}</b>명 모였어요</span>${ready ? `<span class="lb-st ok">✓ ${isHost ? '시작 가능' : '인원 충분'}</span>` : ''}</div>
+    ${meter}
+    <p class="lb-status ${ready ? 'ok' : ''}">${status}</p>
+    <div class="slots lb-slots">${slots.join('')}</div>
+    ${invite}
+  </section>
+  ${isHost ? '' : `<div class="lb-act guest">${action}</div>`}
+  ${opts.trim() ? `<section class="card lb-card lb-opts"><h2 class="hm-h">게임 설정 <small>${isHost ? '방장인 내가 정해요' : '모두에게 똑같이 적용돼요'}</small></h2>${opts}</section>` : ''}
+  ${mine.trim() ? `<section class="card lb-card lb-mine"><h2 class="hm-h">내 설정 <small>나에게만 적용돼요</small></h2>${mine}</section>` : ''}
+  ${isHost ? `<div class="lb-act host">${action}</div>` : ''}
+  <section class="card lb-card hm-rulebox">${hmRules(S.kind)}</section>
+  <div class="foot"><button class="ghost lb-leave" data-act="leave">방 나가기</button></div>
+  </div>`;
 }
+// 대기실 이름 앞 동그라미 색 (자리 순서대로, 한 방 안에서 겹치지 않게)
+const LB_AV = ['#7c9cff', '#ff7a85', '#ffcf4a', '#5fd39a', '#c98bff', '#4cc9ff', '#f0954a', '#ff5fbf', '#b5e35a', '#d9b98a', '#3fd6c6', '#b0b6cc'];
 
 // ---- 아발론 그림 (공식 그림을 쓰지 않고 SVG로 새로 그린 문장들) ----
 
