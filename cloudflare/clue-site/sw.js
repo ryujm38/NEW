@@ -1,5 +1,5 @@
 // 네트워크 우선, 실패하면 저장본 (게임 중 와이파이가 끊겨도 열린다)
-const CACHE='boardgames-18c21baa';
+const CACHE='boardgames-0ff2ba0e';
 const FILES=["/","/clue-onepiece/","/manifest.webmanifest","/icon-192.png","/icon-512.png","/icon-maskable-512.png"];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)).then(()=>self.skipWaiting()));});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});

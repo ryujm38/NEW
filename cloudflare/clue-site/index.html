@@ -77,16 +77,17 @@ a.game:active{transform:scale(.985)}
     <h2>게임 고르기</h2>
     <nav class="games" aria-label="게임 목록">
       <a class="game" href="/clue-onepiece/" data-game="clue-onepiece"><span class="gicon"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="21" cy="21" r="10" fill="none" stroke="#e8a500" stroke-width="3.6"/><path d="M28.5 28.5L38 38" stroke="#e8a500" stroke-width="4.4" stroke-linecap="round"/><path d="M16.5 21.5l3.6 3.6 6.4-7.2" fill="none" stroke="#f2f7fb" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="gtext"><b>클루:원피스</b><small>추리 노트 · 2~6명</small><span class="resume" hidden></span></span><span class="chev" aria-hidden="true">›</span></a>
+      <a class="game" href="/board/" data-game="board"><span class="gicon"><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="9" y="9" width="30" height="30" rx="7" fill="none" stroke="#e8a500" stroke-width="3.4"/><circle cx="18" cy="18" r="2.8" fill="#f2f7fb"/><circle cx="30" cy="18" r="2.8" fill="#f2f7fb"/><circle cx="24" cy="24" r="2.8" fill="#f2f7fb"/><circle cx="18" cy="30" r="2.8" fill="#f2f7fb"/><circle cx="30" cy="30" r="2.8" fill="#f2f7fb"/></svg></span><span class="gtext"><b>보드게임</b><small>아발론·마피아·뱅! 등 · 방 만들어 같이 하기</small><span class="resume" hidden></span></span><span class="chev" aria-hidden="true">›</span></a>
     </nav>
     <p class="more">다른 게임 노트는 준비되는 대로 여기에 추가돼요.</p>
     <div class="banner" id="installbar" hidden></div>
   </main>
-  <footer class="foot">노트는 각자 폰에만 저장돼요. 같이 하는 사람의 카드나 추리는 서로 보이지 않아요.</footer>
+  <footer class="foot">추리 노트는 각자 폰에만 저장돼요. 같이 하는 사람의 카드나 추리는 서로 보이지 않아요. 보드게임 방은 같은 방에 들어온 사람끼리 실시간으로 연결돼요.</footer>
 </div>
 
 <script>
 'use strict';
-const GAMES=[{"id":"clue-onepiece","storageKey":"clue-op-note-v2"}];
+const GAMES=[{"id":"clue-onepiece","storageKey":"clue-op-note-v2"},{"id":"board","storageKey":null}];
 const $=s=>document.querySelector(s);
 
 /* 진행 중인 게임이 있으면 카드에 표시 (각 게임이 저장해 둔 값을 읽기만 한다) */
