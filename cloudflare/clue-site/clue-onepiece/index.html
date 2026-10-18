@@ -540,7 +540,7 @@ function crewList(p){
 const MAX_PLAYERS=6,MIN_PLAYERS=2,VILLAIN_MAX=8;
 const TABS=[
   {k:'note',l:'노트',svg:'<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16M4 15h16M10 4v16"/>'},
-  {k:'deduce',l:'추리',svg:'<circle cx="12" cy="12" r="8"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>'},
+  {k:'deduce',l:'정리',svg:'<circle cx="12" cy="12" r="8"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>'},
   {k:'log',l:'기록',svg:'<path d="M6 5h12M6 10h12M6 15h8M6 20h5"/>'},
   {k:'settings',l:'설정',svg:'<circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/>'}
 ];
@@ -619,10 +619,27 @@ function syncSizes(){
 }
 function directOwner(P,c){let n=0,last=-1;for(let o=0;o<P.O;o++)if(P.allowed[c][o]){n++;last=o;}return n===1?last:-1;}
 const crewDone=()=>st.crewPick.every(v=>v>=0);
+// 기록만 하는 노트: 계산·추리 없이, 내가 직접 알게 된 사실만 칸에 적는다.
+// owner[c] = 확실히 아는 주인(내 카드·공개 카드·나에게 보여준 카드·카드 확인·직접 ✓ 표시), -1 = 모름
+function directInfo(st){
+  const N=st.players.length,C=CARDS.length;
+  const owner=new Array(C).fill(-1);
+  st.hand.forEach(c=>{owner[c]=st.me;});
+  (st.revealed||[]).forEach(c=>{if(owner[c]<0)owner[c]=N+1;});
+  st.events.forEach(ev=>{
+    if(ev.type==='ask'&&ev.shower!=null&&ev.shown!=null&&owner[ev.shown]<0)owner[ev.shown]=ev.shower;
+    else if(ev.type==='know'&&owner[ev.card]<0)owner[ev.card]=ev.owner;
+  });
+  for(const key of Object.keys(st.manual)){
+    const [c,o]=key.split('|').map(Number);
+    if(st.manual[key]&&owner[c]<0)owner[c]=o;
+  }
+  return {ok:true,direct:true,owner};
+}
 
 function refresh(){
   CARDS=flatCards();
-  A=st.started?analyze(st):null;
+  A=st.started?directInfo(st):null;
   save();
   render();
 }
@@ -638,11 +655,8 @@ function headLabels(){
 function renderHeader(){
   const el=$('#status');
   if(!st.started||!A){el.textContent='';return;}
-  if(!A.ok){el.textContent='⚠ 기록 확인';el.className='status bad';return;}
   el.className='status';
-  const N=st.players.length;
-  const left=[0,1,2].map(k=>CARDS.filter((cd,c)=>cd.cat===k&&A.poss[c][N]).length);
-  el.textContent=`정답 후보 ${left.join(' · ')}`;
+  el.textContent=`기록 ${st.events.length}개`;
 }
 function renderTabs(){
   const el=$('#tabs'),fab=$('#fab');
@@ -676,21 +690,12 @@ function renderMain(){
 function shownEvents(c){return st.events.map((ev,i)=>({ev,i})).filter(x=>x.ev.type==='ask'&&x.ev.mine===c&&x.ev.asker!==st.me);}
 function seenCount(c){return new Set(shownEvents(c).map(x=>x.ev.asker)).size;}
 function cellHtml(c,o){
-  const N=st.players.length,P=A.prob;
+  const N=st.players.length;
   let cls='',txt='',style='';
-  if(A.ok){
-    if(!A.poss[c][o]){cls='no'+(P.allowed[c][o]?' inf':'');txt='✕';}
-    else if(A.owner[c]===o){cls='yes'+(directOwner(P,c)===o?'':' inf');txt=(o===N)?'★':'✓';}
-    else{
-      const p=A.pr[c][o];
-      txt=p>=0.995?'99':(p<0.005?'<1':String(Math.round(p*100)));
-      style=` style="--p:${p.toFixed(2)}"`;cls='pct';
-    }
-  }else{
-    const d=directOwner(P,c);
-    if(d===o){cls='yes';txt=(o===N)?'★':'✓';}
-    else if(!P.allowed[c][o]){cls='no';txt='✕';}
-  }
+  const own=A.owner[c],man=st.manual[c+'|'+o];
+  if(own===o){cls='yes';txt=(o===N)?'★':'✓';}
+  else if(own>=0){cls='no';txt='✕';} // 주인을 아는 카드는 다른 칸이 모두 ✕
+  else if(man!==undefined){cls=man?'yes':'no';txt=man?((o===N)?'★':'✓'):'✕';}
   if(st.manual[c+'|'+o]!==undefined)cls+=' man';
   if(o===st.me)cls+=' mine';
   if(o===N)cls+=' envc';
@@ -702,15 +707,6 @@ function cellHtml(c,o){
 function viewNote(){
   const N=st.players.length,hasPool=st.pool>0;
   let banner='';
-  const remain=[0,0,0];
-  if(!A.ok)banner=`<div class="banner warn">${errText()}</div>`;
-  else{
-    CARDS.forEach((cd,c)=>{if(A.poss[c][N])remain[cd.cat]++;});
-    if(remain.every(n=>n===1)){
-      const names=[0,1,2].map(k=>CARDS.find((cd,c)=>cd.cat===k&&A.poss[c][N]).name);
-      banner=`<div class="banner ok">정답 확정! ${names.map(esc).join(' · ')} — 고발하세요</div>`;
-    }
-  }
   const rr=rules();
   if(!banner&&(st.hand.length!==rr.per||st.revealed.length!==rr.revealed)){
     banner=`<div class="banner warn">내 카드나 공개 카드 수가 맞지 않아요 (내 카드 ${st.hand.length}/${rr.per}장, 공개 ${st.revealed.length}/${rr.revealed}장). 설정 탭에서 확인해주세요.</div>`;
@@ -721,10 +717,9 @@ function viewNote(){
   const cols=N+2+(hasPool?1:0);
   let rows='',c=0;
   st.names.forEach((arr,k)=>{
-    rows+=`<tr class="cathead"><th colspan="${cols}"><span class="catlab">${CATS[k].label}<span>${CATS[k].q}</span>${A.ok?`<span class="rem">· 후보 ${remain[k]}</span>`:''}</span></th></tr>`;
+    rows+=`<tr class="cathead"><th colspan="${cols}"><span class="catlab">${CATS[k].label}<span>${CATS[k].q}</span></span></th></tr>`;
     arr.forEach(name=>{
-      let rc='';
-      if(A.ok)rc=A.poss[c][N]?(remain[k]===1?' sure':' cand'):' out';
+      const rc='';
       rows+=`<tr><th class="cname${rc}" title="${esc(name)}">${esc(name)}</th>`;
       rows+=cellHtml(c,N);
       for(let o=0;o<N;o++)rows+=cellHtml(c,o);
@@ -734,7 +729,7 @@ function viewNote(){
   });
   const v=st.villain;
   const vil=`<span class="vil ${v>=VILLAIN_MAX-1?'danger':''}" title="악당 카드가 공개된 횟수. 8번째가 나오면 모두 패배"><span>악당</span><button data-act="vil" data-d="-1" aria-label="악당 카드 줄이기">−</button><b>${v}/${VILLAIN_MAX}</b><button data-act="vil" data-d="1" aria-label="악당 카드 늘리기">＋</button></span>`;
-  return `${banner}<div class="legend"><span><b>✓</b> 보유</span><span><b>✕</b> 없음</span><span><b>숫자</b> 가능성 %</span><span><b>★</b> 정답</span><span><i class="bar3"></i>정답 후보</span><span>칸을 누르면 직접 표시(확실할 때만)</span>${st.events.some(e=>e.type==='ask'&&e.mine!=null)?'<span><i class="seen sl">2</i> 내 카드를 본 사람 수</span>':''}${vil}</div>
+  return `${banner}<div class="legend"><span><b>✓</b> 보유</span><span><b>✕</b> 없음</span><span><b>★</b> 정답(내 표시)</span><span>칸을 누르면 직접 표시 · 자동 추리는 없어요</span>${st.events.some(e=>e.type==='ask'&&e.mine!=null)?'<span><i class="seen sl">2</i> 내 카드를 본 사람 수</span>':''}${vil}</div>
   <div class="gridwrap"><table class="grid"><thead><tr><th class="corner">카드</th><th class="envh">정답<small>봉투</small></th>${head}${poolHead}</tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 function errText(){
@@ -759,27 +754,8 @@ function manualLabel(key){const [c,o]=key.split('|').map(Number);return `${esc(C
 /* 추리 탭 */
 function pctText(p){return p>=0.995?'99%':(p<0.005?'<1%':Math.round(p*100)+'%');}
 function viewDeduce(){
-  if(!A.ok)return `<div class="pad"><h2>추리</h2><div class="banner warn" style="border-radius:10px">${errText()}</div></div>`;
   const N=st.players.length;
-  let h='<div class="pad"><h2>추리</h2><p class="lead">기록에서 알 수 있는 카드 배분을 모두 따져서, 어느 배분이든 똑같이 나올 수 있다고 보고 계산한 값이에요. 상대의 질문 습관은 반영하지 않아요. 숫자는 정답일 가능성이에요.'+(A.exact?'':' (경우가 많아서 시뮬레이션으로 추정한 값이에요)')+'</p>';
-  CATS.forEach((cat,k)=>{
-    const all=CARDS.map((cd,c)=>({cd,c})).filter(x=>x.cd.cat===k);
-    const list=all.filter(x=>A.poss[x.c][N]).map(x=>({...x,p:A.pr[x.c][N]})).sort((a,b)=>b.p-a.p);
-    const sure=list.length===1;
-    h+=`<section class="card"><h3>${cat.label} 정답 후보 <span class="muted">${sure?'확정':list.length+'장 남음'}</span></h3>`;
-    list.forEach(x=>{
-      h+=`<div class="bar ${sure?'sure':''}"><span class="nm">${esc(x.cd.name)}</span><div class="track"><i style="width:${Math.max(2,Math.round(x.p*100))}%"></i></div><b>${sure?'확정':pctText(x.p)}</b></div>`;
-    });
-    h+=`<p class="muted" style="margin-top:6px">${all.length-list.length}장 제외됨</p></section>`;
-  });
-  if(A.clues.length){
-    h+='<section class="card"><h3>남은 단서</h3>';
-    A.clues.forEach(cl=>{
-      if(cl.kind==='any')h+=`<div class="clue"><b>${esc(st.players[cl.p].name)}</b>은(는) ${cl.cands.map(c=>`<span class="tag t${CARDS[c].cat}">${esc(CARDS[c].name)}</span>`).join('')} 중 최소 한 장을 갖고 있어요 <span class="muted">(기록 #${cl.ev+1})</span></div>`;
-      else h+=`<div class="clue">${cl.cards.map(c=>`<span class="tag t${CARDS[c].cat}">${esc(CARDS[c].name)}</span>`).join('')} 세 장이 동시에 정답은 아니에요 <span class="muted">(기록 #${cl.ev+1})</span></div>`;
-    });
-    h+='</section>';
-  }
+  let h='<div class="pad"><h2>정리</h2><p class="lead">자동으로 추리하지 않아요. 내가 확실히 알게 된 카드(내 카드·공개 카드·나에게 보여준 카드·카드 확인·직접 ✓ 표시)만 모아 보여줘요. 나머지는 노트와 기록을 보고 직접 추리하세요!</p>';
   h+='<section class="card"><h3>플레이어별 확인된 카드</h3>';
   st.players.forEach((p,i)=>{
     const known=CARDS.map((cd,c)=>({cd,c})).filter(x=>A.owner[x.c]===i);
@@ -839,7 +815,7 @@ function evHtml(ev,i,del){
 function viewLog(){
   let h='<div class="pad"><h2>기록</h2>';
   if(!st.events.length)h+='<p class="lead">아직 기록이 없어요. 아래 “＋ 기록하기” 버튼으로 누가 무엇을 물었는지, 누가 카드를 보여줬는지 적어주세요.</p>';
-  else h+='<p class="lead">잘못 적었다면 삭제하고 다시 입력하세요. 추리 결과는 바로 다시 계산돼요.</p>';
+  else h+='<p class="lead">잘못 적었다면 삭제하고 다시 입력하세요. 노트에는 나에게 보여준 카드와 카드 확인만 자동으로 표시돼요.</p>';
   for(let i=st.events.length-1;i>=0;i--)h+=`<article class="ev">${evHtml(st.events[i],i,true)}</article>`;
   return h+'</div>';
 }
@@ -959,7 +935,7 @@ function viewSetup(structural){
     const why=!crewOk?'쓰는 동료를 골라주세요':(np||(!handOk?`내 카드 ${r.per}장을 골라주세요`:(!revOk?`공개된 카드 ${r.revealed}장을 골라주세요`:'')));
     h+=`<button class="btn primary" id="startbtn" data-act="start" ${why?'disabled':''} style="padding:14px">게임 시작</button><p class="muted" id="startwhy" style="text-align:center" ${why?'':'hidden'}>${why}</p>`;
   }else{
-    h+='<section class="card"><h3>알아두세요</h3><ul class="rules"><li>장비·모험·사건 카드나 소문 카드로 어떤 카드의 주인을 알게 되면 “＋ 기록하기”의 <b>카드 확인</b>으로 적어주세요.</li><li>2인 게임에서 소문 카드를 몰래 봤다면 카드 확인에서 “남는 카드”를 고르세요.</li><li>질문 순서는 질문자 왼쪽부터 시계 방향이에요. 보여준 사람 앞 순서는 자동으로 “없음” 처리돼요.</li><li>노트 칸을 누르면 ✓(갖고 있음)·✕(없음)을 직접 표시할 수 있어요. 확실할 때만 쓰세요. 틀리면 추리가 모순돼요.</li></ul></section>';
+    h+='<section class="card"><h3>알아두세요</h3><ul class="rules"><li>장비·모험·사건 카드나 소문 카드로 어떤 카드의 주인을 알게 되면 “＋ 기록하기”의 <b>카드 확인</b>으로 적어주세요.</li><li>2인 게임에서 소문 카드를 몰래 봤다면 카드 확인에서 “남는 카드”를 고르세요.</li><li>질문 순서는 질문자 왼쪽부터 시계 방향이에요. 보여준 사람 앞 순서의 사람들은 기록에 “패스”로 남아요.</li><li>노트는 자동으로 추리하지 않아요. 기록을 보고 알아낸 것은 노트 칸을 눌러 ✓(갖고 있음)·✕(없음)으로 직접 표시하세요.</li></ul></section>';
     if(hasManifest()&&!isStandalone())h+='<button class="btn" data-act="install-show">앱 설치 안내 다시 보기</button>';
     const mc=Object.keys(st.manual).length;
     if(mc){
@@ -986,9 +962,9 @@ function openSheet(){
 }
 // 노트에서 주인이 확정된 카드는 선택 목록에 가진 사람을 같이 보여준다 (예: 루피 (나), 드레스로자 (공개), 상디 (친구1))
 function ownerTag(c){
-  if(!A||!A.prob)return '';
+  if(!A)return '';
   const N=st.players.length;
-  const o=A.ok?A.owner[c]:directOwner(A.prob,c);
+  const o=A.owner[c];
   if(o===undefined||o<0)return '';
   if(o<N)return o===st.me?'나':st.players[o].name;
   if(o===N)return '정답';
@@ -1009,17 +985,12 @@ function renderCell(el){
     return;
   }
   const nm=ownerName(o);
-  let info='';
-  if(A&&A.ok){
-    if(!A.poss[c][o])info='지금 계산으로는 <b>가능하지 않은</b> 칸이에요.';
-    else if(A.owner[c]===o)info='지금 계산으로는 <b>확정</b>이에요.';
-    else info=`지금 계산으로는 가능성 <b>${pctText(A.pr[c][o])}</b> 이에요.`;
-  }
+  const info='자동으로 계산하지 않는 기록 노트예요.';
   const yes=o===N?'정답 봉투에 있어요 (정답)':(o===N+1?'남는 카드에 있어요':`${esc(nm)}: 갖고 있어요`);
   const no=o===N?'정답이 아니에요':(o===N+1?'남는 카드에 없어요':`${esc(nm)}: 안 갖고 있어요`);
   el.innerHTML=`<div class="sheetwrap"><div class="backdrop" data-act="cell-close"></div><div class="panel"><div class="pbody">
     <div><span class="tag t${CARDS[c].cat}">${esc(CARDS[c].name)}</span> → <b>${esc(nm)}</b></div>
-    <p class="muted" style="margin:0">${info} 직접 표시는 확실할 때만 하세요. 틀리면 추리가 모순돼요.</p>
+    <p class="muted" style="margin:0">${info} 알아낸 사실을 직접 표시해 두세요.</p>
     <div class="chips" style="flex-direction:column;align-items:stretch">
       <button class="chip ${cur===1?'on':''}" data-act="cell-set" data-v="1">✓ ${yes}</button>
       <button class="chip ${cur===0?'on':''}" data-act="cell-set" data-v="0">✕ ${no}</button>
@@ -1064,7 +1035,7 @@ function renderSheet(){
   }
   const ev=draftEvent();
   if(ev)h+=`<div class="preview">${evHtml(ev,null,false)}</div>`;
-  h+=`</div><div class="actions">${s.error?`<div class="err">${esc(s.error)}</div>`:''}<button class="btn" data-act="sheet-close">취소</button>${(ask&&s.asker===st.me&&A&&A.ok)?'<button class="btn" data-act="sheet-recommend">추천 카드 채우기</button>':''}<button class="btn primary" style="margin-left:auto" data-act="sheet-save">저장</button></div>`;
+  h+=`</div><div class="actions">${s.error?`<div class="err">${esc(s.error)}</div>`:''}<button class="btn" data-act="sheet-close">취소</button><button class="btn primary" style="margin-left:auto" data-act="sheet-save">저장</button></div>`;
   h+='</div></div>';
   el.innerHTML=h;
   const np=el.querySelector('.pbody');if(np)np.scrollTop=sy;
@@ -1182,14 +1153,6 @@ document.addEventListener('click',e=>{
       if(ev.type==='know'&&st.hand.includes(ev.card)){s.error='그 카드는 내가 갖고 있어요.';renderSheet();break;}
       // 앞에서 알게 된 정보와 맞지 않는 기록이면 한 번 더 확인한다
       const sig=JSON.stringify(ev);
-      if(A&&A.ok&&s.forcedSig!==sig){
-        const pr=buildProblem(Object.assign({},st,{events:st.events.concat([ev])}),-1);
-        if(solveRestart(pr,null,10,5000,99,50000).status==='unsat'){
-          s.forcedSig=sig;
-          s.error='이 기록을 넣으면 지금까지 알게 된 정보와 맞지 않아요. 입력이 맞는지 확인하고, 그래도 맞다면 저장을 한 번 더 눌러주세요.';
-          renderSheet();break;
-        }
-      }
       ev.id=st.nextId++;
       st.events.push(ev);ui.sheet=null;refresh();break;
     }
